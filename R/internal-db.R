@@ -36,26 +36,6 @@ aa_delete_user_tokens <- function(conn, login) {
   )
 }
 
-#' Удалить неудачные попытки входа логина
-#'
-#' Таблицы попыток может не быть (защита входа не подготовлена), тогда
-#' ошибка не считается проблемой.
-#'
-#' @inheritParams aa_revoke_user_tokens
-#'
-#' @returns Число удалённых записей (0, если таблицы нет).
-#' @noRd
-aa_clear_failed_attempts <- function(conn, login) {
-  tryCatch(
-    DBI::dbExecute(
-      conn,
-      "DELETE FROM login_attempts WHERE login = ? AND success = 0",
-      params = list(login)
-    ),
-    error = function(e) 0L
-  )
-}
-
 #' Число активных (не заблокированных) администраторов
 #'
 #' @param conn Подключение к базе SQLite.

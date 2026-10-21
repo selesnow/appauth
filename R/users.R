@@ -651,7 +651,8 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
 
   if (n > 0) {
     aa_delete_user_tokens(conn, login)
-    aa_clear_failed_attempts(conn, login)
+    # таблицы попыток входа может не быть, это не должно мешать удалению
+    tryCatch(aa_clear_attempts(conn, login, settings), error = function(e) NULL)
   }
 
   invisible(n)

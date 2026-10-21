@@ -25,6 +25,9 @@ aa_texts_ru <- list(
   login_empty              = "Логин не может быть пустым",
   login_whitespace         = "Логин не должен начинаться или заканчиваться пробелом",
   login_too_long           = "Логин должен содержать максимум %d символов",
+  # статусы пользователей в таблице
+  status_blocked           = "Заблокирован администратором",
+  status_locked            = "Вход заблокирован после неудачных попыток (ещё %d мин.)",
   # управление пользователями
   user_not_specified       = "Пользователь не указан",
   user_not_found           = "Пользователь не найден",
@@ -64,6 +67,9 @@ aa_texts_en <- list(
   login_empty              = "Login cannot be empty",
   login_whitespace         = "Login must not start or end with a space",
   login_too_long           = "Login must be at most %d characters long",
+  # user statuses in the table
+  status_blocked           = "Blocked by an administrator",
+  status_locked            = "Sign-in is locked after failed attempts (%d min. left)",
   # user management
   user_not_specified       = "User is not specified",
   user_not_found           = "User not found",

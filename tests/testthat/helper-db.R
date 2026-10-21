@@ -11,6 +11,13 @@ new_db <- function(env = parent.frame()) {
   con
 }
 
+# База со схемой авторизации, закрывается в конце теста.
+users_db <- function(env = parent.frame()) {
+  con <- new_db(env)
+  aa_init_db(con)
+  con
+}
+
 # Названия таблиц без служебной sqlite_sequence.
 table_names <- function(con) {
   setdiff(sort(DBI::dbListTables(con)), "sqlite_sequence")
@@ -24,6 +31,54 @@ columns_of <- function(con, table) {
 # Содержимое таблицы, упорядоченное для сравнения.
 rows_of <- function(con, table, order_by = "rowid") {
   DBI::dbGetQuery(con, sprintf("SELECT * FROM %s ORDER BY %s", table, order_by))
+}
+
+# Создаёт пользователя без проверок и без медленного хеширования
+# (для тестов, где важна только структура данных, а не пароль).
+raw_user <- function(con, login, role = "user", blocked = 0, password = "x") {
+  DBI::dbExecute(
+    con, "INSERT INTO users (login, password, role, blocked) VALUES (?, ?, ?, ?)",
+    params = list(login, password, role, blocked)
+  )
+}
+
+# Токен автовхода пользователя, действует 30 дней.
+raw_token <- function(con, login, hash, revoked = 0) {
+  DBI::dbExecute(
+    con,
+    "INSERT INTO auth_sessions (user_login, token_hash, expires_at, revoked)
+     VALUES (?, ?, datetime('now', '+30 days'), ?)",
+    params = list(login, hash, revoked)
+  )
+}
+
+revoked_of <- function(con, hash) {
+  DBI::dbGetQuery(con, "SELECT revoked FROM auth_sessions WHERE token_hash = ?", params = list(hash))$revoked
+}
+
+count_users <- function(con) DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM users")$n
+
+stored_password <- function(con, login) {
+  DBI::dbGetQuery(con, "SELECT password FROM users WHERE login = ?", params = list(login))$password
+}
+
+# Попытка входа с заданным временем (UTC): минуты или секунды назад.
+add_attempt <- function(con, login, success, minutes_ago = 0, seconds_ago = NULL) {
+  offset <- if (!is.null(seconds_ago)) {
+    sprintf("-%d seconds", as.integer(seconds_ago))
+  } else {
+    sprintf("-%d minutes", as.integer(minutes_ago))
+  }
+
+  DBI::dbExecute(
+    con,
+    "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, datetime('now', ?))",
+    params = list(login, as.integer(success), offset)
+  )
+}
+
+count_attempts <- function(con) {
+  DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts")$n
 }
 
 # Фикстура: Server Manager на проде до релиза с защитой входа.
