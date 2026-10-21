@@ -1,0 +1,37 @@
+stages:
+  - deploy
+  - notify
+  - notify_fail
+
+deploy-package:
+  stage: deploy
+  script:
+    - Rscript -e "install.packages('devtools', repos='https://cran.r-project.org')"
+    - Rscript -e "Sys.setenv(GITLAB_PAT = '${GITLAB_PAT}'); devtools::install_gitlab(repo = 'netpeak_analytics/appauth', host = 'https://git.netpeak.net/', lib = R.home('library'))"
+  only:
+    - master
+  tags:
+    - rpup_pak_updater
+
+notify_telegram:
+  stage: notify
+  script:
+    - Rscript gitlab_ci_tg_notofocations/success_telegram_message.R
+  when: on_success
+  only:
+    - master
+  tags:
+    - rpup_pak_updater
+  dependencies:
+    - deploy-package
+
+notify_fail_telegram:
+  stage: notify_fail
+  script:
+    - Rscript gitlab_ci_tg_notofocations/fail_telegram_message.R
+  when: on_failure
+  only:
+    - master
+  tags:
+    - rpup_pak_updater
+  dependencies: []
