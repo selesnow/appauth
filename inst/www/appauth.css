@@ -161,3 +161,9 @@ table.dataTable tbody tr.aa-row-locked > td.sorting_1 {
 
 .aa-status-blocked { color: var(--aa-danger); font-weight: 600; }
 .aa-status-locked { color: var(--aa-warning); font-weight: 600; }
+
+.aa-users-hint {
+  margin-top: 8px;
+  color: var(--aa-muted);
+  font-size: 0.85em;
+}
