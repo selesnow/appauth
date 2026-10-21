@@ -165,7 +165,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           shiny::textInput(ns("login"), aa_text(settings, "login_label")),
           shiny::passwordInput(ns("password"), aa_text(settings, "password_label")),
           shiny::actionButton(ns("login_btn"), aa_text(settings, "login_button"), class = "aa-login-button"),
-          shiny::textOutput(ns("message"), inline = FALSE)
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
         )
       } else {
         heading <- aa_text(settings, "setup_title")
@@ -175,7 +175,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           shiny::passwordInput(ns("setup_password"), aa_text(settings, "password_label")),
           shiny::passwordInput(ns("setup_confirm"), aa_text(settings, "password_confirm_label")),
           shiny::actionButton(ns("setup_btn"), aa_text(settings, "setup_button"), class = "aa-login-button"),
-          shiny::textOutput(ns("message"), inline = FALSE)
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
         )
       }
 

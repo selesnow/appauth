@@ -141,7 +141,8 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     })
 
     output$table <- DT::renderDT({
-      auth$user()
+      # после выхода таблица перерисовывается без пользователя: это не отказ в доступе
+      shiny::req(auth$user())
       require_admin()
       data <- overview()
 
@@ -390,7 +391,12 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         shiny::textInput(ns("new_login"), aa_text(settings, "login_label")),
         shiny::passwordInput(ns("new_user_password"), aa_text(settings, "password_label")),
         shiny::passwordInput(ns("new_user_confirm"), aa_text(settings, "password_confirm_label")),
-        shiny::selectInput(ns("new_user_role"), aa_text(settings, "role_label"), choices = settings$roles),
+        shiny::selectInput(
+          ns("new_user_role"), aa_text(settings, "role_label"),
+          choices = settings$roles,
+          # по умолчанию роль без прав администратора, повышать нужно осознанно
+          selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
+        ),
         shiny::textOutput(ns("add_message"))
       ))
     })

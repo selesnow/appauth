@@ -357,3 +357,16 @@ test_that("refresh перерисовывает таблицу после вне
     expect_true("olga" %in% overview()$login)
   })
 })
+
+test_that("после выхода (пользователя нет) таблица не записывает отказ в доступе", {
+  con <- users_fixture()
+  auth <- fake_auth()
+
+  log <- run_users(con, auth = auth, {
+    session$flushReact()
+    auth$user(NULL)
+    session$flushReact()
+  })
+
+  expect_length(log$events, 0)
+})

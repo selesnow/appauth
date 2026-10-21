@@ -34,10 +34,14 @@
 /* Форма входа --------------------------------------------------------------- */
 
 .aa-login {
+  /* на весь экран поверх контейнера страницы, иначе по краям остаются его отступы */
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
   padding: 16px;
   background: var(--aa-bg);
 }
