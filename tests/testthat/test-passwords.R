@@ -129,8 +129,14 @@ test_that("правила пароля берутся из настроек и �
 
 test_that("логин проверяется", {
   expect_null(aa_validate_login("alsey"))
-  expect_null(aa_validate_login("  alsey  "))
+  expect_null(aa_validate_login("al sey"))
   expect_null(aa_validate_login(strrep("a", 64)))
+
+  # пробелы по краям запрещены: вход сравнивает логин точно
+  for (bad in c("  alsey  ", " alsey", "alsey ", "alsey\t")) {
+    expect_identical(aa_validate_login(bad), "Логин не должен начинаться или заканчиваться пробелом")
+  }
+  expect_identical(aa_validate_login(" alsey", aa_settings(texts = aa_texts("en"))), "Login must not start or end with a space")
 
   expect_identical(aa_validate_login(strrep("a", 65)), "Логин должен содержать максимум 64 символов")
 

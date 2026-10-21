@@ -23,16 +23,19 @@ aa_texts_ru <- list(
   password_too_short       = "Пароль должен содержать минимум %d символов",
   password_too_long        = "Пароль должен содержать максимум %d символов",
   login_empty              = "Логин не может быть пустым",
+  login_whitespace         = "Логин не должен начинаться или заканчиваться пробелом",
   login_too_long           = "Логин должен содержать максимум %d символов",
   # управление пользователями
   user_not_specified       = "Пользователь не указан",
   user_not_found           = "Пользователь не найден",
   user_exists              = "Пользователь уже существует",
+  user_exists_case         = "Пользователь с таким логином уже существует (логины различаются только регистром)",
   invalid_role             = "Недопустимая роль",
   cannot_block_self        = "Нельзя заблокировать самого себя",
   cannot_block_last_admin  = "Нельзя заблокировать последнего активного администратора",
   cannot_delete_self       = "Нельзя удалить самого себя",
   cannot_delete_last_admin = "Нельзя удалить последнего активного администратора",
+  cannot_change_last_admin_role = "Нельзя снять роль администратора у последнего активного администратора",
   # права доступа
   access_denied            = "Недостаточно прав для этого действия"
 )
@@ -59,16 +62,19 @@ aa_texts_en <- list(
   password_too_short       = "Password must be at least %d characters long",
   password_too_long        = "Password must be at most %d characters long",
   login_empty              = "Login cannot be empty",
+  login_whitespace         = "Login must not start or end with a space",
   login_too_long           = "Login must be at most %d characters long",
   # user management
   user_not_specified       = "User is not specified",
   user_not_found           = "User not found",
   user_exists              = "User already exists",
+  user_exists_case         = "A user with this login already exists (logins differ only in letter case)",
   invalid_role             = "Invalid role",
   cannot_block_self        = "You cannot block yourself",
   cannot_block_last_admin  = "You cannot block the last active administrator",
   cannot_delete_self       = "You cannot delete yourself",
   cannot_delete_last_admin = "You cannot delete the last active administrator",
+  cannot_change_last_admin_role = "You cannot remove the administrator role from the last active administrator",
   # access control
   access_denied            = "You do not have permission to perform this action"
 )

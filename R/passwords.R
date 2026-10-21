@@ -101,6 +101,71 @@ aa_dummy_hash <- function() {
   .aa_dummy$hash
 }
 
+#' Найти проблему в новом пароле
+#'
+#' @param password Проверяемый пароль.
+#' @param settings Настройки, результат [aa_settings()].
+#'
+#' @returns `NULL`, если пароль подходит, иначе список `reason` (ключ текста) и
+#'   `args` (значения для подстановки в текст).
+#' @noRd
+aa_password_problem <- function(password, settings) {
+  if (!aa_is_string(password)) {
+    return(list(reason = "password_empty", args = list()))
+  }
+
+  n <- nchar(password, type = "chars")
+
+  if (n < settings$password_min) {
+    return(list(reason = "password_too_short", args = list(as.integer(settings$password_min))))
+  }
+
+  if (n > settings$password_max) {
+    return(list(reason = "password_too_long", args = list(as.integer(settings$password_max))))
+  }
+
+  NULL
+}
+
+#' Найти проблему в логине нового пользователя
+#'
+#' @param login Проверяемый логин.
+#' @param settings Настройки, результат [aa_settings()].
+#'
+#' @returns `NULL`, если логин подходит, иначе список `reason` и `args`.
+#' @noRd
+aa_login_problem <- function(login, settings) {
+  if (!(is.character(login) && length(login) == 1 && !is.na(login) && nzchar(trimws(login)))) {
+    return(list(reason = "login_empty", args = list()))
+  }
+
+  # вход сравнивает логин точно, поэтому пробелы по краям создавали бы путаницу
+  if (!identical(login, trimws(login))) {
+    return(list(reason = "login_whitespace", args = list()))
+  }
+
+  if (nchar(login, type = "chars") > settings$login_max) {
+    return(list(reason = "login_too_long", args = list(as.integer(settings$login_max))))
+  }
+
+  NULL
+}
+
+#' Текст проблемы на языке настроек
+#'
+#' @param settings Настройки, результат [aa_settings()].
+#' @param problem Результат `aa_password_problem()` или `aa_login_problem()`.
+#'
+#' @returns Строка либо `NULL`, если проблемы нет.
+#' @noRd
+aa_problem_text <- function(settings, problem) {
+  if (is.null(problem)) {
+    return(NULL)
+  }
+
+  do.call(aa_text, c(list(settings, problem$reason), problem$args))
+}
+
 #' Проверить новый пароль по правилам
 #'
 #' Проверяет пароль, который задаётся пользователю (при создании или сбросе).
@@ -119,27 +184,15 @@ aa_dummy_hash <- function() {
 #' aa_validate_password("long-enough-password")
 #' aa_validate_password("abc", aa_settings(texts = aa_texts("en")))
 aa_validate_password <- function(password, settings = aa_settings()) {
-  if (!aa_is_string(password)) {
-    return(aa_text(settings, "password_empty"))
-  }
-
-  n <- nchar(password, type = "chars")
-
-  if (n < settings$password_min) {
-    return(aa_text(settings, "password_too_short", as.integer(settings$password_min)))
-  }
-
-  if (n > settings$password_max) {
-    return(aa_text(settings, "password_too_long", as.integer(settings$password_max)))
-  }
-
-  NULL
+  aa_problem_text(settings, aa_password_problem(password, settings))
 }
 
 #' Проверить логин нового пользователя
 #'
-#' Логин не должен быть пустым (пробелы по краям не считаются) и не длиннее
-#' `login_max` символов из настроек.
+#' Логин не должен быть пустым, не должен начинаться или заканчиваться
+#' пробелом (вход сравнивает логин точно, поэтому такие логины создавали бы
+#' путаницу; поле ввода в интерфейсе пакета обрезает пробелы по краям само) и не
+#' должен быть длиннее `login_max` символов из настроек.
 #'
 #' @param login Проверяемый логин.
 #' @param settings Настройки, результат [aa_settings()].
@@ -150,16 +203,9 @@ aa_validate_password <- function(password, settings = aa_settings()) {
 #' @examples
 #' aa_validate_login("alsey")
 #' aa_validate_login("   ")
+#' aa_validate_login(" alsey")
 aa_validate_login <- function(login, settings = aa_settings()) {
-  if (!(is.character(login) && length(login) == 1 && !is.na(login) && nzchar(trimws(login)))) {
-    return(aa_text(settings, "login_empty"))
-  }
-
-  if (nchar(login, type = "chars") > settings$login_max) {
-    return(aa_text(settings, "login_too_long", as.integer(settings$login_max)))
-  }
-
-  NULL
+  aa_problem_text(settings, aa_login_problem(login, settings))
 }
 
 #' Перенести пароли из открытого вида в хеши
