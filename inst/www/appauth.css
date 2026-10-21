@@ -1,0 +1,163 @@
+/* appauth: стили формы входа и вкладки пользователей. Подключается через aa_app_head().
+ *
+ * Цвета и скругления задаются переменными --aa-*. Чтобы поменять оформление,
+ * переопределите переменные в своём CSS после aa_app_head():
+ *   :root { --aa-primary: #0d9488; }
+ * Светлая тема: добавьте класс aa-theme-light на <body> или любой родительский элемент.
+ */
+
+:root {
+  --aa-primary: #6366f1;
+  --aa-primary-hover: #4f46e5;
+  --aa-danger: #ef4444;
+  --aa-warning: #f59e0b;
+  --aa-bg: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+  --aa-card-bg: rgba(30, 41, 59, 0.7);
+  --aa-card-border: rgba(255, 255, 255, 0.08);
+  --aa-text: #f8fafc;
+  --aa-muted: #94a3b8;
+  --aa-input-bg: rgba(15, 23, 42, 0.6);
+  --aa-input-border: rgba(255, 255, 255, 0.1);
+  --aa-radius: 12px;
+}
+
+.aa-theme-light {
+  --aa-bg: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  --aa-card-bg: rgba(255, 255, 255, 0.95);
+  --aa-card-border: rgba(15, 23, 42, 0.1);
+  --aa-text: #0f172a;
+  --aa-muted: #475569;
+  --aa-input-bg: #ffffff;
+  --aa-input-border: rgba(15, 23, 42, 0.2);
+}
+
+/* Форма входа --------------------------------------------------------------- */
+
+.aa-login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--aa-bg);
+}
+
+.aa-login-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 35px 40px;
+  border: 1px solid var(--aa-card-border);
+  border-radius: calc(var(--aa-radius) + 4px);
+  background-color: var(--aa-card-bg);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 10px 10px -5px rgba(0, 0, 0, 0.25);
+}
+
+.aa-login-logo {
+  display: block;
+  height: 50px;
+  margin: 0 auto 20px;
+}
+
+.aa-login-title {
+  margin: 0 0 25px;
+  text-align: center;
+  color: var(--aa-text);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.aa-login-hint {
+  color: var(--aa-muted);
+  font-size: 0.85em;
+  text-align: center;
+  margin: -10px 0 20px;
+}
+
+.aa-login-card .form-group { margin-bottom: 20px; }
+
+.aa-login-card label {
+  color: var(--aa-muted);
+  font-weight: 500;
+  font-size: 0.85em;
+  margin-bottom: 6px;
+}
+
+.aa-login-card input.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: var(--aa-input-bg) !important;
+  color: var(--aa-text) !important;
+  border: 1px solid var(--aa-input-border) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease;
+}
+
+.aa-login-card input.form-control:focus {
+  border-color: var(--aa-primary) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+  outline: none;
+}
+
+.aa-login-card .aa-login-button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 15px;
+  background-color: var(--aa-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.aa-login-card .aa-login-button:hover { background-color: var(--aa-primary-hover) !important; }
+
+.aa-login-message {
+  display: block;
+  min-height: 1.4em;
+  margin-top: 15px;
+  text-align: center;
+  color: var(--aa-danger);
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+/* Вкладка пользователей ----------------------------------------------------- */
+
+/* Подсветка строк таблицы. Тема приложения может задавать фон ячеек с
+   !important, поэтому и здесь !important: иначе строка не станет красной. */
+table.dataTable tbody tr.aa-row-blocked > td,
+table.dataTable tbody tr.aa-row-blocked > td.sorting_1 {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+table.dataTable tbody tr.aa-row-locked > td,
+table.dataTable tbody tr.aa-row-locked > td.sorting_1 {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+}
+
+.aa-users-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.aa-card-section {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--aa-card-border);
+  border-radius: 8px;
+  background-color: rgba(99, 102, 241, 0.04);
+}
+
+.aa-card-section h5 { margin-top: 0; }
+
+.aa-card-danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  background-color: rgba(239, 68, 68, 0.04);
+}
+
+.aa-status-blocked { color: var(--aa-danger); font-weight: 600; }
+.aa-status-locked { color: var(--aa-warning); font-weight: 600; }

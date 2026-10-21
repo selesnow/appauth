@@ -57,7 +57,7 @@ aa_emit <- function(on_event, event, user = NULL, session_id = NULL, value = NUL
 #' aa_events()$event
 aa_events <- function() {
   catalog <- list(
-    c("login_success",        "Успешный вход по паролю",                                       ""),
+    c("login_success",        "Успешный вход (по паролю или по cookie автовхода)",              "cookie, если вход по автовходу"),
     c("login_failed",         "Неверный логин или пароль",                                     ""),
     c("login_locked",         "Попытка входа в логин, заблокированный после неудачных попыток", "секунд до конца блокировки"),
     c("login_blocked_user",   "Попытка входа пользователя, заблокированного администратором",   ""),

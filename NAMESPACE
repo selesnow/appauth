@@ -2,6 +2,9 @@
 
 S3method(print,aa_settings)
 S3method(print,aa_texts)
+export(aa_app_head)
+export(aa_auth_server)
+export(aa_auth_ui)
 export(aa_authenticate)
 export(aa_can)
 export(aa_check_can_block)
