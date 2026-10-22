@@ -79,7 +79,7 @@ with sync_playwright() as p:
     page.wait_for_selector("#users-table tbody tr", timeout=15000)
     page.wait_for_timeout(800)
     rows = page.locator("#users-table tbody tr")
-    check("таблица пользователей: 5 строк", rows.count() == 5, rows.count())
+    check("таблица пользователей: 7 строк", rows.count() == 7, rows.count())
     lrow = page.locator("#users-table tbody tr", has_text="lockme")
     lcls = lrow.get_attribute("class") or ""
     lbg = lrow.locator("td").first.evaluate("e => getComputedStyle(e).backgroundColor")
@@ -159,6 +159,44 @@ with sync_playwright() as p:
     pg2.wait_for_timeout(1500)
     check("добавленный пользователь появился в таблице", pg2.locator("#users-table tbody tr", has_text="newbie").count() == 1)
     shot(pg2, "11_after_add")
+
+    # --- принудительный выход: админ блокирует пользователя с открытой сессией ----
+    ctx3 = browser.new_context(viewport={"width": 1280, "height": 900})
+    pg3 = ctx3.new_page()
+    pg3.goto(BASE)
+    pg3.wait_for_selector("#auth-login_btn", timeout=30000)
+    login(pg3, "temp2", "secret123")
+    pg3.wait_for_selector("#whoami", timeout=15000)
+    check("temp2 вошёл", pg3.inner_text("#whoami") == "temp2 / user")
+
+    pg2.locator("#users-table tbody tr", has_text="temp2").dblclick()
+    pg2.wait_for_selector("#users-block", timeout=10000)
+    pg2.click("#users-block")
+    pg2.wait_for_selector("#users-unblock", timeout=10000)
+    pg3.wait_for_selector("#auth-login_btn", timeout=20000)
+    check("заблокированного с открытой сессией выбросило на форму входа (сторож сессии)", pg3.locator("#whoami").count() == 0)
+    tok3 = [c for c in ctx3.cookies() if c["name"] == "appauth_token"]
+    check("cookie заблокированного очищена", len(tok3) == 0, tok3)
+
+    # смена роли у вошедшего вступает в силу без его перелогина
+    ctx4 = browser.new_context(viewport={"width": 1280, "height": 900})
+    pg4 = ctx4.new_page()
+    pg4.goto(BASE)
+    pg4.wait_for_selector("#auth-login_btn", timeout=30000)
+    login(pg4, "temp3", "secret123")
+    pg4.wait_for_selector("#whoami", timeout=15000)
+    pg2.keyboard.press("Escape")
+    pg2.wait_for_timeout(1000)
+    pg2.locator("#users-table tbody tr", has_text="temp3").dblclick()
+    pg2.wait_for_selector("#users-change_role", timeout=10000)
+    pg2.evaluate("document.querySelector('#users-role').selectize.setValue('viewer')")
+    pg2.click("#users-change_role")
+    pg2.wait_for_timeout(1500)
+    pg4.wait_for_selector("#auth-login_btn", timeout=20000)
+    check("после смены роли сессия завершена и нужен повторный вход", pg4.locator("#whoami").count() == 0)
+    login(pg4, "temp3", "secret123")
+    pg4.wait_for_selector("#whoami", timeout=15000)
+    check("после повторного входа роль новая", pg4.inner_text("#whoami") == "temp3 / viewer")
 
     check("ошибок JS на странице нет", len(errors) == 0, errors)
     browser.close()

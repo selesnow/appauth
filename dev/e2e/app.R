@@ -5,7 +5,7 @@ suppressMessages({
 
 db_path <- Sys.getenv("AA_DB")
 log_path <- Sys.getenv("AA_LOG")
-settings <- aa_settings(max_failed_logins = 3)
+settings <- aa_settings(max_failed_logins = 3, session_check_seconds = 2)
 provider <- aa_permissions_from_matrix(list(Tasks = c("admin", "user", "viewer"), Access = "admin"))
 
 log_event <- function(event, user, session_id, value) {
@@ -19,17 +19,13 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
-  session$onSessionEnded(function() try(DBI::dbDisconnect(conn), silent = TRUE))
+  conn <- aa_session_connection(db_path)
 
   auth <- aa_auth_server("auth", conn, settings, on_event = log_event, title = "E2E App")
 
-  users_started <- FALSE
-  observe({
-    if (auth$logged_in() && aa_can(auth$user(), "Access", provider) && !users_started) {
-      users_started <<- TRUE
-      aa_users_server("users", conn, auth, settings, on_event = log_event)
-    }
+  aa_session_guard(auth, conn, settings)
+  aa_register_module(auth, "Access", provider, function() {
+    aa_users_server("users", conn, auth, settings, on_event = log_event)
   })
 
   output$app <- renderUI({
