@@ -9,6 +9,7 @@ test_that("настройки по умолчанию соответствуют
   expect_identical(s$password_max, 128)
   expect_identical(s$login_max, 64)
   expect_true(s$autologin)
+  expect_true(s$must_change_default)
   expect_identical(s$session_days, 30)
   expect_identical(s$session_check_seconds, 30)
   expect_identical(s$attempts_retention_hours, 24)
@@ -54,6 +55,14 @@ test_that("autologin должен быть TRUE или FALSE", {
   for (value in list(NA, "yes", 1, c(TRUE, FALSE), NULL)) {
     expect_error(aa_settings(autologin = value), class = "appauth_error_settings")
   }
+})
+
+test_that("must_change_default должен быть TRUE или FALSE", {
+  expect_false(aa_settings(must_change_default = FALSE)$must_change_default)
+  for (value in list(NA, "yes", 1, c(TRUE, FALSE), NULL)) {
+    expect_error(aa_settings(must_change_default = value), class = "appauth_error_settings")
+  }
+  expect_false(aa_settings_from_list(list(must_change_default = FALSE))$must_change_default)
 })
 
 test_that("password_min не может быть больше password_max", {

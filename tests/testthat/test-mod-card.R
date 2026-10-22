@@ -111,3 +111,37 @@ test_that("карточка предлагает роли из настроек 
   expect_match(html, "editor", fixed = TRUE)
   expect_match(html, "<option value=\"user\" selected>", fixed = TRUE)
 })
+
+checkbox_checked <- function(html, id) {
+  grepl(paste0("<input id=\"", id, "\"[^>]*checked"), html)
+}
+
+test_that("галочка временного пароля при сбросе: по умолчанию включена, настройка выключает", {
+  con <- card_users()
+
+  html_on <- open_card(con, "ivan")
+  html_off <- open_card(con, "ivan", settings = aa_settings(must_change_default = FALSE))
+
+  expect_true(checkbox_checked(html_on, "proxy1-reset_must_change"))
+  expect_match(html_off, "proxy1-reset_must_change", fixed = TRUE)
+  expect_false(checkbox_checked(html_off, "proxy1-reset_must_change"))
+})
+
+test_that("галочка временного пароля в окне добавления зависит от настройки", {
+  con <- card_users()
+  card <- capture_card()
+
+  run_users(con, {
+    session$setInputs(add = 1)
+  })
+  html_on <- card$html
+
+  run_users(con, settings = aa_settings(must_change_default = FALSE), {
+    session$setInputs(add = 2)
+  })
+  html_off <- card$html
+
+  expect_true(checkbox_checked(html_on, "proxy1-new_user_must_change"))
+  expect_match(html_off, "proxy1-new_user_must_change", fixed = TRUE)
+  expect_false(checkbox_checked(html_off, "proxy1-new_user_must_change"))
+})

@@ -262,7 +262,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
                 class = "btn btn-warning w-100", style = "margin-top: 25px;"
               ))
             ),
-            shiny::checkboxInput(ns("reset_must_change"), aa_text(settings, "must_change_label"), value = TRUE)
+            shiny::checkboxInput(ns("reset_must_change"), aa_text(settings, "must_change_label"), value = settings$must_change_default)
           ),
           shiny::div(
             class = "aa-card-section",
@@ -412,7 +412,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
           # по умолчанию роль без прав администратора, повышать нужно осознанно
           selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
         ),
-        shiny::checkboxInput(ns("new_user_must_change"), aa_text(settings, "must_change_label"), value = TRUE),
+        shiny::checkboxInput(ns("new_user_must_change"), aa_text(settings, "must_change_label"), value = settings$must_change_default),
         shiny::textOutput(ns("add_message"))
       ))
     })

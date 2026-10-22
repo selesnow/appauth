@@ -37,6 +37,11 @@
 #' @param admin_role Роль администратора, она должна входить в `roles`. Только
 #'   эта роль управляет пользователями, независимо от матрицы прав приложения,
 #'   и именно её получает первый созданный пользователь.
+#' @param must_change_default Значение галочки «потребовать смену пароля при
+#'   следующем входе» в окне добавления пользователя и при сбросе пароля.
+#'   `TRUE` (по умолчанию): пароль, который задал администратор, временный, и
+#'   администратор снимает галочку, если смена не нужна. `FALSE`: галочка
+#'   выключена, администратор включает её сам.
 #' @param texts Тексты интерфейса, результат [aa_texts()].
 #'
 #' @returns Список настроек класса `aa_settings`.
@@ -69,6 +74,7 @@ aa_settings <- function(
     token_retention_days         = 30,
     roles                        = c("admin", "user", "viewer"),
     admin_role                   = "admin",
+    must_change_default          = TRUE,
     texts                        = aa_texts("ru")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
@@ -78,6 +84,7 @@ aa_settings <- function(
   aa_check_positive(password_max, "password_max")
   aa_check_positive(login_max, "login_max")
   aa_check_flag(autologin, "autologin")
+  aa_check_flag(must_change_default, "must_change_default")
   aa_check_positive(session_days, "session_days")
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
@@ -127,6 +134,7 @@ aa_settings <- function(
       token_retention_days         = token_retention_days,
       roles                        = roles,
       admin_role                   = admin_role,
+      must_change_default          = must_change_default,
       texts                        = texts
     ),
     class = "aa_settings"
@@ -173,6 +181,8 @@ print.aa_settings <- function(x, ...) {
   cat("  Длина нового пароля: от ", x$password_min, " до ", x$password_max, " символов\n", sep = "")
   cat("  Автовход: ", if (x$autologin) "включён" else "выключен",
       ", срок токена ", x$session_days, " дн.\n", sep = "")
+  cat("  Пароль от администратора: ", if (x$must_change_default) "временный (смена при входе)" else "постоянный",
+      " по умолчанию\n", sep = "")
   cat("  Роли: ", paste(x$roles, collapse = ", "),
       " (администратор: ", x$admin_role, ")\n", sep = "")
   cat("  Язык интерфейса: ", attr(x$texts, "lang"), "\n", sep = "")
