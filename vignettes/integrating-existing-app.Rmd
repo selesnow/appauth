@@ -66,28 +66,34 @@ res$backup     # путь к резервной копии (в ней парол
 
 ## Шаг 2. Заменить код авторизации
 
-Подключите пакет по [быстрому старту](getting-started.html) и удалите свой код. Соответствие функций (на примере Server Manager, остальные приложения устроены так же):
+Подключите пакет по [быстрому старту](getting-started.html) и удалите свой код. Соответствие функций сверено с кодом Server Manager (файлы `R/passwords.R`, `R/login_protection.R`, `R/user_blocking.R`, `R/access.R`, `modules/mod_auth.R`, `modules/mod_tab_access.R`); в других приложениях названия могут отличаться, но задачи те же:
 
-| Было в приложении | Стало в пакете |
+| Было в Server Manager | Стало в пакете |
 | --- | --- |
-| Хеширование и проверка пароля | `aa_hash_password()`, `aa_verify_password()` |
-| `check_user()`, запрос логина и пароля к `users` | `aa_authenticate()` (параметризованный запрос, фиктивный хеш для несуществующего логина) |
-| `mod_auth_ui/server` | `aa_auth_ui()` и `aa_auth_server()` |
-| Окно создания первого администратора | входит в `aa_auth_server()` |
-| JS для cookie и `input$auth_cookie` | `aa_app_head()` и автовход внутри `aa_auth_server()` |
-| Запись попытки входа, проверка блокировки логина, общий лимит | `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_login_gate()` (модуль входа вызывает их сам) |
-| Поиск пользователя по токену, отзыв токена | `aa_find_session_user()`, `aa_issue_token()`, `aa_revoke_token()` |
-| Периодическая проверка «пользователя заблокировали или удалили» | `aa_session_guard()` |
-| Выход, `perform_logout()` | `auth$logout(reload = TRUE)` |
+| `hash_password()`, `verify_password()`, `is_password_hash()` | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()` |
+| `authenticate_user()` (в `app.R` обёрнута в `check_user()`) | `aa_authenticate()` |
+| `validate_new_password()`, `validate_new_login()` | `aa_validate_password()`, `aa_validate_login()` (для формы целиком `aa_validate_new_user()`) |
+| `create_user()`, `create_first_admin()`, `set_user_password()` | `aa_create_user()`, `aa_create_first_admin()`, `aa_set_password()` |
+| `migrate_passwords_to_hash()` | `aa_migrate_plaintext_passwords()` |
+| `mod_auth_ui()`, `mod_auth_server()` (включая окно первого администратора) | `aa_auth_ui()`, `aa_auth_server()` |
+| JS `setAuthCookie`, `clearAuthCookie`, `readAuthCookie` и `input$auth_cookie` в `app.R` | `aa_app_head()` и автовход внутри `aa_auth_server()` |
+| `record_login_attempt()`, `login_lock_remaining()`, `login_global_throttled()`, `clear_login_attempts()` | `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`; модуль входа вызывает их сам через `aa_login_gate()` |
+| `login_security_settings()` (настройки из `config.yaml`) | `aa_settings_from_list(conf$security)` |
+| `normalize_login()` | не нужна: логин считается точно (см. «Что меняется») |
+| `ensure_login_attempts_table()`, `ensure_users_blocked_column()`, `prepare_login_protection()`, `prepare_user_blocking()` | `aa_init_db()` и `aa_prepare_db()` (или `aa_session_connection(prepare = TRUE)`) |
+| `cleanup_security_tables()` | `aa_cleanup()` (вызывается при подготовке базы и сторожем сессии) |
+| `find_session_user()`, поиск и отзыв токена в `app.R` и `mod_auth.R` | `aa_find_session_user()`, `aa_issue_token()`, `aa_revoke_token()` |
+| `user_session_valid(conn, login)` и проверка раз в 30 секунд в `app.R` | `aa_session_guard()` (проверяет и роль, и токен; вручную `aa_user_session_valid(conn, login, role, token)`) |
+| `perform_logout()` | `auth$logout(reload = TRUE)` |
 | `user_can()` | `aa_can()` с `aa_permissions_from_matrix()` |
 | `require_permission()` | `aa_require()` |
-| Блокировка, удаление, смена роли и пароля, проверки допустимости | `aa_set_blocked()`, `aa_delete_user()`, `aa_set_role()`, `aa_set_password()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
-| Таблица пользователей со статусами | `aa_users_overview()` |
-| Пользовательская часть вкладки «Доступ» (таблица, карточка, добавление) | `aa_users_ui()` и `aa_users_server()` |
-| Проверка нового логина и пароля | `aa_validate_new_user()`, `aa_validate_password()`, `aa_validate_login()` |
+| `is_user_blocked()`, `set_user_blocked()`, `delete_user_account()` | `aa_get_user()` (поле `blocked`), `aa_set_blocked()`, `aa_delete_user()` |
+| `check_can_block_user()`, `check_can_delete_user()` | `aa_check_can_block()`, `aa_check_can_delete()`, а также `aa_check_can_change_role()` |
+| `users_overview()` | `aa_users_overview()` |
+| Пользовательская часть `mod_access_ui()`/`mod_access_server()` (таблица, карточка, добавление, роль, пароль, блокировка, удаление) | `aa_users_ui()` и `aa_users_server()` |
 | `dbConnect` на каждую сессию без закрытия | `aa_session_connection()` |
 
-Остаётся в приложении: редактор матрицы прав, переключатели логов, прикладные проверки (имена задач, пути, `system2`).
+Остаются в приложении (в пакет они не идут): `is_safe_task_name()`, `task_exists_in_scheduler()` и другие прикладные проверки, редактор матрицы прав и переключатели логов в `mod_access_server()`, запись в лог (`write_action_log`).
 
 ### Не потеряйте открытые сессии
 
@@ -140,7 +146,7 @@ log_event <- function(event, user, session_id, value) {
 
 Поведение пакета строже, чем у типичной самописной авторизации. Учтите это при переходе:
 
-* **Логин сравнивается точно**, с учётом регистра и пробелов. `Alsey` и `alsey` это разные пользователи. Существующие пары вроде `kiruka`/`Kiruka` сохраняются и работают как разные люди, а вот новый пользователь, чей логин совпадает с существующим без учёта регистра, создан быть не может.
+* **Логин сравнивается точно**, с учётом регистра и пробелов; так же считаются неудачные попытки (`normalize_login()` из Server Manager приводил логин к нижнему регистру и обрезал пробелы, теперь `ALSEY` и `alsey` имеют отдельные счётчики; старые записи попыток в нижнем регистре просто устареют через сутки). `Alsey` и `alsey` это разные пользователи. Существующие пары вроде `kiruka`/`Kiruka` сохраняются и работают как разные люди, а вот новый пользователь, чей логин совпадает с существующим без учёта регистра, создан быть не может.
 * **Открытые пароли не принимаются.** Их нужно перенести (шаг 1).
 * **Нельзя остаться без активного администратора**: ни блокировкой, ни удалением, ни сменой роли.
 * **Смена роли действует сразу**: открытая сессия пользователя с изменённой ролью завершается при ближайшей проверке, и он входит заново с новой ролью.
