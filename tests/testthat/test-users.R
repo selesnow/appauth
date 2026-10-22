@@ -197,7 +197,7 @@ test_that("aa_authenticate: верный пароль даёт login, role и bl
 
   res <- aa_authenticate(con, "worker", "worker-password")
 
-  expect_identical(names(res), c("login", "role", "blocked"))
+  expect_identical(names(res), c("login", "role", "blocked", "must_change"))
   expect_identical(res$login, "worker")
   expect_identical(res$role, "user")
   expect_identical(res$blocked, 0L)

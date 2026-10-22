@@ -76,6 +76,20 @@ aa_texts_ru <- list(
   done_unblocked           = "Пользователь %s разблокирован",
   done_unlocked            = "Блокировка входа снята: %s",
   done_deleted             = "Пользователь %s удалён",
+  # смена пароля
+  password_old_label       = "Текущий пароль",
+  password_new_label       = "Новый пароль",
+  password_change_title    = "Смена пароля",
+  password_change_button   = "Сменить пароль",
+  password_wrong           = "Неверный текущий пароль",
+  password_same            = "Новый пароль должен отличаться от текущего",
+  done_password_changed    = "Пароль изменён",
+  must_change_title        = "Смените пароль",
+  must_change_hint         = "Пароль задан администратором. Задайте свой пароль, чтобы войти.",
+  must_change_label        = "Потребовать смену пароля при следующем входе",
+  # сессии
+  button_revoke            = "Завершить все сессии",
+  done_sessions_revoked    = "Сессии пользователя %s завершены",
   # права доступа
   access_denied            = "Недостаточно прав для этого действия"
 )
@@ -155,6 +169,20 @@ aa_texts_en <- list(
   done_unblocked           = "User %s unblocked",
   done_unlocked            = "Sign-in lock removed: %s",
   done_deleted             = "User %s deleted",
+  # password change
+  password_old_label       = "Current password",
+  password_new_label       = "New password",
+  password_change_title    = "Change password",
+  password_change_button   = "Change password",
+  password_wrong           = "The current password is incorrect",
+  password_same            = "The new password must differ from the current one",
+  done_password_changed    = "Password changed",
+  must_change_title        = "Change your password",
+  must_change_hint         = "The password was set by an administrator. Set your own password to sign in.",
+  must_change_label        = "Require a password change at next sign-in",
+  # sessions
+  button_revoke            = "End all sessions",
+  done_sessions_revoked    = "Sessions of user %s ended",
   # access control
   access_denied            = "You do not have permission to perform this action"
 )

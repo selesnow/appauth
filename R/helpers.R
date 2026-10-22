@@ -62,7 +62,13 @@ aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDo
 #'
 #' Если базу прочитать не удалось, сессия не завершается.
 #'
+#' Токен сессии (`auth$token()`) тоже проверяется: сброс пароля пользователя или
+#' «завершить все сессии» завершают и открытые сессии. Раз в `cleanup_minutes`
+#' сторож заодно удаляет устаревшие попытки входа и токены ([aa_cleanup()]).
+#'
 #' @param auth Результат [aa_auth_server()].
+#' @param cleanup_minutes Как часто чистить устаревшие записи, в минутах.
+
 #' @param conn Подключение к базе SQLite.
 #' @param settings Настройки, результат [aa_settings()].
 #' @param reload Перезагружать страницу после выхода, чтобы модули прежнего
@@ -76,21 +82,30 @@ aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDo
 #' auth <- aa_auth_server("auth", conn)
 #' aa_session_guard(auth, conn)
 #' }
-aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE) {
+aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE,
+                             cleanup_minutes = 60) {
   aa_check_sqlite(conn)
 
   interval <- max(1, settings$session_check_seconds) * 1000
+  last_cleanup <- Sys.time()
 
   invisible(shiny::observe({
     shiny::req(auth$logged_in())
     shiny::invalidateLater(interval)
 
     usr <- shiny::isolate(auth$user())
-    check <- aa_user_session_valid(conn, usr$login, usr$role)
+    token <- if (is.function(auth$token)) auth$token() else NULL
+    check <- aa_user_session_valid(conn, usr$login, usr$role, token)
 
     if (!check$valid) {
       message("appauth: сессия закрыта: ", usr$login, " (", check$reason, ")")
       auth$logout(reason = check$reason, reload = reload)
+    }
+
+    # служба работает месяцами: устаревшие попытки входа и токены чистим по ходу
+    if (as.numeric(difftime(Sys.time(), last_cleanup, units = "mins")) >= cleanup_minutes) {
+      last_cleanup <<- Sys.time()
+      try(aa_cleanup(conn, settings), silent = TRUE)
     }
   }))
 }

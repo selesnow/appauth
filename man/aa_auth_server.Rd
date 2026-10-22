@@ -34,9 +34,10 @@ aa_auth_server(
 \value{
 Список: \code{user} (реактивное значение, список \code{login} и \code{role} либо
 \code{NULL}), \code{logged_in} (реактивное логическое), \code{role} (реактивная роль либо
-\code{NULL}) и функция \code{logout(reason = NULL, reload = FALSE)}. Без \code{reason}
+\code{NULL}), функция \code{token()} (токен автовхода этой сессии или \code{NULL}, нужен
+\code{\link[=aa_session_guard]{aa_session_guard()}}) и функция \code{logout(reason = NULL, reload = FALSE)}. Без \code{reason}
 это обычный выход (событие \code{logout}), с \code{reason} (\code{"blocked"}, \code{"deleted"},
-\code{"role_changed"}) принудительный (\code{session_forced_logout}). При
+\code{"role_changed"}, \code{"token_revoked"}) принудительный (\code{session_forced_logout}). При
 \code{reload = TRUE} страница перезагружается, чтобы модули прежнего пользователя
 исчезли.
 }
@@ -47,6 +48,10 @@ aa_auth_server(
 (каталог в \code{\link[=aa_events]{aa_events()}}), сам в логи ничего не пишет.
 }
 \details{
+Если пароль пользователю задал администратор (\code{must_change}), после ввода
+верного пароля показывается форма смены пароля, и в приложение пользователь
+попадает только после смены.
+
 Роль и логин берутся из базы, а не из введённой строки. Подключение \code{conn}
 принадлежит приложению: закрывайте его при завершении сессии.
 }

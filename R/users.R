@@ -41,8 +41,8 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
 #' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
 #' @param login Логин.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role` и `blocked`
-#'   либо `NULL`, если такого пользователя нет.
+#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked` и
+#'   `must_change` либо `NULL`, если такого пользователя нет или пароль неверен.
 #' @export
 #'
 #' @examples
@@ -189,6 +189,8 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #' @param password Пароль в открытом виде (в базу попадёт только хеш).
 #' @param role Роль из списка `roles` настроек.
 #' @param settings Настройки, результат [aa_settings()].
+#' @param must_change Потребовать смену пароля при первом входе (разумно, если
+#'   пароль задал администратор).
 #'
 #' @returns `TRUE` (невидимо).
 #' @export
@@ -207,7 +209,7 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #'   )
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_create_user <- function(conn, login, password, role, settings = aa_settings()) {
+aa_create_user <- function(conn, login, password, role, settings = aa_settings(), must_change = FALSE) {
   aa_check_sqlite(conn)
 
   problem <- aa_new_user_problem(conn, login, password, role, settings)
@@ -216,8 +218,8 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
   tryCatch(
     DBI::dbExecute(
       conn,
-      "INSERT INTO users (login, password, role) VALUES (?, ?, ?)",
-      params = list(login, aa_hash_password(password), role)
+      "INSERT INTO users (login, password, role, must_change) VALUES (?, ?, ?, ?)",
+      params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)))
     ),
     error = function(e) {
       # при одновременном создании сработает ограничение уникальности логина
@@ -308,12 +310,12 @@ aa_authenticate <- function(conn, login, password) {
     return(NULL)
   }
 
-  # колонка blocked появляется миграциями; если её по какой-то причине нет,
-  # вход продолжает работать по паролю
+  # колонки blocked и must_change появляются миграциями; если их по какой-то
+  # причине нет, вход продолжает работать по паролю
   user <- tryCatch(
     DBI::dbGetQuery(
       conn,
-      "SELECT login, role, password, blocked FROM users WHERE login = ?",
+      "SELECT login, role, password, blocked, must_change FROM users WHERE login = ?",
       params = list(login)
     ),
     error = function(e) {
@@ -323,6 +325,7 @@ aa_authenticate <- function(conn, login, password) {
         params = list(login)
       )
       u$blocked <- 0L
+      u$must_change <- 0L
       u
     }
   )
@@ -337,17 +340,21 @@ aa_authenticate <- function(conn, login, password) {
     return(NULL)
   }
 
-  user[, c("login", "role", "blocked"), drop = FALSE]
+  user[, c("login", "role", "blocked", "must_change"), drop = FALSE]
 }
 
 #' Задать пользователю новый пароль
 #'
 #' Записывает хеш нового пароля и **отзывает все токены автовхода**
 #' пользователя, чтобы после сброса пароля старые сессии браузера перестали
-#' работать. Пароль проверяется по правилам из настроек, при нарушении ошибка
-#' класса `appauth_error_user`.
+#' работать (открытые сессии завершит [aa_session_guard()]). Пароль проверяется
+#' по правилам из настроек, при нарушении ошибка класса `appauth_error_user`.
 #'
 #' @inheritParams aa_create_user
+#' @param must_change Потребовать от пользователя сменить этот пароль при
+#'   следующем входе (разумно, если пароль задал администратор).
+#' @param keep_token Токен автовхода, который не нужно отзывать (текущая сессия
+#'   того, кто меняет свой пароль), либо `NULL`.
 #'
 #' @returns Число изменённых пользователей (невидимо): 1 или 0, если такого
 #'   логина нет.
@@ -362,7 +369,8 @@ aa_authenticate <- function(conn, login, password) {
 #'   aa_authenticate(conn, "boss", "new-boss-password")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_set_password <- function(conn, login, password, settings = aa_settings()) {
+aa_set_password <- function(conn, login, password, settings = aa_settings(),
+                            must_change = FALSE, keep_token = NULL) {
   aa_check_sqlite(conn)
 
   problem <- aa_password_problem(password, settings)
@@ -374,12 +382,15 @@ aa_set_password <- function(conn, login, password, settings = aa_settings()) {
 
   n <- DBI::dbExecute(
     conn,
-    "UPDATE users SET password = ? WHERE login = ?",
-    params = list(aa_hash_password(password), login)
+    "UPDATE users SET password = ?, must_change = ? WHERE login = ?",
+    params = list(aa_hash_password(password), as.integer(isTRUE(must_change)), login)
   )
 
   if (n > 0) {
-    aa_revoke_user_tokens(conn, login)
+    aa_revoke_user_tokens(
+      conn, login,
+      keep_hash = if (aa_is_string(keep_token)) aa_token_hash(keep_token) else NULL
+    )
   }
 
   invisible(n)
@@ -656,4 +667,85 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
   }
 
   invisible(n)
+}
+
+#' Сменить собственный пароль
+#'
+#' Для самого пользователя: нужно подтвердить текущий пароль. Новый пароль
+#' проверяется по правилам из настроек и должен отличаться от текущего. Токены
+#' автовхода остальных сессий отзываются, токен текущей сессии (`keep_token`)
+#' остаётся. Требование сменить пароль (`must_change`) снимается.
+#'
+#' Ошибки (неверный текущий пароль, слабый или тот же пароль) имеют класс
+#' `appauth_error_user` и текст на языке настроек.
+#'
+#' @inheritParams aa_get_user
+#' @param old_password Текущий пароль.
+#' @param new_password Новый пароль.
+#' @param settings Настройки, результат [aa_settings()].
+#' @param keep_token Токен автовхода текущей сессии, который не нужно отзывать.
+#'
+#' @returns `TRUE` (невидимо).
+#' @export
+#'
+#' @examples
+#' if (requireNamespace("RSQLite", quietly = TRUE)) {
+#'   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#'   aa_init_db(conn)
+#'   aa_create_first_admin(conn, "boss", "boss-password")
+#'   aa_change_own_password(conn, "boss", "boss-password", "new-boss-password")
+#'   DBI::dbDisconnect(conn)
+#' }
+aa_change_own_password <- function(conn, login, old_password, new_password,
+                                   settings = aa_settings(), keep_token = NULL) {
+  aa_check_sqlite(conn)
+
+  current <- aa_authenticate(conn, login, old_password)
+
+  if (is.null(current) || isTRUE(current$blocked[1] == 1)) {
+    aa_abort_user(settings, "password_wrong")
+  }
+
+  problem <- aa_password_problem(new_password, settings)
+  if (!is.null(problem)) aa_abort_problem(settings, problem)
+
+  if (identical(old_password, new_password)) {
+    aa_abort_user(settings, "password_same")
+  }
+
+  aa_set_password(conn, current$login[1], new_password, settings,
+                  must_change = FALSE, keep_token = keep_token)
+
+  invisible(TRUE)
+}
+
+#' Завершить все сессии пользователя
+#'
+#' Отзывает все токены автовхода пользователя. Открытые сессии с такими
+#' токенами завершит [aa_session_guard()] при ближайшей проверке, а cookie в
+#' браузерах перестанут работать.
+#'
+#' @inheritParams aa_get_user
+#'
+#' @returns Число отозванных токенов (невидимо).
+#' @export
+#'
+#' @examples
+#' if (requireNamespace("RSQLite", quietly = TRUE)) {
+#'   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#'   aa_init_db(conn)
+#'   aa_create_first_admin(conn, "boss", "boss-password")
+#'   token <- aa_issue_token(conn, "boss")
+#'   aa_revoke_sessions(conn, "boss")
+#'   is.null(aa_find_session_user(conn, token))
+#'   DBI::dbDisconnect(conn)
+#' }
+aa_revoke_sessions <- function(conn, login) {
+  aa_check_sqlite(conn)
+
+  if (!aa_is_string(login)) {
+    return(invisible(0L))
+  }
+
+  invisible(aa_revoke_user_tokens(conn, login))
 }

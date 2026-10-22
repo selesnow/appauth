@@ -12,8 +12,8 @@ aa_get_user(conn, login)
 \item{login}{Логин.}
 }
 \value{
-Таблица из одной строки с колонками \code{login}, \code{role} и \code{blocked}
-либо \code{NULL}, если такого пользователя нет.
+Таблица из одной строки с колонками \code{login}, \code{role}, \code{blocked} и
+\code{must_change} либо \code{NULL}, если такого пользователя нет или пароль неверен.
 }
 \description{
 Логин сравнивается точно, с учётом регистра. Пароль в результат не

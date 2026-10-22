@@ -1,25 +1,3 @@
-fake_auth_obj <- function(login = "ivan", role = "user") {
-  state <- shiny::reactiveVal(if (is.null(login)) NULL else list(login = login, role = role))
-  calls <- new.env()
-  calls$logout <- list()
-  list(
-    user = state,
-    logged_in = shiny::reactive(!is.null(state())),
-    logout = function(reason = NULL, reload = FALSE) {
-      calls$logout[[length(calls$logout) + 1]] <- list(reason = reason, reload = reload)
-      state(NULL)
-    },
-    calls = calls
-  )
-}
-
-with_guard <- function(con, auth, expr, settings = aa_settings(session_check_seconds = 30), ...) {
-  rlang::inject(shiny::testServer(
-    function(input, output, session) aa_session_guard(auth, con, settings, ...),
-    expr = !!rlang::enquo(expr)
-  ))
-}
-
 test_that("сторож не трогает действующую сессию", {
   con <- users_db()
   raw_user(con, "ivan", "user")

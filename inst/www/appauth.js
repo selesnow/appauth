@@ -8,6 +8,22 @@
     return window.location.protocol === 'https:' ? '; Secure' : '';
   }
 
+  // Enter в поле формы входа нажимает кнопку формы
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    var field = e.target;
+    if (!field || field.tagName !== 'INPUT') return;
+    var card = field.closest('.aa-login-card');
+    if (!card) return;
+    var button = card.querySelector('.aa-login-button');
+    if (button) {
+      // значение поля доходит до Shiny по событию change, поэтому сначала снимаем фокус
+      field.blur();
+      button.click();
+      e.preventDefault();
+    }
+  });
+
   function register() {
     // {name, token, days}
     Shiny.addCustomMessageHandler('appauth_set_cookie', function (msg) {

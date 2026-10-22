@@ -4,7 +4,14 @@
 \alias{aa_create_user}
 \title{Создать пользователя}
 \usage{
-aa_create_user(conn, login, password, role, settings = aa_settings())
+aa_create_user(
+  conn,
+  login,
+  password,
+  role,
+  settings = aa_settings(),
+  must_change = FALSE
+)
 }
 \arguments{
 \item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
@@ -16,6 +23,9 @@ aa_create_user(conn, login, password, role, settings = aa_settings())
 \item{role}{Роль из списка \code{roles} настроек.}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+
+\item{must_change}{Потребовать смену пароля при первом входе (разумно, если
+пароль задал администратор).}
 }
 \value{
 \code{TRUE} (невидимо).

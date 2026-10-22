@@ -8,15 +8,25 @@
 #'
 #' @param conn Подключение к базе SQLite.
 #' @param login Логин пользователя.
+#' @param keep_hash Хеш токена, который оставить действующим (токен текущей
+#'   сессии при смене своего пароля), либо `NULL`.
 #'
 #' @returns Число отозванных токенов.
 #' @noRd
-aa_revoke_user_tokens <- function(conn, login) {
-  DBI::dbExecute(
-    conn,
-    "UPDATE auth_sessions SET revoked = 1 WHERE user_login = ?",
-    params = list(login)
-  )
+aa_revoke_user_tokens <- function(conn, login, keep_hash = NULL) {
+  if (is.null(keep_hash)) {
+    DBI::dbExecute(
+      conn,
+      "UPDATE auth_sessions SET revoked = 1 WHERE user_login = ?",
+      params = list(login)
+    )
+  } else {
+    DBI::dbExecute(
+      conn,
+      "UPDATE auth_sessions SET revoked = 1 WHERE user_login = ? AND token_hash <> ?",
+      params = list(login, keep_hash)
+    )
+  }
 }
 
 #' Удалить токены автовхода пользователя

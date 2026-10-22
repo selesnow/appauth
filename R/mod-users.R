@@ -261,7 +261,12 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
                 ns("reset_password"), aa_text(settings, "reset_button"),
                 class = "btn btn-warning w-100", style = "margin-top: 25px;"
               ))
-            )
+            ),
+            shiny::checkboxInput(ns("reset_must_change"), aa_text(settings, "must_change_label"), value = TRUE)
+          ),
+          shiny::div(
+            class = "aa-card-section",
+            shiny::actionButton(ns("revoke"), aa_text(settings, "button_revoke"), class = "btn btn-warning btn-sm")
           ),
           if (is.function(extra_card_ui)) extra_card_ui(login, ns),
           if (is.null(delete_reason)) {
@@ -351,12 +356,22 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         return()
       }
 
-      if (run_action(function() aa_set_password(conn, login, input$new_password, settings))) {
+      must_change <- isTRUE(input$reset_must_change)
+
+      if (run_action(function() aa_set_password(conn, login, input$new_password, settings, must_change = must_change))) {
         emit("password_reset", login)
         notify(aa_text(settings, "done_password_reset", login))
         shiny::removeModal()
         card_login(NULL)
       }
+    })
+
+    shiny::observeEvent(input$revoke, {
+      require_admin()
+      login <- target()
+      aa_revoke_sessions(conn, login)
+      emit("sessions_revoked", login)
+      notify(aa_text(settings, "done_sessions_revoked", login))
     })
 
     shiny::observeEvent(input$delete, {
@@ -397,6 +412,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
           # по умолчанию роль без прав администратора, повышать нужно осознанно
           selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
         ),
+        shiny::checkboxInput(ns("new_user_must_change"), aa_text(settings, "must_change_label"), value = TRUE),
         shiny::textOutput(ns("add_message"))
       ))
     })
@@ -417,7 +433,8 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
 
       created <- tryCatch(
         {
-          aa_create_user(conn, login, input$new_user_password, role, settings)
+          aa_create_user(conn, login, input$new_user_password, role, settings,
+                         must_change = isTRUE(input$new_user_must_change))
           TRUE
         },
         appauth_error_user = function(e) {

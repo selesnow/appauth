@@ -69,3 +69,25 @@ run_users <- function(con, expr, auth = fake_auth(), settings = aa_settings(), l
 
 role_of <- function(con, login) DBI::dbGetQuery(con, "SELECT role FROM users WHERE login = ?", params = list(login))$role
 blocked_of <- function(con, login) DBI::dbGetQuery(con, "SELECT blocked FROM users WHERE login = ?", params = list(login))$blocked
+
+fake_auth_obj <- function(login = "ivan", role = "user") {
+  state <- shiny::reactiveVal(if (is.null(login)) NULL else list(login = login, role = role))
+  calls <- new.env()
+  calls$logout <- list()
+  list(
+    user = state,
+    logged_in = shiny::reactive(!is.null(state())),
+    logout = function(reason = NULL, reload = FALSE) {
+      calls$logout[[length(calls$logout) + 1]] <- list(reason = reason, reload = reload)
+      state(NULL)
+    },
+    calls = calls
+  )
+}
+
+with_guard <- function(con, auth, expr, settings = aa_settings(session_check_seconds = 30), ...) {
+  rlang::inject(shiny::testServer(
+    function(input, output, session) aa_session_guard(auth, con, settings, ...),
+    expr = !!rlang::enquo(expr)
+  ))
+}

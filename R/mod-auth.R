@@ -23,6 +23,10 @@ aa_auth_ui <- function(id) {
 #' настройках) и выход. Обо всех событиях модуль сообщает хуку `on_event`
 #' (каталог в [aa_events()]), сам в логи ничего не пишет.
 #'
+#' Если пароль пользователю задал администратор (`must_change`), после ввода
+#' верного пароля показывается форма смены пароля, и в приложение пользователь
+#' попадает только после смены.
+#'
 #' Роль и логин берутся из базы, а не из введённой строки. Подключение `conn`
 #' принадлежит приложению: закрывайте его при завершении сессии.
 #'
@@ -38,9 +42,10 @@ aa_auth_ui <- function(id) {
 #'
 #' @returns Список: `user` (реактивное значение, список `login` и `role` либо
 #'   `NULL`), `logged_in` (реактивное логическое), `role` (реактивная роль либо
-#'   `NULL`) и функция `logout(reason = NULL, reload = FALSE)`. Без `reason`
+#'   `NULL`), функция `token()` (токен автовхода этой сессии или `NULL`, нужен
+#'   [aa_session_guard()]) и функция `logout(reason = NULL, reload = FALSE)`. Без `reason`
 #'   это обычный выход (событие `logout`), с `reason` (`"blocked"`, `"deleted"`,
-#'   `"role_changed"`) принудительный (`session_forced_logout`). При
+#'   `"role_changed"`, `"token_revoked"`) принудительный (`session_forced_logout`). При
 #'   `reload = TRUE` страница перезагружается, чтобы модули прежнего пользователя
 #'   исчезли.
 #' @seealso [aa_auth_ui()]
@@ -65,6 +70,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     user <- shiny::reactiveVal(NULL)
     message_text <- shiny::reactiveVal("")
     current_token <- NULL
+    # вошёл с паролем, который задал администратор: пока не сменит, в приложение не пускаем
+    pending <- shiny::reactiveVal(NULL)
 
     users_exist <- shiny::reactiveVal(
       tryCatch(aa_users_exist(conn), error = function(e) TRUE)
@@ -159,7 +166,16 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       ns <- session$ns
       hint <- NULL
 
-      fields <- if (users_exist()) {
+      fields <- if (!is.null(pending())) {
+        heading <- aa_text(settings, "must_change_title")
+        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "must_change_hint"))
+        shiny::tagList(
+          shiny::passwordInput(ns("change_password"), aa_text(settings, "password_new_label")),
+          shiny::passwordInput(ns("change_confirm"), aa_text(settings, "password_confirm_label")),
+          shiny::actionButton(ns("change_btn"), aa_text(settings, "password_change_button"), class = "aa-login-button"),
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
+        )
+      } else if (users_exist()) {
         heading <- title %||% aa_text(settings, "login_title")
         shiny::tagList(
           shiny::textInput(ns("login"), aa_text(settings, "login_label")),
@@ -224,6 +240,14 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
       if (!is.null(res)) {
         try(aa_record_attempt(conn, login, success = TRUE, settings = settings), silent = TRUE)
+
+        if (isTRUE(res$must_change[1] == 1)) {
+          # пароль верный, но его задал администратор: сначала смена пароля
+          message_text("")
+          pending(list(login = res$login[1], role = res$role[1], old = password))
+          return()
+        }
+
         finish_login(res$login[1], res$role[1])
         emit("login_success", res$login[1])
         return()
@@ -239,6 +263,34 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       } else {
         message_text(aa_text(settings, "bad_credentials"))
         emit("login_failed", login)
+      }
+    })
+
+    shiny::observeEvent(input$change_btn, {
+      waiting <- pending()
+      shiny::req(waiting)
+
+      if (!identical(input$change_password, input$change_confirm)) {
+        message_text(aa_text(settings, "passwords_mismatch"))
+        return()
+      }
+
+      changed <- tryCatch(
+        {
+          aa_change_own_password(conn, waiting$login, waiting$old, input$change_password, settings)
+          TRUE
+        },
+        appauth_error_user = function(e) {
+          message_text(conditionMessage(e))
+          FALSE
+        }
+      )
+
+      if (changed) {
+        pending(NULL)
+        emit("password_changed", waiting$login)
+        finish_login(waiting$login, waiting$role)
+        emit("login_success", waiting$login)
       }
     })
 
@@ -281,7 +333,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       user = shiny::reactive(user()),
       logged_in = shiny::reactive(!is.null(user())),
       role = shiny::reactive(user()$role),
-      logout = logout
+      logout = logout,
+      token = function() current_token
     )
   })
 }

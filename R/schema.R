@@ -82,6 +82,17 @@ aa_migrations <- function() {
           CREATE INDEX IF NOT EXISTS idx_login_attempts_login ON login_attempts (login, attempted_at)
         ")
       }
+    ),
+    list(
+      version = 5L,
+      name    = "users_must_change_column",
+      up      = function(conn) {
+        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+
+        if (!"must_change" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0")
+        }
+      }
     )
   )
 }

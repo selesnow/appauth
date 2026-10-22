@@ -4,7 +4,13 @@
 \alias{aa_session_guard}
 \title{Принудительно завершать недействительные сессии}
 \usage{
-aa_session_guard(auth, conn, settings = aa_settings(), reload = TRUE)
+aa_session_guard(
+  auth,
+  conn,
+  settings = aa_settings(),
+  reload = TRUE,
+  cleanup_minutes = 60
+)
 }
 \arguments{
 \item{auth}{Результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
@@ -15,6 +21,8 @@ aa_session_guard(auth, conn, settings = aa_settings(), reload = TRUE)
 
 \item{reload}{Перезагружать страницу после выхода, чтобы модули прежнего
 пользователя исчезли. Рекомендуется \code{TRUE}.}
+
+\item{cleanup_minutes}{Как часто чистить устаревшие записи, в минутах.}
 }
 \value{
 Невидимо наблюдатель Shiny (его можно остановить через \verb{$destroy()}).
@@ -29,6 +37,10 @@ aa_session_guard(auth, conn, settings = aa_settings(), reload = TRUE)
 }
 \details{
 Если базу прочитать не удалось, сессия не завершается.
+
+Токен сессии (\code{auth$token()}) тоже проверяется: сброс пароля пользователя или
+«завершить все сессии» завершают и открытые сессии. Раз в \code{cleanup_minutes}
+сторож заодно удаляет устаревшие попытки входа и токены (\code{\link[=aa_cleanup]{aa_cleanup()}}).
 }
 \examples{
 \dontrun{

@@ -58,8 +58,8 @@ aa_issue_token <- function(conn, login, settings = aa_settings()) {
 #' Найти пользователя по токену автовхода
 #'
 #' Возвращает пользователя только если токен существует, не отозван и не истёк,
-#' а сам пользователь есть и не заблокирован. Роль берётся из базы на момент
-#' проверки.
+#' а сам пользователь есть, не заблокирован и не обязан сменить пароль (после
+#' смены пароля войти нужно заново). Роль берётся из базы на момент проверки.
 #'
 #' @inheritParams aa_issue_token
 #' @param token Токен из cookie.
@@ -85,7 +85,8 @@ aa_find_session_user <- function(conn, token) {
      WHERE s.token_hash = ?
        AND s.revoked = 0
        AND s.expires_at > datetime('now')
-       AND u.blocked = 0",
+       AND u.blocked = 0
+       AND u.must_change = 0",
     params = list(aa_token_hash(token))
   )
 
@@ -121,12 +122,31 @@ aa_revoke_token <- function(conn, token) {
   ))
 }
 
+#' Активен ли токен автовхода
+#'
+#' @param conn Подключение к базе SQLite.
+#' @param token Токен из cookie.
+#'
+#' @returns `TRUE`, если токен существует, не отозван и не истёк.
+#' @noRd
+aa_token_active <- function(conn, token) {
+  n <- DBI::dbGetQuery(
+    conn,
+    "SELECT COUNT(*) AS n FROM auth_sessions
+     WHERE token_hash = ? AND revoked = 0 AND expires_at > datetime('now')",
+    params = list(aa_token_hash(token))
+  )$n
+
+  n > 0
+}
+
 #' Проверить, что открытая сессия всё ещё действует
 #'
 #' Вызывается периодически (интервал `session_check_seconds`), чтобы блокировка,
-#' удаление или понижение роли вступали в силу у уже вошедшего пользователя, а
-#' не только при следующем входе. Сессия недействительна, если пользователь
-#' удалён, заблокирован или его роль в базе отличается от роли в сессии.
+#' удаление, понижение роли и завершение сессий вступали в силу у уже вошедшего
+#' пользователя, а не только при следующем входе. Сессия недействительна, если
+#' пользователь удалён, заблокирован, его роль в базе отличается от роли в
+#' сессии или токен этой сессии отозван (сброс пароля, «завершить все сессии»).
 #'
 #' Если базу прочитать не удалось, сессия считается действующей
 #' (`reason = "check_failed"`), чтобы сбой базы не выбросил всех пользователей;
@@ -134,18 +154,20 @@ aa_revoke_token <- function(conn, token) {
 #'
 #' @inheritParams aa_issue_token
 #' @param role Роль, с которой пользователь вошёл.
+#' @param token Токен автовхода этой сессии (`auth$token()`) или `NULL`, если
+#'   у сессии токена нет (например, автовход выключен): тогда токен не проверяется.
 #'
 #' @returns Список: `valid` (логическое), `reason` (`"ok"`, `"deleted"`,
-#'   `"blocked"`, `"role_changed"`, `"check_failed"`) и `role` (актуальная роль
-#'   из базы или `NULL`).
+#'   `"blocked"`, `"role_changed"`, `"token_revoked"`, `"check_failed"`) и `role`
+#'   (актуальная роль из базы или `NULL`).
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role)
-#' if (!check$valid) aa_logout(session)
+#' check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role, auth$token())
+#' if (!check$valid) auth$logout(reason = check$reason)
 #' }
-aa_user_session_valid <- function(conn, login, role) {
+aa_user_session_valid <- function(conn, login, role, token = NULL) {
   user <- tryCatch(aa_get_user(conn, login), error = function(e) e)
 
   if (inherits(user, "error")) {
@@ -159,6 +181,14 @@ aa_user_session_valid <- function(conn, login, role) {
   }
   if (!identical(as.character(user$role), as.character(role))) {
     return(list(valid = FALSE, reason = "role_changed", role = user$role))
+  }
+
+  if (aa_is_string(token)) {
+    active <- tryCatch(aa_token_active(conn, token), error = function(e) NA)
+
+    if (isFALSE(active)) {
+      return(list(valid = FALSE, reason = "token_revoked", role = user$role))
+    }
   }
 
   list(valid = TRUE, reason = "ok", role = user$role)

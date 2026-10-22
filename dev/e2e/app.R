@@ -24,6 +24,7 @@ server <- function(input, output, session) {
   auth <- aa_auth_server("auth", conn, settings, on_event = log_event, title = "E2E App")
 
   aa_session_guard(auth, conn, settings)
+  aa_password_server("pw", conn, auth, settings, on_event = log_event)
   aa_register_module(auth, "Access", provider, function() {
     aa_users_server("users", conn, auth, settings, on_event = log_event)
   })
@@ -34,6 +35,7 @@ server <- function(input, output, session) {
       div(style = "padding: 16px;",
         h3(id = "whoami", paste0(auth$user()$login, " / ", auth$user()$role)),
         actionButton("logout", "Выйти"),
+        aa_password_ui("pw"),
         if (aa_can(auth$user(), "Access", provider)) aa_users_ui("users")
       )
     )

@@ -4,7 +4,14 @@
 \alias{aa_set_password}
 \title{Задать пользователю новый пароль}
 \usage{
-aa_set_password(conn, login, password, settings = aa_settings())
+aa_set_password(
+  conn,
+  login,
+  password,
+  settings = aa_settings(),
+  must_change = FALSE,
+  keep_token = NULL
+)
 }
 \arguments{
 \item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
@@ -14,6 +21,12 @@ aa_set_password(conn, login, password, settings = aa_settings())
 \item{password}{Пароль в открытом виде (в базу попадёт только хеш).}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+
+\item{must_change}{Потребовать от пользователя сменить этот пароль при
+следующем входе (разумно, если пароль задал администратор).}
+
+\item{keep_token}{Токен автовхода, который не нужно отзывать (текущая сессия
+того, кто меняет свой пароль), либо \code{NULL}.}
 }
 \value{
 Число изменённых пользователей (невидимо): 1 или 0, если такого
@@ -22,8 +35,8 @@ aa_set_password(conn, login, password, settings = aa_settings())
 \description{
 Записывает хеш нового пароля и \strong{отзывает все токены автовхода}
 пользователя, чтобы после сброса пароля старые сессии браузера перестали
-работать. Пароль проверяется по правилам из настроек, при нарушении ошибка
-класса \code{appauth_error_user}.
+работать (открытые сессии завершит \code{\link[=aa_session_guard]{aa_session_guard()}}). Пароль проверяется
+по правилам из настроек, при нарушении ошибка класса \code{appauth_error_user}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {
