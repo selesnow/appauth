@@ -314,3 +314,50 @@ test_that("сбой хука событий не мешает входу", {
     expect_true(session$returned$logged_in())
   }))
 })
+
+test_that("выход на всех устройствах отзывает все токены пользователя, шлёт событие и выходит", {
+  con <- auth_db()
+  other_device <- aa_issue_token(con, "ivan")
+  other_user <- aa_issue_token(con, "alsey")
+
+  log <- run_auth(con, {
+    session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
+    own <- session$returned$token()
+    expect_false(is.null(aa_find_session_user(con, other_device)))
+
+    session$returned$logout_all(reload = FALSE)
+
+    expect_false(session$returned$logged_in())
+    expect_null(aa_find_session_user(con, own))
+    expect_null(aa_find_session_user(con, other_device))
+  })
+
+  expect_false(is.null(aa_find_session_user(con, other_user)))
+  expect_equal(log$names(), c("login_success", "sessions_revoked", "logout"))
+  expect_equal(log$events[[2]]$user, "ivan")
+  expect_equal(log$events[[2]]$value, "ivan")
+})
+
+test_that("выход на всех устройствах без входа ничего не делает", {
+  con <- auth_db()
+  token <- aa_issue_token(con, "ivan")
+
+  log <- run_auth(con, {
+    expect_false(session$returned$logout_all(reload = FALSE))
+  })
+
+  expect_length(log$events, 0)
+  expect_false(is.null(aa_find_session_user(con, token)))
+})
+
+test_that("после выхода на всех устройствах cookie открытой сессии больше не работает", {
+  con <- auth_db()
+
+  run_auth(con, {
+    session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
+    own <- session$returned$token()
+    session$returned$logout_all(reload = FALSE)
+    session$setInputs(cookie = own)
+    expect_false(session$returned$logged_in())
+  })
+})

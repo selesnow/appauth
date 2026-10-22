@@ -35,11 +35,17 @@ aa_auth_server(
 Список: \code{user} (реактивное значение, список \code{login} и \code{role} либо
 \code{NULL}), \code{logged_in} (реактивное логическое), \code{role} (реактивная роль либо
 \code{NULL}), функция \code{token()} (токен автовхода этой сессии или \code{NULL}, нужен
-\code{\link[=aa_session_guard]{aa_session_guard()}}) и функция \code{logout(reason = NULL, reload = FALSE)}. Без \code{reason}
+\code{\link[=aa_session_guard]{aa_session_guard()}}), функция \code{logout(reason = NULL, reload = FALSE)} и
+функция \code{logout_all(reload = TRUE)}. Без \code{reason}
 это обычный выход (событие \code{logout}), с \code{reason} (\code{"blocked"}, \code{"deleted"},
 \code{"role_changed"}, \code{"token_revoked"}) принудительный (\code{session_forced_logout}). При
 \code{reload = TRUE} страница перезагружается, чтобы модули прежнего пользователя
 исчезли.
+
+\code{logout_all()} это «выйти на всех устройствах»: отзывает все токены
+пользователя (событие \code{sessions_revoked}) и сразу выходит; открытые сессии на
+других устройствах закроет \code{\link[=aa_session_guard]{aa_session_guard()}} при ближайшей проверке. Перед
+вызовом покажите пользователю окно подтверждения: кнопка выбросит его везде.
 }
 \description{
 Вход по логину и паролю с защитой от подбора (\code{\link[=aa_login_gate]{aa_login_gate()}}), создание

@@ -179,6 +179,7 @@ DBI::dbDisconnect(conn)
 | Свои права (не матрица) | функция `function(user)` вместо `aa_permissions_from_matrix()` |
 | Свой блок в карточке пользователя | `extra_card_ui` и `extra_card_server` в `aa_users_server()` |
 | Куда писать события | функция `on_event` во всех модулях |
+| Смена своего пароля и «выйти на всех устройствах» | `aa_password_server()` и `auth$logout_all()`, рецепт в виньетке `extension-points` |
 
 Подробности и примеры в виньетке `extension-points`.
 

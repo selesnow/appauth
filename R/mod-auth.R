@@ -43,11 +43,17 @@ aa_auth_ui <- function(id) {
 #' @returns Список: `user` (реактивное значение, список `login` и `role` либо
 #'   `NULL`), `logged_in` (реактивное логическое), `role` (реактивная роль либо
 #'   `NULL`), функция `token()` (токен автовхода этой сессии или `NULL`, нужен
-#'   [aa_session_guard()]) и функция `logout(reason = NULL, reload = FALSE)`. Без `reason`
+#'   [aa_session_guard()]), функция `logout(reason = NULL, reload = FALSE)` и
+#'   функция `logout_all(reload = TRUE)`. Без `reason`
 #'   это обычный выход (событие `logout`), с `reason` (`"blocked"`, `"deleted"`,
 #'   `"role_changed"`, `"token_revoked"`) принудительный (`session_forced_logout`). При
 #'   `reload = TRUE` страница перезагружается, чтобы модули прежнего пользователя
 #'   исчезли.
+#'
+#'   `logout_all()` это «выйти на всех устройствах»: отзывает все токены
+#'   пользователя (событие `sessions_revoked`) и сразу выходит; открытые сессии на
+#'   других устройствах закроет [aa_session_guard()] при ближайшей проверке. Перед
+#'   вызовом покажите пользователю окно подтверждения: кнопка выбросит его везде.
 #' @seealso [aa_auth_ui()]
 #' @export
 #'
@@ -156,6 +162,22 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       }
 
       invisible(TRUE)
+    }
+
+    # выход на всех устройствах: отзываются все токены пользователя (остальные
+    # сессии закроет сторож aa_session_guard() при ближайшей проверке) и сразу
+    # выходит текущая сессия
+    logout_all <- function(reload = TRUE) {
+      login <- shiny::isolate(user())$login
+
+      if (!aa_is_string(login)) {
+        return(invisible(FALSE))
+      }
+
+      try(aa_revoke_sessions(conn, login), silent = TRUE)
+      emit("sessions_revoked", login, login)
+
+      logout(reload = reload)
     }
 
     output$form <- shiny::renderUI({
@@ -334,6 +356,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       logged_in = shiny::reactive(!is.null(user())),
       role = shiny::reactive(user()$role),
       logout = logout,
+      logout_all = logout_all,
       token = function() current_token
     )
   })

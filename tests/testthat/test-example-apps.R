@@ -29,6 +29,12 @@ db_do <- function(db, fn) {
   fn(con)
 }
 
+db_active_tokens <- function(db, login) {
+  db_do(db, function(con) {
+    DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = ? AND revoked = 0", params = list(login))$n
+  })
+}
+
 run_app <- function(example, expr) {
   rlang::inject(suppressMessages(shiny::testServer(example$app, expr = !!rlang::enquo(expr))))
 }
@@ -48,7 +54,8 @@ test_that("minimal-app: первый запуск создаёт админис�
     expect_match(html, "Задачи", fixed = TRUE)
     expect_match(html, "Запустить задачу", fixed = TRUE)
     expect_match(html, "Доступ", fixed = TRUE)
-    expect_match(html, "Профиль", fixed = TRUE)
+    expect_match(html, "Сменить пароль", fixed = TRUE)
+    expect_match(html, "Выйти на всех устройствах", fixed = TRUE)
   })
 
   db_do(ex$db, function(con) {
@@ -106,6 +113,35 @@ test_that("minimal-app: обработчик защищён на сервере,
 
   expect_true(any(grepl("access_denied user=olga value=Run", msgs, fixed = TRUE)))
   expect_false(any(grepl("Задача запущена", msgs, fixed = TRUE)))
+})
+
+test_that("minimal-app: смена пароля в окне и выход на всех устройствах после подтверждения", {
+  ex <- example_app("minimal-app")
+  run_app(ex, {
+    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
+                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+  })
+  other_device <- NULL
+  db_do(ex$db, function(con) other_device <<- aa_issue_token(con, "boss"))
+
+  run_app(ex, {
+    session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
+    expect_match(html_of(output$main), "Сменить пароль", fixed = TRUE)
+    session$setInputs(change_password = 1)               # открывает окно со сменой пароля
+    session$setInputs(`password-old` = "secret123", `password-new` = "brand-new-1",
+                      `password-confirm` = "brand-new-1", `password-change` = 1)
+
+    session$setInputs(logout_all = 1)                   # только окно подтверждения
+    expect_true(db_active_tokens(ex$db, "boss") >= 1)
+    session$setInputs(logout_all_confirm = 1)           # подтверждение
+  })
+
+  expect_equal(db_active_tokens(ex$db, "boss"), 0)
+  db_do(ex$db, function(con) {
+    expect_null(aa_find_session_user(con, other_device))
+    expect_false(is.null(aa_authenticate(con, "boss", "brand-new-1")))
+    expect_null(aa_authenticate(con, "boss", "secret123"))
+  })
 })
 
 test_that("minimal-app: администратор через приложение блокирует пользователя", {

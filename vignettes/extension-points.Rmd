@@ -157,6 +157,54 @@ aa_users_server("users", conn, auth, settings,
 tabPanel("Доступ", aa_users_ui("users"), my_permissions_editor(), my_log_switches())
 ```
 
+# Личный кабинет: кнопки рядом с плашкой пользователя
+
+Смена своего пароля и выход на всех устройствах это обычные кнопки приложения, подключённые к функциям пакета. Их удобно держать рядом с плашкой пользователя и кнопкой «Выйти»:
+
+```{r, eval = FALSE}
+# сервер: модуль смены пароля подключается один раз
+pw <- aa_password_server("password", conn, auth, settings, on_event = log_event)
+
+# интерфейс: плашка пользователя и кнопки
+div(
+  span(icon("user"), user$login, paste0(" (", user$role, ")")),
+  actionButton("change_password", "Сменить пароль"),
+  actionButton("logout_all", "Выйти на всех устройствах"),
+  actionButton("logout", "Выйти")
+)
+
+# смена пароля: форма модуля в окне, после успешной смены окно закрывается
+observeEvent(input$change_password, {
+  showModal(modalDialog(aa_password_ui("password"), title = "Смена пароля",
+                        easyClose = TRUE, footer = modalButton("Закрыть")))
+})
+observeEvent(pw$changed(), removeModal(), ignoreInit = TRUE)
+
+# выход везде только после подтверждения: кнопка выбросит и с других устройств
+observeEvent(input$logout_all, {
+  showModal(modalDialog(
+    "Все ваши сессии на всех устройствах будут завершены.",
+    title = "Выйти на всех устройствах?", easyClose = TRUE,
+    footer = tagList(modalButton("Отмена"),
+                     actionButton("logout_all_confirm", "Выйти везде", class = "btn-danger"))
+  ))
+})
+observeEvent(input$logout_all_confirm, {
+  removeModal()
+  auth$logout_all(reload = TRUE)
+})
+
+observeEvent(input$logout, auth$logout(reload = TRUE))
+```
+
+Что происходит:
+
+* `aa_password_server()` проверяет текущий пароль, не принимает тот же самый и слабый, отзывает токены остальных сессий и оставляет текущую; событие `password_changed`.
+* `auth$logout_all()` отзывает все токены пользователя и сразу выходит; событие `sessions_revoked` (значение это логин) и `logout`. Открытые сессии на других устройствах закроет `aa_session_guard()` при ближайшей проверке (по умолчанию в течение 30 секунд), поэтому сторож должен быть подключён.
+* Если автовход выключен (`autologin = FALSE`), у сессий нет токенов: «выйти везде» закроет только текущую сессию. Для такой схемы понадобится своё хранение сессий.
+
+Рабочий пример: `examples/minimal-app`.
+
 # Тексты
 
 Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.
