@@ -1,0 +1,231 @@
+---
+title: "Точки расширения appauth"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Точки расширения appauth}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(appauth)
+```
+
+Пакет содержит то, что обязано быть одинаковым во всех приложениях: пароли, защиту входа, сессии, блокировки, проверку прав. Всё, что у приложений разное, подключается через точки расширения. Этот документ описывает каждую из них.
+
+| Точка | Для чего | Где |
+| --- | --- | --- |
+| Источник прав | Как приложение определяет, что можно роли или пользователю | `aa_can()`, `aa_require()`, `aa_register_module()` |
+| Роли | Какие роли есть и какая из них администратор | `aa_settings(roles, admin_role)` |
+| Хук событий | Куда писать лог, что уведомлять | `on_event` во всех модулях |
+| Слоты карточки | Свой блок в карточке пользователя | `aa_users_server(extra_card_ui, extra_card_server)` |
+| Тексты | Язык и формулировки | `aa_texts()` |
+| Оформление | Цвета, светлая тема, заголовок, логотип | `aa_app_head()`, `aa_auth_server(title, logo)` |
+| Параметры безопасности | Сроки, лимиты, автовход | `aa_settings()` |
+
+# Права
+
+## Матрица «право -> роли»
+
+Формат как в `config.yaml` Server Manager: имя права и роли, которым оно доступно (вектор или одна строка).
+
+```{r}
+provider <- aa_permissions_from_matrix(list(
+  Tasks  = c("admin", "user", "viewer"),
+  Run    = c("admin", "user"),
+  Access = "admin"
+))
+
+provider(list(login = "ivan", role = "user"))
+aa_can(list(login = "ivan", role = "user"), "Run", provider)
+aa_can(list(login = "ivan", role = "user"), "Access", provider)
+```
+
+Права называйте как угодно: `"Задачи"`, `"Run"`, `"export"`. Пакет их не знает. Роль администратора прав сама по себе **не** получает: если нужно, перечислите её в матрице.
+
+### Матрица, которая меняется на ходу
+
+Если в приложении есть редактор прав и матрица меняется без перезапуска, передайте функцию. Она читается при каждой проверке:
+
+```{r, eval = FALSE}
+provider <- aa_permissions_from_matrix(function() conf_rv()$access_matrix)
+```
+
+## Свой источник прав
+
+Любая функция `function(user)`, которая возвращает вектор названий прав пользователя, подходит. Так делаются права на каждого пользователя из базы, по группам, из внешней системы:
+
+```{r, eval = FALSE}
+provider <- function(user) {
+  if (identical(user$role, "owner")) {
+    return(c("reports", "export", "users"))     # владелец может всё
+  }
+
+  DBI::dbGetQuery(
+    conn, "SELECT permission FROM user_permissions WHERE login = ?",
+    params = list(user$login)
+  )$permission
+}
+```
+
+`aa_can()` закрыт по умолчанию: если функция упала, вернула не строки или `NA`, права нет. Рабочий пример лежит в `examples/custom-permissions-app`.
+
+## Где проверять право
+
+* **В интерфейсе**: `aa_can(user, "Run", provider)` решает, показывать ли кнопку или вкладку. Это удобство, а не защита.
+* **На сервере в каждом обработчике**: `aa_require(auth, "Run", provider, on_event = ...)` первой строкой. Без права обработчик тихо останавливается, пользователь видит уведомление, хук получает `access_denied`.
+* **При регистрации модулей**: `aa_register_module(auth, "Access", provider, function() mod_server(...))` подключает серверную часть вкладки только тем, у кого есть право.
+
+# Роли
+
+```{r}
+settings <- aa_settings(
+  roles = c("owner", "editor", "viewer"),
+  admin_role = "owner"
+)
+settings$roles
+```
+
+`admin_role` обязана входить в `roles`. Только эта роль управляет пользователями (модуль `aa_users_server()` проверяет её на сервере и сверяет с базой при каждом действии, независимо от вашей матрицы). Её же получает первый созданный администратор.
+
+# События
+
+Пакет ничего не пишет в логи приложения: о каждом событии он вызывает функцию `on_event(event, user, session_id, value)`, одну на все модули.
+
+```{r, eval = FALSE}
+log_event <- function(event, user, session_id, value) {
+  write_action_log(user = user, func = event, session_id = session_id, value = value)
+}
+
+aa_auth_server("auth", conn, settings, on_event = log_event)
+aa_users_server("users", conn, auth, settings, on_event = log_event)
+aa_require(auth, "Run", provider, on_event = log_event)
+```
+
+Хук получает:
+
+* `event` — ключ события из каталога;
+* `user` — логин, от имени которого событие (для неудачного входа это введённый логин, а если логина нет, `"anonymous"`);
+* `session_id` — идентификатор сессии Shiny;
+* `value` — уточнение (см. каталог), всегда строка. Пароли и токены в события не попадают.
+
+Ошибка внутри хука никогда не прерывает действие пакета: она выводится сообщением.
+
+Каталог событий (его возвращает `aa_events()`):
+
+```{r}
+knitr::kable(aa_events())
+```
+
+Хук можно использовать не только для лога: например, отправлять уведомление в Telegram при `login_locked` или `user_blocked`. События самого приложения хук тоже может получать от вашего кода, пакет названия не проверяет.
+
+# Слоты карточки пользователя
+
+Карточка пользователя (двойной клик по строке) показывает стандартные действия. Свой блок добавляется двумя функциями:
+
+* `extra_card_ui(login, ns)` возвращает интерфейс блока; идентификаторы оборачивайте в `ns()`;
+* `extra_card_server(input, output, session, login)` вызывается **один раз** при старте модуля, внутри его пространства имён; `login` это реактивное значение с логином открытой карточки.
+
+```{r, eval = FALSE}
+card_ui <- function(login, ns) {
+  div(
+    class = "aa-card-section",
+    h5("Права"),
+    checkboxGroupInput(ns("permissions"), NULL, choices = c("reports", "export")),
+    actionButton(ns("save_permissions"), "Сохранить")
+  )
+}
+
+card_server <- function(input, output, session, login) {
+  observeEvent(input$save_permissions, {
+    # роль берём из серверного состояния, а не из input
+    req(identical(isolate(auth$user())$role, "owner"), login())
+    save_permissions(login(), input$permissions)
+  })
+}
+
+aa_users_server("users", conn, auth, settings,
+                extra_card_ui = card_ui, extra_card_server = card_server)
+```
+
+Обработчик слота должен сам проверять право на действие: слот это ваш код, пакет за него не отвечает. Класс `aa-card-section` даёт блоку стандартное оформление.
+
+Остальное содержимое вкладки «Доступ» (редактор прав ролей, переключатели логов) собирайте сами:
+
+```{r, eval = FALSE}
+tabPanel("Доступ", aa_users_ui("users"), my_permissions_editor(), my_log_switches())
+```
+
+# Тексты
+
+Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.
+
+```{r}
+length(aa_text_keys())
+texts <- aa_texts("ru", login_button = "Войти в систему", login_title = "Вход для команды")
+texts$login_button
+
+aa_text(texts, "locked", 15)          # подстановка значений: %d, %s
+```
+
+```{r, eval = FALSE}
+settings <- aa_settings(texts = aa_texts("en", login_title = "Reports portal"))
+```
+
+Список ключей: `aa_text_keys()`. Неизвестный ключ или пустое значение дадут ошибку сразу, а не незаметную пустую надпись в интерфейсе.
+
+# Оформление
+
+`aa_app_head()` подключает стили и скрипт. Цвета меняются CSS-переменными, которые нужно переопределить **после** `aa_app_head()`:
+
+```{r, eval = FALSE}
+ui <- fluidPage(
+  aa_app_head(),
+  tags$style(HTML(":root { --aa-primary: #0d9488; --aa-primary-hover: #0f766e; }")),
+  ...
+)
+```
+
+| Переменная | Что красит |
+| --- | --- |
+| `--aa-primary`, `--aa-primary-hover` | Кнопка входа, фокус полей |
+| `--aa-danger`, `--aa-warning` | Ошибки, подсветка заблокированных и временно заблокированных строк |
+| `--aa-bg`, `--aa-card-bg`, `--aa-card-border` | Фон страницы входа и карточки |
+| `--aa-text`, `--aa-muted` | Цвета текста |
+| `--aa-input-bg`, `--aa-input-border` | Поля ввода |
+
+Светлая тема включается классом `aa-theme-light` на `<body>` или на родителе. Подсветка строк таблицы задана с `!important`, так как темы приложений часто задают фон ячеек с ним.
+
+Заголовок и логотип формы входа: `aa_auth_server("auth", conn, title = "Мой сервис", logo = "logo.png")`, картинка из папки `www`.
+
+# Параметры безопасности
+
+| Параметр `aa_settings()` | Значение по умолчанию | Смысл |
+| --- | --- | --- |
+| `max_failed_logins` | 5 | неудач до блокировки логина |
+| `lockout_minutes` | 15 | окно подсчёта и срок блокировки |
+| `max_failed_logins_per_minute` | 30 | общий лимит неудач по всем логинам |
+| `password_min`, `password_max` | 6, 128 | длина нового пароля |
+| `login_max` | 64 | длина логина |
+| `autologin` | `TRUE` | автовход по cookie |
+| `session_days` | 30 | срок токена |
+| `session_check_seconds` | 30 | как часто проверять открытую сессию |
+| `attempts_retention_hours`, `token_retention_days` | 24, 30 | сколько хранить попытки и просроченные токены |
+| `roles`, `admin_role` | `admin`, `user`, `viewer` / `admin` | роли |
+| `must_change_default` | `TRUE` | пароль от администратора по умолчанию временный |
+
+Настройки удобно держать в `config.yaml` и читать через `aa_settings_from_list()`: лишние ключи в списке игнорируются, а язык и тексты задаются отдельным аргументом.
+
+Имя cookie автовхода задаёт `aa_auth_server(cookie_name = ...)`. Приложениям на одном хосте нужны разные имена: cookie не изолируются по порту.
+
+# Что остаётся за приложением
+
+Пакет намеренно не берёт на себя:
+
+* матрицу прав и её редактор;
+* переключатели логов и сам лог;
+* состав вкладок и прикладные проверки (имена задач, пути, команды);
+* дополнительные поля пользователя (отдел, проекты): они живут в таблицах приложения рядом с таблицами пакета, а в карточке показываются через слот.
+
+Если одна и та же доработка понадобилась в трёх приложениях, это повод перенести её в пакет.

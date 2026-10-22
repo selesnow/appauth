@@ -1,0 +1,193 @@
+---
+title: "Быстрый старт с appauth"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Быстрый старт с appauth}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+has_sqlite <- requireNamespace("RSQLite", quietly = TRUE)
+```
+
+Этот документ для того, кто пишет новое Shiny приложение и хочет подключить авторизацию за полчаса. Как устроен пакет и от чего он защищает, написано в виньетке `architecture-and-security`, как перевести уже работающее приложение, в `integrating-existing-app`.
+
+# Что понадобится
+
+* Пакет уже установлен в общую библиотеку сервера, отдельной установки нет: `library(appauth)`.
+* Файл базы SQLite для приложения. Пакет сам создаст в нём свои таблицы (`users`, `auth_sessions`, `login_attempts`, `appauth_migrations`), остальные таблицы приложения он не трогает.
+* Решение, как приложение определяет права: матрица «право -> роли» (как в Server Manager) или что-то своё. Об этом ниже и в виньетке `extension-points`.
+
+# Основные понятия
+
+* **Пользователь**: логин, роль, признак блокировки. Пароль хранится только в виде хеша scrypt.
+* **Роль**: одна из `settings$roles` (по умолчанию `admin`, `user`, `viewer`). Роль `settings$admin_role` управляет пользователями, остальные права задаёте вы.
+* **Право**: название действия или раздела, например `"Run"` или `"Access"`. У роли есть набор прав, определяет его *источник прав* (`provider`).
+* **Сессия**: вошедший пользователь (`auth$user()`) и, если включён автовход, его токен в cookie.
+* **Событие**: пакет сам ничего не пишет в логи, а сообщает о событиях (`login_failed`, `user_blocked`...) функции `on_event`, которую задаёте вы.
+
+# Пять шагов
+
+## 1. Настройки
+
+```{r, eval = FALSE}
+library(shiny)
+library(appauth)
+
+settings <- aa_settings()   # значения по умолчанию подходят большинству приложений
+```
+
+Настройки можно читать из `config.yaml`: `aa_settings_from_list(conf$security)`. Все параметры перечислены в `?aa_settings`.
+
+## 2. Права
+
+```{r, eval = FALSE}
+provider <- aa_permissions_from_matrix(list(
+  Tasks  = c("admin", "user", "viewer"),
+  Run    = c("admin", "user"),
+  Access = "admin"
+))
+```
+
+Роль администратора прав сама по себе не получает: только те, что перечислены в матрице.
+
+## 3. Интерфейс
+
+```{r, eval = FALSE}
+ui <- fluidPage(
+  aa_app_head(),          # стили и скрипт cookie, один раз на страницу
+  aa_auth_ui("auth"),     # форма входа
+  uiOutput("main")        # остальное приложение
+)
+```
+
+## 4. Сервер
+
+```{r, eval = FALSE}
+log_event <- function(event, user, session_id, value) {
+  message(sprintf("[appauth] %s user=%s value=%s", event, user, value))
+}
+
+server <- function(input, output, session) {
+  # подключение закроется вместе с сессией; схема подготовится при подключении
+  conn <- aa_session_connection("app.db", prepare = TRUE, settings = settings)
+
+  # вход, создание первого администратора, автовход, выход
+  auth <- aa_auth_server("auth", conn, settings, on_event = log_event)
+
+  # блокировка, удаление, смена роли и сброс пароля вступают в силу за 30 секунд
+  aa_session_guard(auth, conn, settings)
+
+  # серверная часть вкладки подключается только тем, у кого есть право
+  aa_register_module(auth, "Access", provider, function() {
+    aa_users_server("users", conn, auth, settings, on_event = log_event)
+  })
+
+  output$main <- renderUI({
+    req(auth$logged_in())
+    user <- auth$user()
+
+    tabsetPanel(
+      tabPanel("Задачи",
+        p("Вы вошли как ", strong(user$login)),
+        if (aa_can(user, "Run", provider)) actionButton("run", "Запустить")
+      ),
+      if (aa_can(user, "Access", provider)) tabPanel("Доступ", aa_users_ui("users")),
+      tabPanel("Выход", actionButton("logout", "Выйти"))
+    )
+  })
+
+  observeEvent(input$run, {
+    # право проверяется на сервере: скрытая кнопка не защита
+    aa_require(auth, "Run", provider, on_event = log_event, settings = settings)
+    showNotification("Готово")
+  })
+
+  observeEvent(input$logout, auth$logout(reload = TRUE))
+}
+```
+
+## 5. Запуск
+
+```{r, eval = FALSE}
+shinyApp(ui, server)
+```
+
+На пустой базе приложение предложит создать первого администратора. Дальше администратор добавляет пользователей на вкладке «Доступ». Готовые запускаемые версии лежат в `system.file("examples", package = "appauth")`.
+
+# Как это работает без Shiny
+
+Все возможности доступны и как обычные функции. Это удобно для скриптов, тестов и административных задач:
+
+```{r, eval = has_sqlite}
+library(appauth)
+
+conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+aa_init_db(conn)                                   # создаёт таблицы
+
+aa_create_first_admin(conn, "boss", "boss-password")
+aa_create_user(conn, "ivan", "ivan-password", "user")
+
+aa_list_users(conn)                                # хеши паролей не возвращаются
+
+aa_authenticate(conn, "ivan", "ivan-password")     # данные пользователя
+is.null(aa_authenticate(conn, "ivan", "wrong"))    # неверный пароль: NULL
+```
+
+Токен автовхода и проверка прав:
+
+```{r, eval = has_sqlite}
+token <- aa_issue_token(conn, "ivan")              # токен для cookie
+aa_find_session_user(conn, token)                  # по токену находится пользователь
+
+provider <- aa_permissions_from_matrix(list(Tasks = c("admin", "user"), Access = "admin"))
+aa_can(list(login = "ivan", role = "user"), "Tasks", provider)
+aa_can(list(login = "ivan", role = "user"), "Access", provider)
+```
+
+Блокировка пользователя отзывает его токены:
+
+```{r, eval = has_sqlite}
+aa_set_blocked(conn, "ivan", TRUE, acting_login = "boss")
+is.null(aa_find_session_user(conn, token))
+```
+
+Правила пользователей проверяются сами и сообщают понятную причину:
+
+```{r, eval = has_sqlite}
+tryCatch(
+  aa_delete_user(conn, "boss", acting_login = "boss"),
+  appauth_error_user = function(e) conditionMessage(e)
+)
+
+DBI::dbDisconnect(conn)
+```
+
+# Что настроить под себя
+
+| Нужно | Как |
+| --- | --- |
+| Другие роли | `aa_settings(roles = c("owner", "editor"), admin_role = "owner")` |
+| Строже защита от подбора | `aa_settings(max_failed_logins = 3, lockout_minutes = 30)` |
+| Длина пароля | `aa_settings(password_min = 10)` |
+| Без автовхода | `aa_settings(autologin = FALSE)` |
+| Английский интерфейс | `aa_settings(texts = aa_texts("en"))` |
+| Свой текст кнопки | `aa_texts("ru", login_button = "Войти в систему")` |
+| Пароль от администратора постоянный | `aa_settings(must_change_default = FALSE)` |
+| Свои права (не матрица) | функция `function(user)` вместо `aa_permissions_from_matrix()` |
+| Свой блок в карточке пользователя | `extra_card_ui` и `extra_card_server` в `aa_users_server()` |
+| Куда писать события | функция `on_event` во всех модулях |
+
+Подробности и примеры в виньетке `extension-points`.
+
+# Частые вопросы
+
+**Зачем `aa_register_module()`, если есть `aa_require()`?** Это разные вещи. Регистрация избавляет от лишней работы для тех, у кого нет права, а `aa_require()` защищает от подделанных запросов: в каждом обработчике действия право проверяется заново.
+
+**Что делает `aa_session_guard()`?** Раз в интервал проверяет открытую сессию. Если пользователя заблокировали, удалили, поменяли роль или сбросили пароль, сессия завершается. Без него такие изменения вступят в силу только при следующем входе.
+
+**Можно ли передать в `aa_auth_server()` подключение, которое я открываю сам?** Да, но тогда закрывать его нужно самому в `session$onSessionEnded()`. Иначе файл базы останется занят до остановки процесса, а на Windows такой файл нельзя переименовать. `aa_session_connection()` делает это за вас.
+
+**Куда делись пароли в открытом виде?** Пакет их не принимает: открытый пароль в базе не позволит войти. Как безопасно перенести такие пароли в хеши, написано в виньетке `integrating-existing-app`.

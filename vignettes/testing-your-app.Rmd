@@ -1,0 +1,192 @@
+---
+title: "Тестирование приложения с appauth"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Тестирование приложения с appauth}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(eval = FALSE)
+```
+
+Авторизацию нужно тестировать вместе с приложением: пакет проверен своими автотестами, но ошибки чаще возникают на стыке, например забытая проверка права в обработчике. Здесь собраны приёмы, которые мы используем в тестах самого пакета (`tests/testthat` в его исходниках) и которые подходят для тестов приложения.
+
+# Временная база
+
+Для функций пакета хватает базы в памяти:
+
+```{r}
+new_db <- function(env = parent.frame()) {
+  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  withr::defer(if (DBI::dbIsValid(con)) DBI::dbDisconnect(con), envir = env)
+  appauth::aa_init_db(con)
+  con
+}
+```
+
+Если приложению нужен файл базы (как у примеров), создайте `tempfile(fileext = ".db")`, передайте путь через переменную среды или конфиг и удалите файл в `withr::defer()`.
+
+**Хеширование scrypt намеренно медленное** (доли секунды на пароль). В тесте заводите только тех пользователей, которые реально входят. Если пользователь нужен только как строка в таблице (проверка прав, статусов), вставьте его SQL-запросом:
+
+```{r}
+DBI::dbExecute(
+  con, "INSERT INTO users (login, password, role) VALUES (?, ?, ?)",
+  params = list("ivan", "x", "user")
+)
+```
+
+Такой пользователь войти не сможет (пароль не хеш), но для остальных проверок он подходит.
+
+# Функции без Shiny
+
+Правила пользователей, права, токены и защита входа проверяются обычными `expect_*`:
+
+```{r}
+test_that("последнего администратора нельзя удалить", {
+  con <- new_db()
+  aa_create_first_admin(con, "boss", "boss-password")
+  aa_create_user(con, "ann", "ann-password", "admin")
+  aa_delete_user(con, "ann", acting_login = "boss")
+
+  expect_error(
+    aa_delete_user(con, "boss", acting_login = "ann"),
+    class = "appauth_error_user"
+  )
+})
+
+test_that("права берутся из матрицы", {
+  provider <- aa_permissions_from_matrix(list(Run = c("admin", "user"), Access = "admin"))
+
+  expect_true(aa_can(list(login = "ivan", role = "user"), "Run", provider))
+  expect_false(aa_can(list(login = "ivan", role = "user"), "Access", provider))
+  expect_false(aa_can(NULL, "Run", provider))      # закрыто по умолчанию
+})
+```
+
+Ошибки правил имеют класс `appauth_error_user` и поле `reason`; текст ошибки на языке настроек.
+
+Время для защиты входа проще задавать SQL-запросом (время хранится в UTC):
+
+```{r}
+DBI::dbExecute(
+  con,
+  "INSERT INTO login_attempts (login, success, attempted_at)
+   VALUES (?, 0, datetime('now', '-3 minutes'))",
+  params = list("ivan")
+)
+aa_login_lock_remaining(con, "ivan", aa_settings(max_failed_logins = 1))
+```
+
+# Модули через testServer
+
+Модули входа, пользователей и смены пароля проверяются через `shiny::testServer()`. Удобно завернуть вызов в помощника, потому что `expr` нужно передать как выражение:
+
+```{r}
+run_auth <- function(con, expr, settings = aa_settings(), on_event = NULL, ...) {
+  rlang::inject(shiny::testServer(
+    aa_auth_server,
+    args = list(conn = con, settings = settings, on_event = on_event, ...),
+    expr = !!rlang::enquo(expr)
+  ))
+}
+
+test_that("вход по паролю", {
+  con <- new_db()
+  aa_create_user(con, "ivan", "ivan-password", "user")
+
+  run_auth(con, {
+    session$setInputs(login = "ivan", password = "wrong", login_btn = 1)
+    expect_false(session$returned$logged_in())
+    expect_equal(output$message, "Неверный логин или пароль")
+
+    session$setInputs(login = "ivan", password = "ivan-password", login_btn = 2)
+    expect_true(session$returned$logged_in())
+    expect_equal(session$returned$user(), list(login = "ivan", role = "user"))
+  })
+})
+```
+
+Для модуля пользователей вместо настоящего `auth` достаточно объекта с реактивным `user`:
+
+```{r}
+fake_auth <- function(login = "boss", role = "admin") {
+  list(user = shiny::reactiveVal(list(login = login, role = role)))
+}
+```
+
+Идентификаторы в тесте модуля без префикса (`login`, `login_btn`), в тесте всего приложения с префиксом модуля (`auth-login`, `users-open`).
+
+## События
+
+Хук собирает события в список, по нему видно, что пакет отправил:
+
+```{r}
+events <- list()
+hook <- function(event, user, session_id, value) {
+  events[[length(events) + 1]] <<- list(event = event, user = user, value = value)
+}
+```
+
+## Содержимое окон
+
+Окна открываются через `shiny::showModal()`, в testServer их не видно. Подмените функцию и получите HTML, который увидит браузер:
+
+```{r}
+html <- NULL
+testthat::local_mocked_bindings(
+  showModal = function(ui, ...) html <<- paste(as.character(ui), collapse = ""),
+  .package = "shiny"
+)
+```
+
+Так можно проверить, что кнопка блокировки не показывается для себя, что слот карточки выведен, что логин с HTML экранирован.
+
+## Время и сторож
+
+В `testServer` время сессии двигается вручную:
+
+```{r}
+shiny::testServer(function(input, output, session) aa_session_guard(auth, con, settings), {
+  session$flushReact()
+  DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")
+  session$elapse(35000)               # прошло 35 секунд
+  expect_equal(logout_calls[[1]]$reason, "blocked")
+})
+```
+
+# Защита обработчиков вашего приложения
+
+Для каждого обработчика действия напишите тест «без права обработчик не выполняется»:
+
+```{r}
+test_that("запуск задачи без права отклоняется", {
+  provider <- aa_permissions_from_matrix(list(Run = "admin"))
+  auth <- list(user = function() list(login = "olga", role = "viewer"))
+
+  expect_error(
+    suppressMessages(aa_require(auth, "Run", provider)),
+    class = "shiny.silent.error"
+  )
+})
+```
+
+В тесте всего приложения проверяйте, что побочный эффект не произошёл (запись не добавлена, задача не запущена), а хук получил `access_denied`.
+
+# Чек-лист тестов безопасности приложения
+
+* Вход: неверный пароль, несуществующий логин (сообщение то же), пустые поля.
+* Блокировка после серии неудач; верный пароль при блокировке не пускает.
+* Заблокированный администратором пользователь не входит, его токен не работает.
+* Каждый обработчик действия отказывает без права (для каждой роли без права).
+* Пользователь без права не получает серверную часть модуля.
+* SQL-инъекция в логине и пароле формы входа не даёт войти.
+* Логин с HTML и скриптами экранируется во всех таблицах и окнах приложения.
+* Токен отозванного, удалённого и заблокированного пользователя не работает.
+* Открытая сессия завершается после блокировки, удаления, смены роли, сброса пароля.
+* Подключение к базе закрывается при завершении сессии (файл базы можно переименовать после остановки сессий).
+
+# Проверка в настоящем браузере
+
+`testServer` не проверяет JavaScript: cookie автовхода, подсветку строк, вход по Enter. Для таких проверок в исходниках пакета есть сценарии на Playwright и Chrome (`dev/e2e`): приложение поднимается на временной базе, сценарий проходит вход, блокировку, карточку и выход и сохраняет скриншоты. Их можно взять за основу для своего приложения. Запускайте такую проверку на копии базы с тестовыми пользователями, а не на рабочей базе.
