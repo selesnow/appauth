@@ -17,8 +17,16 @@
 Подробнее об устройстве и модели угроз смотрите в виньетке
 \code{architecture-and-security}.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://git.netpeak.net/netpeak_analytics/appauth}
+  \item Report bugs at \url{https://git.netpeak.net/netpeak_analytics/appauth/-/issues}
+}
+
+}
 \author{
-\strong{Maintainer}: Alexey Seleznev \email{first.last@example.com} (\href{https://orcid.org/0000-0003-0410-7385}{ORCID})
+\strong{Maintainer}: Alexey Seleznev \email{selesnow@gmail.com} (\href{https://orcid.org/0000-0003-0410-7385}{ORCID})
 
 }
 \keyword{internal}
