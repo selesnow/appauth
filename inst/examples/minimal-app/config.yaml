@@ -1,0 +1,22 @@
+# Настройки примера. В реальном приложении держите этот файл вне git,
+# если в нём есть что-то секретное (здесь секретов нет).
+
+# Защита входа. Ключи совпадают с аргументами aa_settings(), лишние игнорируются.
+security:
+  max_failed_logins: 5          # неудач до блокировки логина
+  lockout_minutes: 15           # окно подсчёта и срок блокировки
+  max_failed_logins_per_minute: 30
+  password_min: 6
+  autologin: true               # автовход по cookie
+  session_days: 30
+  session_check_seconds: 30     # как часто проверять открытую сессию
+  must_change_default: true     # пароль от администратора по умолчанию временный
+  roles: [admin, user, viewer]
+  admin_role: admin
+
+# Матрица прав: право -> роли. Админ не получает права автоматически,
+# только те, что перечислены ниже.
+access_matrix:
+  Tasks: [admin, user, viewer]
+  Run: [admin, user]
+  Access: admin
