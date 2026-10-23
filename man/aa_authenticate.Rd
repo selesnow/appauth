@@ -14,8 +14,9 @@ aa_authenticate(conn, login, password)
 \item{password}{Введённый пароль.}
 }
 \value{
-Таблица из одной строки с колонками \code{login}, \code{role} и \code{blocked}
-(пароль в результат не попадает) либо \code{NULL}, если логин или пароль неверны.
+Таблица из одной строки с колонками \code{login}, \code{role}, \code{blocked} и
+\code{must_change} (пароль в результат не попадает) либо \code{NULL}, если логин или
+пароль неверны.
 }
 \description{
 Ищет пользователя по логину (точно, с учётом регистра) и проверяет пароль по

@@ -41,8 +41,8 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
 #' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
 #' @param login Логин.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked` и
-#'   `must_change` либо `NULL`, если такого пользователя нет или пароль неверен.
+#' @returns Таблица из одной строки с колонками `login`, `role` и `blocked`
+#'   либо `NULL`, если такого пользователя нет.
 #' @export
 #'
 #' @examples
@@ -290,8 +290,9 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
 #' @inheritParams aa_get_user
 #' @param password Введённый пароль.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role` и `blocked`
-#'   (пароль в результат не попадает) либо `NULL`, если логин или пароль неверны.
+#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked` и
+#'   `must_change` (пароль в результат не попадает) либо `NULL`, если логин или
+#'   пароль неверны.
 #' @export
 #'
 #' @examples
