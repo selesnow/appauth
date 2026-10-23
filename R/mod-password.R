@@ -77,6 +77,7 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
       }
 
       token <- if (is.function(auth$token)) auth$token() else NULL
+      new_password <- input$new
 
       ok <- tryCatch(
         {
@@ -95,6 +96,13 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
         form_version(form_version() + 1)
         changed(changed() + 1)
         shiny::showNotification(aa_text(settings, "done_password_changed"), type = "message")
+
+        # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+        weak <- aa_password_warning(new_password, settings, user$login)
+        if (!is.null(weak)) {
+          aa_emit(on_event, "weak_password_set", user$login, session$token, paste0(user$login, ": ", weak$reason))
+          shiny::showNotification(weak$text, type = "warning")
+        }
       }
     })
 

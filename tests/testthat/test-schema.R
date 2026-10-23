@@ -5,21 +5,21 @@ test_that("на пустой базе создаются все таблицы �
 
   res <- aa_init_db(con)
 
-  expect_identical(res$applied, 1:5)
-  expect_identical(res$version, 5L)
+  expect_identical(res$applied, 1:6)
+  expect_identical(res$version, 6L)
   expect_false(res$legacy)
   expect_identical(
     table_names(con),
     c("appauth_migrations", "auth_sessions", "login_attempts", "users")
   )
-  expect_identical(aa_schema_version(con), 5L)
+  expect_identical(aa_schema_version(con), 6L)
 })
 
 test_that("колонки таблиц соответствуют схеме Server Manager", {
   con <- new_db()
   aa_init_db(con)
 
-  expect_identical(columns_of(con, "users"), c("id", "login", "password", "role", "blocked", "must_change"))
+  expect_identical(columns_of(con, "users"), c("id", "login", "password", "role", "blocked", "must_change", "created_at", "last_login_at"))
   expect_identical(
     columns_of(con, "auth_sessions"),
     c("id", "user_login", "token_hash", "created_at", "expires_at", "revoked")
@@ -45,10 +45,11 @@ test_that("миграции записываются в служебную та�
 
   migrations <- DBI::dbGetQuery(con, "SELECT version, name FROM appauth_migrations ORDER BY version")
 
-  expect_identical(migrations$version, 1:5)
+  expect_identical(migrations$version, 1:6)
   expect_identical(
     migrations$name,
-    c("users", "users_blocked_column", "auth_sessions", "login_attempts", "users_must_change_column")
+    c("users", "users_blocked_column", "auth_sessions", "login_attempts", "users_must_change_column",
+      "users_created_and_last_login_columns")
   )
 })
 
@@ -64,7 +65,7 @@ test_that("повторный запуск ничего не меняет", {
   after <- lapply(c("users", "auth_sessions", "login_attempts", "appauth_migrations"), \(t) rows_of(con, t))
 
   expect_identical(res$applied, integer())
-  expect_identical(res$version, 5L)
+  expect_identical(res$version, 6L)
   expect_identical(before, after)
 })
 
@@ -78,7 +79,7 @@ test_that("Server Manager prod: старая схема достраиваетс
   res <- aa_init_db(con)
 
   expect_true(res$legacy)
-  expect_identical(res$applied, 1:5)
+  expect_identical(res$applied, 1:6)
   expect_true("blocked" %in% columns_of(con, "users"))
   expect_true("login_attempts" %in% table_names(con))
 
@@ -215,7 +216,7 @@ test_that("aa_prepare_db подготавливает базу и не брос�
   con <- new_db()
 
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
-  expect_identical(aa_schema_version(con), 5L)
+  expect_identical(aa_schema_version(con), 6L)
 
   expect_message(aa_prepare_db(new_db(), aa_settings()), "применены миграции схемы")
 })

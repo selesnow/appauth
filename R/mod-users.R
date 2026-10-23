@@ -81,6 +81,16 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       shiny::showNotification(text, type = type)
     }
 
+    # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+    warn_weak <- function(password, login) {
+      weak <- aa_password_warning(password, settings, login)
+
+      if (!is.null(weak)) {
+        emit("weak_password_set", paste0(login, ": ", weak$reason))
+        notify(weak$text, "warning")
+      }
+    }
+
     # администратор по серверному состоянию сессии и по текущим данным базы
     is_admin <- function() {
       acting <- acting_user()
@@ -147,12 +157,13 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       data <- overview()
 
       shown <- data.frame(
-        data$login, data$role, data$status, data$state,
+        data$login, data$role, data$status, data$created, data$last_login, data$state,
         stringsAsFactors = FALSE
       )
       names(shown) <- c(
         aa_text(settings, "col_login"), aa_text(settings, "col_role"),
-        aa_text(settings, "col_status"), "state"
+        aa_text(settings, "col_status"), aa_text(settings, "col_created"),
+        aa_text(settings, "col_last_login"), "state"
       )
 
       DT::datatable(
@@ -163,11 +174,11 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         options = list(
           dom = "t",
           paging = FALSE,
-          columnDefs = list(list(visible = FALSE, targets = 3)),
+          columnDefs = list(list(visible = FALSE, targets = 5)),
           rowCallback = DT::JS(
             "function(row, data) {",
-            "  if (data[3] === 'blocked') { $(row).addClass('aa-row-blocked'); }",
-            "  else if (data[3] === 'locked') { $(row).addClass('aa-row-locked'); }",
+            "  if (data[5] === 'blocked') { $(row).addClass('aa-row-blocked'); }",
+            "  else if (data[5] === 'locked') { $(row).addClass('aa-row-locked'); }",
             "}"
           )
         ),
@@ -361,6 +372,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       if (run_action(function() aa_set_password(conn, login, input$new_password, settings, must_change = must_change))) {
         emit("password_reset", login)
         notify(aa_text(settings, "done_password_reset", login))
+        warn_weak(input$new_password, login)
         shiny::removeModal()
         card_login(NULL)
       }
@@ -374,9 +386,40 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       notify(aa_text(settings, "done_sessions_revoked", login))
     })
 
+    # удаление необратимо: кнопка в карточке открывает окно подтверждения
+    delete_pending <- shiny::reactiveVal(NULL)
+
     shiny::observeEvent(input$delete, {
       require_admin()
       login <- target()
+      delete_pending(login)
+
+      shiny::showModal(shiny::modalDialog(
+        title = aa_text(settings, "delete_confirm_title"),
+        size = "s",
+        easyClose = FALSE,
+        footer = shiny::tagList(
+          shiny::actionButton(ns("delete_cancel"), aa_text(settings, "button_cancel"), class = "btn btn-default"),
+          shiny::actionButton(ns("delete_confirm"), aa_text(settings, "delete_confirm_button"), class = "btn btn-danger")
+        ),
+        shiny::p(aa_text(settings, "delete_confirm_text", login))
+      ))
+    })
+
+    shiny::observeEvent(input$delete_cancel, {
+      require_admin()
+      login <- delete_pending()
+      delete_pending(NULL)
+      shiny::req(aa_is_string(login))
+      show_card(login)
+    })
+
+    shiny::observeEvent(input$delete_confirm, {
+      require_admin()
+      login <- delete_pending()
+      # подтверждение действует только для пользователя, которого показали в окне
+      shiny::req(aa_is_string(login), identical(login, card_login()))
+      delete_pending(NULL)
 
       if (run_action(function() aa_delete_user(conn, login, acting_user()$login, settings))) {
         emit("user_removed", login)
@@ -446,6 +489,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       if (created) {
         emit("user_added", paste0(login, " (", role, ")"))
         notify(aa_text(settings, "done_user_added", login))
+        warn_weak(input$new_user_password, login)
         shiny::removeModal()
         version(version() + 1)
       }

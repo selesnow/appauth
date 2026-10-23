@@ -87,11 +87,25 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       aa_emit(on_event, event, login, session$token, value)
     }
 
+    # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+    warn_weak <- function(password, login) {
+      weak <- aa_password_warning(password, settings, login)
+
+      if (!is.null(weak)) {
+        emit("weak_password_set", login, paste0(login, ": ", weak$reason))
+        shiny::showNotification(weak$text, type = "warning")
+      }
+    }
+
     finish_login <- function(login, role, issue_token = TRUE) {
       message_text("")
       user(list(login = login, role = role))
 
       if (issue_token) {
+        # вход по паролю (в том числе после обязательной смены пароля и создания
+        # первого администратора); вход по cookie дату не обновляет
+        aa_touch_last_login(conn, login)
+
         token <- tryCatch(
           aa_issue_token(conn, login, settings),
           error = function(e) {
@@ -311,6 +325,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       if (changed) {
         pending(NULL)
         emit("password_changed", waiting$login)
+        warn_weak(input$change_password, waiting$login)
         finish_login(waiting$login, waiting$role)
         emit("login_success", waiting$login)
       }
@@ -347,6 +362,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
       if (isTRUE(created)) {
         emit("first_admin_created", login)
+        warn_weak(password, login)
         finish_login(login, settings$admin_role)
       }
     })

@@ -225,15 +225,6 @@ test_that("модуль входа отдаёт токен сессии для �
   })
 })
 
-password_run <- function(con, auth, expr, settings = aa_settings(), log = users_events()) {
-  rlang::inject(shiny::testServer(
-    aa_password_server,
-    args = list(conn = con, auth = auth, settings = settings, on_event = log$hook),
-    expr = !!rlang::enquo(expr)
-  ))
-  invisible(log)
-}
-
 test_that("модуль смены пароля: успех меняет пароль, событие, токен текущей сессии остаётся", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")

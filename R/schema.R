@@ -93,6 +93,23 @@ aa_migrations <- function() {
           DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0")
         }
       }
+    ),
+    list(
+      version = 6L,
+      name    = "users_created_and_last_login_columns",
+      up      = function(conn) {
+        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+
+        # SQLite не разрешает DEFAULT CURRENT_TIMESTAMP в ALTER TABLE, поэтому колонки
+        # допускают NULL: у уже существующих пользователей даты неизвестны
+        if (!"created_at" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN created_at TEXT")
+        }
+
+        if (!"last_login_at" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN last_login_at TEXT")
+        }
+      }
     )
   )
 }

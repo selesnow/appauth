@@ -106,6 +106,7 @@ test_that("себя заблокировать и удалить нельзя, �
     session$setInputs(open = "alsey")
     session$setInputs(block = 1)
     session$setInputs(delete = 1)
+    session$setInputs(delete_confirm = 1)
   })
 
   expect_equal(blocked_of(con, "alsey"), 0)
@@ -122,6 +123,7 @@ test_that("последнего активного администратора 
     session$setInputs(change_role = 1, role = "user")
     session$setInputs(block = 1)
     session$setInputs(delete = 2)
+    session$setInputs(delete_confirm = 2)
   })
 
   expect_equal(role_of(con, "alsey"), "admin")
@@ -189,6 +191,7 @@ test_that("удаление пользователя: запись и токен
   log <- run_users(con, {
     session$setInputs(open = "ivan")
     session$setInputs(delete = 1)
+    session$setInputs(delete_confirm = 1)
   })
 
   expect_null(aa_get_user(con, "ivan"))
@@ -200,7 +203,7 @@ test_that("действие без открытой карточки ничег�
   con <- users_fixture()
 
   log <- run_users(con, {
-    session$setInputs(delete = 1, block = 1, role = "viewer", change_role = 1, unlock = 1)
+    session$setInputs(delete = 1, delete_confirm = 1, block = 1, role = "viewer", change_role = 1, unlock = 1)
   })
 
   expect_equal(count_users(con), 3)
@@ -215,8 +218,10 @@ test_that("после закрытия карточки (удаление, сб�
   run_users(con, {
     session$setInputs(open = "ivan")
     session$setInputs(delete = 1)
+    session$setInputs(delete_confirm = 1)
     session$setInputs(open = "boss") # другая карточка
     session$setInputs(delete = 2)
+    session$setInputs(delete_confirm = 2)
     expect_null(aa_get_user(con, "boss"))
   })
 })
@@ -304,6 +309,7 @@ test_that("карточка несуществующего пользовате�
   run_users(con, {
     session$setInputs(open = "ghost")
     session$setInputs(delete = 1)
+    session$setInputs(delete_confirm = 1)
   })
 
   expect_equal(count_users(con), 3)

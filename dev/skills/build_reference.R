@@ -20,7 +20,8 @@ groups <- list(
        fns = c("aa_init_db", "aa_prepare_db", "aa_schema_version", "aa_cleanup", "aa_session_connection")),
   list(file = "api-passwords.md",       title = "Пароли",
        fns = c("aa_hash_password", "aa_verify_password", "aa_is_password_hash", "aa_validate_password",
-               "aa_validate_login", "aa_migrate_plaintext_passwords", "aa_check_default_accounts", "aa_common_passwords")),
+               "aa_validate_login", "aa_migrate_plaintext_passwords", "aa_check_default_accounts", "aa_common_passwords",
+               "aa_weak_password_warning")),
   list(file = "api-users.md",           title = "Пользователи",
        fns = c("aa_get_user", "aa_list_users", "aa_users_exist", "aa_users_overview", "aa_create_user",
                "aa_create_first_admin", "aa_validate_new_user", "aa_authenticate", "aa_set_password",
@@ -31,7 +32,7 @@ groups <- list(
                "aa_clear_attempts", "aa_issue_token", "aa_find_session_user", "aa_revoke_token",
                "aa_revoke_sessions", "aa_user_session_valid")),
   list(file = "api-permissions-events.md", title = "Права и события",
-       fns = c("aa_permissions_from_matrix", "aa_can", "aa_require", "aa_events")),
+       fns = c("aa_permissions_from_matrix", "aa_can", "aa_require", "aa_events", "aa_event_logger")),
   list(file = "api-modules.md",         title = "Модули интерфейса и помощники приложения",
        fns = c("aa_app_head", "aa_auth_ui", "aa_auth_server", "aa_users_ui", "aa_users_server",
                "aa_password_ui", "aa_password_server", "aa_session_guard", "aa_register_module"))

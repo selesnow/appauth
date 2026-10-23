@@ -267,7 +267,10 @@ aa_login_gate <- function(conn, login, settings = aa_settings()) {
 #' @returns Таблица с колонками `login`, `role`, `blocked`, `state` (`"blocked"`
 #'   при блокировке администратором, `"locked"` при блокировке по попыткам,
 #'   иначе `"ok"`), `lock_seconds` (секунд до конца блокировки по попыткам) и
-#'   `status` (текст статуса на языке настроек, для `"ok"` пустая строка).
+#'   `status` (текст статуса на языке настроек, для `"ok"` пустая строка), а
+#'   также `created_at` и `last_login_at` (даты из базы по UTC, как в
+#'   [aa_get_user()]) и `created` и `last_login` (те же даты для показа:
+#'   местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»).
 #' @export
 #'
 #' @examples
@@ -287,6 +290,8 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
     return(data.frame(
       login = character(), role = character(), blocked = integer(),
       state = character(), lock_seconds = integer(), status = character(),
+      created_at = character(), last_login_at = character(),
+      created = character(), last_login = character(),
       stringsAsFactors = FALSE
     ))
   }
@@ -313,6 +318,10 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
     state        = state,
     lock_seconds = lock_seconds,
     status       = status,
+    created_at    = as.character(users$created_at),
+    last_login_at = as.character(users$last_login_at),
+    created       = aa_format_db_time(users$created_at, aa_text(settings, "date_unknown")),
+    last_login    = aa_format_db_time(users$last_login_at, aa_text(settings, "date_never")),
     stringsAsFactors = FALSE
   )
 }

@@ -1,6 +1,6 @@
 Package: appauth
 Title: Безопасная авторизация и управление пользователями для Shiny приложений
-Version: 0.2.1
+Version: 0.3.0
 Authors@R:
     person("Alexey", "Seleznev", , "selesnow@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0410-7385"))

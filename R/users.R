@@ -33,6 +33,51 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
   )
 }
 
+#' Колонки пользователя для выборки
+#'
+#' Даты создания и последнего входа появились в схеме позже остальных колонок:
+#' если их в таблице ещё нет (схема не достроена), вместо них отдаётся `NULL`.
+#'
+#' @param conn Подключение к базе SQLite.
+#'
+#' @returns Строка со списком колонок для `SELECT`.
+#' @noRd
+aa_user_columns <- function(conn) {
+  cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+
+  paste0(
+    "login, role, blocked, ",
+    if ("created_at" %in% cols) "created_at" else "NULL AS created_at", ", ",
+    if ("last_login_at" %in% cols) "last_login_at" else "NULL AS last_login_at"
+  )
+}
+
+#' Запомнить время успешного входа по паролю
+#'
+#' @param conn Подключение к базе SQLite.
+#' @param login Логин.
+#'
+#' @returns Невидимо `TRUE`, если дата записана. Ошибка не прерывает вход.
+#' @noRd
+aa_touch_last_login <- function(conn, login) {
+  ok <- tryCatch(
+    {
+      DBI::dbExecute(
+        conn,
+        "UPDATE users SET last_login_at = datetime('now') WHERE login = ?",
+        params = list(login)
+      )
+      TRUE
+    },
+    error = function(e) {
+      message("appauth: не удалось записать время входа: ", conditionMessage(e))
+      FALSE
+    }
+  )
+
+  invisible(ok)
+}
+
 #' Пользователь по логину
 #'
 #' Логин сравнивается точно, с учётом регистра. Пароль в результат не
@@ -41,8 +86,11 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
 #' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
 #' @param login Логин.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role` и `blocked`
-#'   либо `NULL`, если такого пользователя нет.
+#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked`,
+#'   `created_at` и `last_login_at` либо `NULL`, если такого пользователя нет.
+#'   Даты хранятся текстом `"ГГГГ-ММ-ДД ЧЧ:ММ:СС"` по UTC; у пользователей,
+#'   созданных до версии 0.3.0, `created_at` пустая (`NA`), а `last_login_at`
+#'   пустая, пока пользователь не войдёт по паролю.
 #' @export
 #'
 #' @examples
@@ -63,7 +111,7 @@ aa_get_user <- function(conn, login) {
 
   user <- DBI::dbGetQuery(
     conn,
-    "SELECT login, role, blocked FROM users WHERE login = ?",
+    paste0("SELECT ", aa_user_columns(conn), " FROM users WHERE login = ?"),
     params = list(login)
   )
 
@@ -74,7 +122,8 @@ aa_get_user <- function(conn, login) {
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns Таблица с колонками `login`, `role` и `blocked` в порядке создания.
+#' @returns Таблица с колонками `login`, `role`, `blocked`, `created_at` и
+#'   `last_login_at` в порядке создания (описание дат: [aa_get_user()]).
 #'   Хеши паролей в результат не попадают.
 #' @export
 #'
@@ -89,7 +138,7 @@ aa_get_user <- function(conn, login) {
 aa_list_users <- function(conn) {
   aa_check_sqlite(conn)
 
-  DBI::dbGetQuery(conn, "SELECT login, role, blocked FROM users ORDER BY rowid")
+  DBI::dbGetQuery(conn, paste0("SELECT ", aa_user_columns(conn), " FROM users ORDER BY rowid"))
 }
 
 #' Есть ли в базе хотя бы один пользователь
@@ -127,7 +176,7 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
   if (!is.null(problem)) return(problem)
 
   if (check_password) {
-    problem <- aa_password_problem(password, settings)
+    problem <- aa_password_problem(password, settings, login)
     if (!is.null(problem)) return(problem)
   }
 
@@ -218,7 +267,7 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
   tryCatch(
     DBI::dbExecute(
       conn,
-      "INSERT INTO users (login, password, role, must_change) VALUES (?, ?, ?, ?)",
+      "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
       params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)))
     ),
     error = function(e) {
@@ -261,13 +310,13 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
   aa_check_sqlite(conn)
 
   problem <- aa_login_problem(login, settings)
-  if (is.null(problem)) problem <- aa_password_problem(password, settings)
+  if (is.null(problem)) problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
   n <- DBI::dbExecute(
     conn,
-    "INSERT INTO users (login, password, role)
-     SELECT ?, ?, ?
+    "INSERT INTO users (login, password, role, created_at)
+     SELECT ?, ?, ?, datetime('now')
      WHERE NOT EXISTS (SELECT 1 FROM users)",
     params = list(login, aa_hash_password(password), settings$admin_role)
   )
@@ -374,7 +423,7 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
                             must_change = FALSE, keep_token = NULL) {
   aa_check_sqlite(conn)
 
-  problem <- aa_password_problem(password, settings)
+  problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
   if (!aa_is_string(login)) {
@@ -707,7 +756,7 @@ aa_change_own_password <- function(conn, login, old_password, new_password,
     aa_abort_user(settings, "password_wrong")
   }
 
-  problem <- aa_password_problem(new_password, settings)
+  problem <- aa_password_problem(new_password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
   if (identical(old_password, new_password)) {

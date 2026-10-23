@@ -10,7 +10,8 @@ aa_list_users(conn)
 \item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 }
 \value{
-Таблица с колонками \code{login}, \code{role} и \code{blocked} в порядке создания.
+Таблица с колонками \code{login}, \code{role}, \code{blocked}, \code{created_at} и
+\code{last_login_at} в порядке создания (описание дат: \code{\link[=aa_get_user]{aa_get_user()}}).
 Хеши паролей в результат не попадают.
 }
 \description{

@@ -23,6 +23,11 @@
 #' @param password_min,password_max Минимальная и максимальная длина нового
 #'   пароля. Ограничение действует только для новых и сбрасываемых паролей,
 #'   существующие пароли не затрагиваются.
+#' @param password_policy Что делать со слабыми новыми паролями (из списка
+#'   [aa_common_passwords()], совпадающими с логином без учёта регистра или
+#'   состоящими из одного повторяющегося символа): `"off"` ничего не проверять,
+#'   `"warn"` (по умолчанию) принять пароль, но показать предупреждение, `"reject"`
+#'   отклонить пароль. Существующие пароли не затрагиваются.
 #' @param login_max Максимальная длина логина (логин также приводится к нижнему
 #'   регистру и обрезается по краям при подсчёте попыток).
 #' @param autologin Использовать ли автовход по cookie. Если `FALSE`, пользователь
@@ -66,6 +71,7 @@ aa_settings <- function(
     max_failed_logins_per_minute = 30,
     password_min                 = 6,
     password_max                 = 128,
+    password_policy              = "warn",
     login_max                    = 64,
     autologin                    = TRUE,
     session_days                 = 30,
@@ -89,6 +95,13 @@ aa_settings <- function(
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
   aa_check_positive(token_retention_days, "token_retention_days")
+
+  if (!(aa_is_string(password_policy) && password_policy %in% c("off", "warn", "reject"))) {
+    rlang::abort(
+      "Параметр `password_policy` должен быть одним из значений: \"off\", \"warn\", \"reject\".",
+      class = "appauth_error_settings"
+    )
+  }
 
   if (password_min > password_max) {
     rlang::abort(
@@ -126,7 +139,8 @@ aa_settings <- function(
       max_failed_logins_per_minute = max_failed_logins_per_minute,
       password_min                 = password_min,
       password_max                 = password_max,
-      login_max                    = login_max,
+      password_policy              = password_policy,
+      login_max                   = login_max,
       autologin                    = autologin,
       session_days                 = session_days,
       session_check_seconds        = session_check_seconds,
@@ -179,6 +193,7 @@ print.aa_settings <- function(x, ...) {
       " за ", x$lockout_minutes, " мин., блокировка на ", x$lockout_minutes, " мин.\n", sep = "")
   cat("  Общий лимит неудачных попыток: ", x$max_failed_logins_per_minute, " в минуту\n", sep = "")
   cat("  Длина нового пароля: от ", x$password_min, " до ", x$password_max, " символов\n", sep = "")
+  cat("  Слабые пароли: ", switch(x$password_policy, off = "не проверяются", warn = "предупреждение", reject = "отклоняются"), "\n", sep = "")
   cat("  Автовход: ", if (x$autologin) "включён" else "выключен",
       ", срок токена ", x$session_days, " дн.\n", sep = "")
   cat("  Пароль от администратора: ", if (x$must_change_default) "временный (смена при входе)" else "постоянный",

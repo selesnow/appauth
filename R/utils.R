@@ -77,6 +77,24 @@ aa_check_flag <- function(x, name, call = rlang::caller_env()) {
   invisible(x)
 }
 
+#' Дата из базы в местном времени для показа
+#'
+#' В базе даты хранятся по UTC текстом `"ГГГГ-ММ-ДД ЧЧ:ММ:СС"`.
+#'
+#' @param x Вектор дат из базы (текст или `NA`).
+#' @param missing Текст для пустых значений.
+#'
+#' @returns Вектор строк `"ГГГГ-ММ-ДД ЧЧ:ММ"` в часовом поясе сервера.
+#' @noRd
+aa_format_db_time <- function(x, missing = "") {
+  x <- as.character(x)
+  parsed <- as.POSIXct(x, tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
+  tz <- Sys.timezone()
+  out <- format(parsed, "%Y-%m-%d %H:%M", tz = if (is.na(tz)) "" else tz)
+  out[is.na(parsed)] <- missing
+  out
+}
+
 #' Одна ли это непустая строка
 #'
 #' @param x Значение.

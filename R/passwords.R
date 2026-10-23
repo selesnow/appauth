@@ -101,15 +101,53 @@ aa_dummy_hash <- function() {
   .aa_dummy$hash
 }
 
+#' Найти слабое место в пароле
+#'
+#' Проверяет пароль, который уже прошёл правила длины: входит ли он в список
+#' распространённых слабых паролей, совпадает ли с логином (без учёта регистра)
+#' и не состоит ли из одного повторяющегося символа.
+#'
+#' @param password Проверяемый пароль.
+#' @param login Логин пользователя или `NULL`, если он неизвестен.
+#'
+#' @returns Ключ текста (`password_common`, `password_equals_login`,
+#'   `password_repeated`) или `NULL`, если слабых мест не найдено.
+#' @noRd
+aa_password_weakness <- function(password, login = NULL) {
+  if (!aa_is_string(password)) {
+    return(NULL)
+  }
+
+  lower <- tolower(password)
+
+  if (aa_is_string(login) && identical(lower, tolower(login))) {
+    return("password_equals_login")
+  }
+
+  if (lower %in% aa_common_passwords()) {
+    return("password_common")
+  }
+
+  chars <- strsplit(password, "", fixed = TRUE)[[1]]
+  if (length(chars) >= 2 && length(unique(chars)) == 1) {
+    return("password_repeated")
+  }
+
+  NULL
+}
+
 #' Найти проблему в новом пароле
 #'
 #' @param password Проверяемый пароль.
 #' @param settings Настройки, результат [aa_settings()].
+#' @param login Логин пользователя для проверки совпадения пароля с логином
+#'   (необязательно). Слабые пароли отклоняются, только если
+#'   `settings$password_policy` равна `"reject"`.
 #'
 #' @returns `NULL`, если пароль подходит, иначе список `reason` (ключ текста) и
 #'   `args` (значения для подстановки в текст).
 #' @noRd
-aa_password_problem <- function(password, settings) {
+aa_password_problem <- function(password, settings, login = NULL) {
   if (!aa_is_string(password)) {
     return(list(reason = "password_empty", args = list()))
   }
@@ -124,7 +162,39 @@ aa_password_problem <- function(password, settings) {
     return(list(reason = "password_too_long", args = list(as.integer(settings$password_max))))
   }
 
+  if (identical(settings$password_policy, "reject")) {
+    weakness <- aa_password_weakness(password, login)
+    if (!is.null(weakness)) {
+      return(list(reason = weakness, args = list()))
+    }
+  }
+
   NULL
+}
+
+#' Предупреждение о слабом пароле (режим `password_policy = "warn"`)
+#'
+#' @param password Пароль, который только что приняли.
+#' @param settings Настройки, результат [aa_settings()].
+#' @param login Логин пользователя или `NULL`.
+#'
+#' @returns Список `reason` (ключ причины) и `text` (готовое сообщение) либо
+#'   `NULL`, если режим не `"warn"` или слабых мест нет.
+#' @noRd
+aa_password_warning <- function(password, settings, login = NULL) {
+  if (!identical(settings$password_policy, "warn")) {
+    return(NULL)
+  }
+
+  weakness <- aa_password_weakness(password, login)
+  if (is.null(weakness)) {
+    return(NULL)
+  }
+
+  list(
+    reason = weakness,
+    text   = aa_text(settings, "weak_password_notice", aa_text(settings, weakness))
+  )
 }
 
 #' Найти проблему в логине нового пользователя
@@ -173,8 +243,15 @@ aa_problem_text <- function(settings, problem) {
 #' символах, а не в байтах. Ограничения действуют только для новых паролей,
 #' уже существующие пароли не затрагиваются.
 #'
+#' Если в настройках `password_policy = "reject"`, слабые пароли (из списка
+#' [aa_common_passwords()], совпадающие с логином, из одного повторяющегося
+#' символа) тоже считаются ошибкой. Режим `"warn"` пароль не отклоняет: о
+#' слабом пароле сообщает [aa_weak_password_warning()].
+#'
 #' @param password Проверяемый пароль.
 #' @param settings Настройки, результат [aa_settings()].
+#' @param login Логин пользователя, нужен для проверки совпадения пароля с
+#'   логином (необязательно).
 #'
 #' @returns `NULL`, если пароль подходит, иначе текст ошибки (на языке настроек).
 #' @export
@@ -183,8 +260,33 @@ aa_problem_text <- function(settings, problem) {
 #' aa_validate_password("abc")
 #' aa_validate_password("long-enough-password")
 #' aa_validate_password("abc", aa_settings(texts = aa_texts("en")))
-aa_validate_password <- function(password, settings = aa_settings()) {
-  aa_problem_text(settings, aa_password_problem(password, settings))
+aa_validate_password <- function(password, settings = aa_settings(), login = NULL) {
+  aa_problem_text(settings, aa_password_problem(password, settings, login))
+}
+
+#' Предупреждение о слабом пароле
+#'
+#' В режиме `password_policy = "warn"` (по умолчанию) слабый пароль принимается,
+#' но пользователю нужно сообщить, что лучше выбрать надёжнее: встроенные модули
+#' показывают это уведомлением после успешной смены пароля. Функция нужна
+#' приложениям со своим интерфейсом. Слабым считается пароль из списка
+#' [aa_common_passwords()], совпадающий с логином (без учёта регистра) или
+#' состоящий из одного повторяющегося символа.
+#'
+#' @param password Принятый пароль.
+#' @param settings Настройки, результат [aa_settings()].
+#' @param login Логин пользователя (необязательно).
+#'
+#' @returns Текст предупреждения (на языке настроек) либо `NULL`, если режим не
+#'   `"warn"` или слабых мест нет.
+#' @export
+#'
+#' @examples
+#' aa_weak_password_warning("123456")
+#' aa_weak_password_warning("boss", login = "Boss")
+#' aa_weak_password_warning("long-and-unusual-phrase")
+aa_weak_password_warning <- function(password, settings = aa_settings(), login = NULL) {
+  aa_password_warning(password, settings, login)$text
 }
 
 #' Проверить логин нового пользователя

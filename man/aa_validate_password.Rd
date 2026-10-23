@@ -4,12 +4,15 @@
 \alias{aa_validate_password}
 \title{Проверить новый пароль по правилам}
 \usage{
-aa_validate_password(password, settings = aa_settings())
+aa_validate_password(password, settings = aa_settings(), login = NULL)
 }
 \arguments{
 \item{password}{Проверяемый пароль.}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+
+\item{login}{Логин пользователя, нужен для проверки совпадения пароля с
+логином (необязательно).}
 }
 \value{
 \code{NULL}, если пароль подходит, иначе текст ошибки (на языке настроек).
@@ -19,6 +22,12 @@ aa_validate_password(password, settings = aa_settings())
 Правила берутся из настроек: минимальная и максимальная длина считаются в
 символах, а не в байтах. Ограничения действуют только для новых паролей,
 уже существующие пароли не затрагиваются.
+}
+\details{
+Если в настройках \code{password_policy = "reject"}, слабые пароли (из списка
+\code{\link[=aa_common_passwords]{aa_common_passwords()}}, совпадающие с логином, из одного повторяющегося
+символа) тоже считаются ошибкой. Режим \code{"warn"} пароль не отклоняет: о
+слабом пароле сообщает \code{\link[=aa_weak_password_warning]{aa_weak_password_warning()}}.
 }
 \examples{
 aa_validate_password("abc")

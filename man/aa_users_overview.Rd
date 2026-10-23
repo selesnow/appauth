@@ -15,7 +15,10 @@ aa_users_overview(conn, settings = aa_settings())
 Таблица с колонками \code{login}, \code{role}, \code{blocked}, \code{state} (\code{"blocked"}
 при блокировке администратором, \code{"locked"} при блокировке по попыткам,
 иначе \code{"ok"}), \code{lock_seconds} (секунд до конца блокировки по попыткам) и
-\code{status} (текст статуса на языке настроек, для \code{"ok"} пустая строка).
+\code{status} (текст статуса на языке настроек, для \code{"ok"} пустая строка), а
+также \code{created_at} и \code{last_login_at} (даты из базы по UTC, как в
+\code{\link[=aa_get_user]{aa_get_user()}}) и \code{created} и \code{last_login} (те же даты для показа:
+местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»).
 }
 \description{
 Список пользователей с признаками, которые нужны для таблицы на вкладке

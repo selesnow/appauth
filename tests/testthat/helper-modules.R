@@ -58,6 +58,16 @@ fake_auth <- function(login = "alsey", role = "admin") {
   list(user = state)
 }
 
+# модуль смены своего пароля через testServer
+password_run <- function(con, auth, expr, settings = aa_settings(), log = users_events()) {
+  rlang::inject(shiny::testServer(
+    aa_password_server,
+    args = list(conn = con, auth = auth, settings = settings, on_event = log$hook),
+    expr = !!rlang::enquo(expr)
+  ))
+  invisible(log)
+}
+
 run_users <- function(con, expr, auth = fake_auth(), settings = aa_settings(), log = users_events(), ...) {
   rlang::inject(shiny::testServer(
     aa_users_server,

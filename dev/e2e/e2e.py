@@ -84,7 +84,12 @@ with sync_playwright() as p:
     lcls = lrow.get_attribute("class") or ""
     lbg = lrow.locator("td").first.evaluate("e => getComputedStyle(e).backgroundColor")
     check("строка с блокировкой по попыткам: класс aa-row-locked и оранжевый фон", "aa-row-locked" in lcls and lbg.startswith("rgba(245, 158, 11"), (lcls, lbg))
-    check("колонка state скрыта", page.locator("#users-table thead th").count() == 3, page.locator("#users-table thead th").count())
+    heads = [h.strip() for h in page.locator("#users-table thead th").all_inner_texts()]
+    check("колонка state скрыта, колонки дат показаны", heads == ["Логин", "Роль", "Статус", "Создан", "Последний вход"], heads)
+    alsey_row = page.locator("#users-table tbody tr", has_text="alsey").inner_text()
+    ivan_row = page.locator("#users-table tbody tr", has_text="ivan").inner_text()
+    check("у вошедшего администратора указана дата последнего входа", re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}.*\d{4}-\d{2}-\d{2} \d{2}:\d{2}", alsey_row.replace("\n", " ").replace("\t", " ")), alsey_row)
+    check("у не входившего пользователя «не входил», дата создания есть", "не входил" in ivan_row and re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}", ivan_row), ivan_row)
     shot(page, "05_users_table")
 
     # --- карточка и блокировка ivan -------------------------------------
@@ -159,6 +164,34 @@ with sync_playwright() as p:
     pg2.wait_for_timeout(1500)
     check("добавленный пользователь появился в таблице", pg2.locator("#users-table tbody tr", has_text="newbie").count() == 1)
     shot(pg2, "11_after_add")
+
+    # --- слабый пароль при добавлении (режим warn): принят, но с предупреждением ----
+    pg2.click("#users-add")
+    pg2.wait_for_selector("#users-new_login", timeout=10000)
+    pg2.fill("#users-new_login", "weakling")
+    pg2.fill("#users-new_user_password", "123456")
+    pg2.fill("#users-new_user_confirm", "123456")
+    pg2.click("#users-add_confirm")
+    pg2.wait_for_timeout(1500)
+    notes = " ".join(pg2.locator(".shiny-notification").all_inner_texts())
+    check("слабый пароль принят и показано предупреждение", pg2.locator("#users-table tbody tr", has_text="weakling").count() == 1 and "слабый" in notes, notes)
+    shot(pg2, "11b_weak_password_warning")
+
+    # --- удаление требует подтверждения ---------------------------------------------
+    pg2.locator("#users-table tbody tr", has_text="weakling").dblclick()
+    pg2.wait_for_selector("#users-delete", timeout=10000)
+    pg2.click("#users-delete")
+    pg2.wait_for_selector("#users-delete_confirm", timeout=10000)
+    check("удаление: окно подтверждения с названием пользователя", "weakling" in pg2.inner_text(".modal-body") and pg2.locator("#users-delete_cancel").count() == 1)
+    shot(pg2, "11c_delete_confirm")
+    pg2.click("#users-delete_cancel")
+    pg2.wait_for_selector("#users-delete", timeout=10000)
+    check("отмена удаления возвращает карточку, пользователь остаётся", pg2.locator("#users-table tbody tr", has_text="weakling").count() == 1)
+    pg2.click("#users-delete")
+    pg2.wait_for_selector("#users-delete_confirm", timeout=10000)
+    pg2.click("#users-delete_confirm")
+    pg2.wait_for_timeout(1500)
+    check("после подтверждения пользователь удалён", pg2.locator("#users-table tbody tr", has_text="weakling").count() == 0)
 
     # --- принудительный выход: админ блокирует пользователя с открытой сессией ----
     ctx3 = browser.new_context(viewport={"width": 1280, "height": 900})

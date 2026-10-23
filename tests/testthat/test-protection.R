@@ -346,7 +346,7 @@ test_that("обзор пользователей: состояния, стату
 
   ov <- aa_users_overview(con)
 
-  expect_identical(names(ov), c("login", "role", "blocked", "state", "lock_seconds", "status"))
+  expect_identical(names(ov), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login"))
   expect_identical(ov$login, c("boss", "worker", "viewer1", "both"))
   expect_identical(ov$state, c("ok", "blocked", "locked", "blocked"))
   expect_identical(ov$status[1], "")
@@ -363,7 +363,7 @@ test_that("обзор пользователей на английском и с
 
   empty <- aa_users_overview(con)
   expect_identical(nrow(empty), 0L)
-  expect_identical(names(empty), c("login", "role", "blocked", "state", "lock_seconds", "status"))
+  expect_identical(names(empty), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login"))
 
   raw_user(con, "worker", "user", blocked = 1)
   en <- aa_users_overview(con, aa_settings(texts = aa_texts("en")))

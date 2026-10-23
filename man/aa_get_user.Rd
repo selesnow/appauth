@@ -12,8 +12,11 @@ aa_get_user(conn, login)
 \item{login}{Логин.}
 }
 \value{
-Таблица из одной строки с колонками \code{login}, \code{role} и \code{blocked}
-либо \code{NULL}, если такого пользователя нет.
+Таблица из одной строки с колонками \code{login}, \code{role}, \code{blocked},
+\code{created_at} и \code{last_login_at} либо \code{NULL}, если такого пользователя нет.
+Даты хранятся текстом \code{"ГГГГ-ММ-ДД ЧЧ:ММ:СС"} по UTC; у пользователей,
+созданных до версии 0.3.0, \code{created_at} пустая (\code{NA}), а \code{last_login_at}
+пустая, пока пользователь не войдёт по паролю.
 }
 \description{
 Логин сравнивается точно, с учётом регистра. Пароль в результат не

@@ -5,7 +5,7 @@ test_that("aa_get_user и aa_list_users не возвращают пароль, 
   raw_user(con, "alsey", "admin")
   raw_user(con, "Ida", "viewer", blocked = 1)
 
-  expect_identical(names(aa_get_user(con, "alsey")), c("login", "role", "blocked"))
+  expect_identical(names(aa_get_user(con, "alsey")), c("login", "role", "blocked", "created_at", "last_login_at"))
   expect_identical(aa_get_user(con, "alsey")$role, "admin")
   expect_identical(aa_get_user(con, "Ida")$blocked, 1L)
   expect_null(aa_get_user(con, "ida"))
@@ -17,7 +17,7 @@ test_that("aa_get_user и aa_list_users не возвращают пароль, 
   }
 
   users <- aa_list_users(con)
-  expect_identical(names(users), c("login", "role", "blocked"))
+  expect_identical(names(users), c("login", "role", "blocked", "created_at", "last_login_at"))
   expect_identical(users$login, c("alsey", "Ida"))
 })
 
