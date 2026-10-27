@@ -47,6 +47,20 @@
 #'   `TRUE` (по умолчанию): пароль, который задал администратор, временный, и
 #'   администратор снимает галочку, если смена не нужна. `FALSE`: галочка
 #'   выключена, администратор включает её сам.
+#' @param reset_enabled Включить восстановление пароля по email: на форме входа
+#'   появляется ссылка «Забыли пароль?». По умолчанию `FALSE`. Требует `send_reset`
+#'   и `reset_base_url`.
+#' @param send_reset Функция отправки письма `function(email, link, login)`:
+#'   отправляет письмо со ссылкой `link` на адрес `email` (например, через
+#'   `emayili`). Ошибка в функции не прерывает запрос и не видна пользователю,
+#'   причина попадает в событие `password_reset_requested`.
+#' @param reset_base_url Адрес приложения, на который ведёт ссылка из письма, например
+#'   `"https://apps.example.com/my_app"`. К нему добавляется `?reset=<токен>`.
+#' @param reset_ttl_minutes Срок жизни ссылки для смены пароля, минут.
+#' @param reset_max_per_hour Сколько писем для восстановления можно отправить
+#'   одному пользователю за час, остальные запросы молча игнорируются.
+#' @param reset_max_per_minute Общий лимит писем восстановления по всем
+#'   пользователям за минуту (защита от рассылки спама).
 #' @param texts Тексты интерфейса, результат [aa_texts()].
 #'
 #' @returns Список настроек класса `aa_settings`.
@@ -55,6 +69,13 @@
 #' @examples
 #' # настройки по умолчанию
 #' settings <- aa_settings()
+#'
+#' # восстановление пароля по email
+#' settings <- aa_settings(
+#'   reset_enabled  = TRUE,
+#'   reset_base_url = "https://apps.example.com/my_app",
+#'   send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+#' )
 #'
 #' # более строгая защита, английский интерфейс и свои роли
 #' settings <- aa_settings(
@@ -81,6 +102,12 @@ aa_settings <- function(
     roles                        = c("admin", "user", "viewer"),
     admin_role                   = "admin",
     must_change_default          = TRUE,
+    reset_enabled                = FALSE,
+    send_reset                   = NULL,
+    reset_base_url               = NULL,
+    reset_ttl_minutes            = 60,
+    reset_max_per_hour           = 3,
+    reset_max_per_minute         = 10,
     texts                        = aa_texts("ru")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
@@ -91,6 +118,10 @@ aa_settings <- function(
   aa_check_positive(login_max, "login_max")
   aa_check_flag(autologin, "autologin")
   aa_check_flag(must_change_default, "must_change_default")
+  aa_check_flag(reset_enabled, "reset_enabled")
+  aa_check_positive(reset_ttl_minutes, "reset_ttl_minutes")
+  aa_check_positive(reset_max_per_hour, "reset_max_per_hour")
+  aa_check_positive(reset_max_per_minute, "reset_max_per_minute")
   aa_check_positive(session_days, "session_days")
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
@@ -99,6 +130,27 @@ aa_settings <- function(
   if (!(aa_is_string(password_policy) && password_policy %in% c("off", "warn", "reject"))) {
     rlang::abort(
       "Параметр `password_policy` должен быть одним из значений: \"off\", \"warn\", \"reject\".",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!(is.null(send_reset) || is.function(send_reset))) {
+    rlang::abort(
+      "Параметр `send_reset` должен быть функцией `function(email, link, login)` или `NULL`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!(is.null(reset_base_url) || aa_is_string(reset_base_url))) {
+    rlang::abort(
+      "Параметр `reset_base_url` должен быть строкой с адресом приложения или `NULL`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (reset_enabled && !(is.function(send_reset) && aa_is_string(reset_base_url))) {
+    rlang::abort(
+      "Для `reset_enabled = TRUE` нужны функция `send_reset` и адрес приложения `reset_base_url`.",
       class = "appauth_error_settings"
     )
   }
@@ -149,6 +201,12 @@ aa_settings <- function(
       roles                        = roles,
       admin_role                   = admin_role,
       must_change_default          = must_change_default,
+      reset_enabled                = reset_enabled,
+      send_reset                   = send_reset,
+      reset_base_url               = reset_base_url,
+      reset_ttl_minutes            = reset_ttl_minutes,
+      reset_max_per_hour           = reset_max_per_hour,
+      reset_max_per_minute         = reset_max_per_minute,
       texts                        = texts
     ),
     class = "aa_settings"
@@ -198,6 +256,9 @@ print.aa_settings <- function(x, ...) {
       ", срок токена ", x$session_days, " дн.\n", sep = "")
   cat("  Пароль от администратора: ", if (x$must_change_default) "временный (смена при входе)" else "постоянный",
       " по умолчанию\n", sep = "")
+  cat("  Восстановление пароля по email: ",
+      if (x$reset_enabled) paste0("включено, ссылка действует ", x$reset_ttl_minutes, " мин.") else "выключено",
+      "\n", sep = "")
   cat("  Роли: ", paste(x$roles, collapse = ", "),
       " (администратор: ", x$admin_role, ")\n", sep = "")
   cat("  Язык интерфейса: ", attr(x$texts, "lang"), "\n", sep = "")

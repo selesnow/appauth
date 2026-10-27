@@ -18,11 +18,20 @@ library(appauth)
 
 all_permissions <- c("reports", "export")
 
+# Вместо письма пример пишет ссылку восстановления пароля в консоль; в настоящем
+# приложении здесь отправка почты, например через пакет emayili
+send_reset <- function(email, link, login) {
+  message(sprintf("[reset] %s (%s): %s", login, email, link))
+}
+
 settings <- aa_settings(
   roles = c("owner", "editor", "viewer"),
   admin_role = "owner",
   must_change_default = FALSE,
   max_failed_logins = 3,
+  reset_enabled = TRUE,
+  send_reset = send_reset,
+  reset_base_url = Sys.getenv("APPAUTH_EXAMPLE_URL", "http://127.0.0.1:3838"),
   texts = aa_texts("en", login_title = "Reports portal", login_button = "Sign in")
 )
 

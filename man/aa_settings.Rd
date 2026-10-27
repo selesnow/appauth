@@ -20,6 +20,12 @@ aa_settings(
   roles = c("admin", "user", "viewer"),
   admin_role = "admin",
   must_change_default = TRUE,
+  reset_enabled = FALSE,
+  send_reset = NULL,
+  reset_base_url = NULL,
+  reset_ttl_minutes = 60,
+  reset_max_per_hour = 3,
+  reset_max_per_minute = 10,
   texts = aa_texts("ru")
 )
 }
@@ -70,6 +76,26 @@ aa_settings(
 администратор снимает галочку, если смена не нужна. \code{FALSE}: галочка
 выключена, администратор включает её сам.}
 
+\item{reset_enabled}{Включить восстановление пароля по email: на форме входа
+появляется ссылка «Забыли пароль?». По умолчанию \code{FALSE}. Требует \code{send_reset}
+и \code{reset_base_url}.}
+
+\item{send_reset}{Функция отправки письма \verb{function(email, link, login)}:
+отправляет письмо со ссылкой \code{link} на адрес \code{email} (например, через
+\code{emayili}). Ошибка в функции не прерывает запрос и не видна пользователю,
+причина попадает в событие \code{password_reset_requested}.}
+
+\item{reset_base_url}{Адрес приложения, на который ведёт ссылка из письма, например
+\code{"https://apps.example.com/my_app"}. К нему добавляется \verb{?reset=<токен>}.}
+
+\item{reset_ttl_minutes}{Срок жизни ссылки для смены пароля, минут.}
+
+\item{reset_max_per_hour}{Сколько писем для восстановления можно отправить
+одному пользователю за час, остальные запросы молча игнорируются.}
+
+\item{reset_max_per_minute}{Общий лимит писем восстановления по всем
+пользователям за минуту (защита от рассылки спама).}
+
 \item{texts}{Тексты интерфейса, результат \code{\link[=aa_texts]{aa_texts()}}.}
 }
 \value{
@@ -96,6 +122,13 @@ aa_settings(
 \examples{
 # настройки по умолчанию
 settings <- aa_settings()
+
+# восстановление пароля по email
+settings <- aa_settings(
+  reset_enabled  = TRUE,
+  reset_base_url = "https://apps.example.com/my_app",
+  send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+)
 
 # более строгая защита, английский интерфейс и свои роли
 settings <- aa_settings(

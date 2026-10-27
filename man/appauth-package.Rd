@@ -28,5 +28,10 @@ Useful links:
 \author{
 \strong{Maintainer}: Alexey Seleznev \email{selesnow@gmail.com} (\href{https://orcid.org/0000-0003-0410-7385}{ORCID})
 
+Authors:
+\itemize{
+  \item Alexey Seleznev \email{selesnow@gmail.com} (\href{https://orcid.org/0000-0003-0410-7385}{ORCID})
+}
+
 }
 \keyword{internal}

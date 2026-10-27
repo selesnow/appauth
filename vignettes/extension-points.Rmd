@@ -229,6 +229,48 @@ observeEvent(input$logout, auth$logout(reload = TRUE))
 
 Рабочий пример: `examples/minimal-app`.
 
+# Восстановление пароля по email
+
+По умолчанию выключено. Чтобы включить, нужны три вещи: функция отправки письма, адрес приложения для ссылки и адреса пользователей.
+
+```{r, eval = FALSE}
+library(emayili)
+
+# функция отправки: пакет сам письма не шлёт, он только отдаёт адрес и ссылку
+send_reset <- function(email, link, login) {
+  msg <- envelope() %>%
+    from("Netpeak Analytics Dept. <bi@netpeak.net>") %>%
+    to(email) %>%
+    subject("Восстановление пароля") %>%
+    html(paste0(
+      "<p>Здравствуйте, ", htmltools::htmlEscape(login), "!</p>",
+      "<p>Чтобы задать новый пароль, перейдите по <a href='", link, "'>ссылке</a>. ",
+      "Она действует 60 минут и работает один раз.</p>",
+      "<p>Если вы не запрашивали восстановление, просто проигнорируйте письмо.</p>"
+    ))
+
+  smtp <- gmail(Sys.getenv("DEPT_EMAIL"), Sys.getenv("DEPT_EMAIL_PWD"))
+  smtp(msg)
+}
+
+settings <- aa_settings(
+  reset_enabled  = TRUE,
+  send_reset     = send_reset,
+  reset_base_url = "https://apps.example.com/my_app"   # адрес приложения, как его видят пользователи
+)
+```
+
+Дальше ничего подключать не нужно: `aa_auth_server()` сам показывает ссылку «Забыли пароль?», читает параметр `reset` из адреса, показывает форму нового пароля и сообщает события `password_reset_requested`, `password_reset_done` и `password_reset_failed`.
+
+* **Адреса пользователей** администратор указывает в карточке пользователя (блок «Email для восстановления пароля») или при добавлении пользователя; программно это `aa_set_email()` и аргумент `email` у `aa_create_user()`. Без адреса письмо не уходит, пользователю остаётся сброс пароля администратором.
+* **Ответ пользователю всегда один и тот же**: найден ли пользователь, есть ли у него адрес и не превышен ли лимит, видно только в событии `password_reset_requested` (в `value` лежит причина: `sent`, `no_user`, `no_email`, `blocked`, `throttled`, `send_failed`).
+* **`reset_base_url`** должен вести на приложение так, как его открывают пользователи, вместе с префиксом nginx и по HTTPS. К нему добавляется `/?reset=<токен>`.
+* **Функция `send_reset`** выполняется в сессии пользователя, поэтому долгая отправка задержит ответ. Если ошибка выбросится, пользователь её не увидит, а причина (`send_failed`) попадёт в событие и в лог приложения.
+* **Лимиты**: `reset_max_per_hour` писем на пользователя и `reset_max_per_minute` на всё приложение; лишние запросы молча игнорируются.
+* **Свой интерфейс**: логика доступна без модуля, это `aa_request_password_reset()`, `aa_reset_token_login()` и `aa_reset_password_with_token()`.
+
+Тексты формы меняются ключами `forgot_*`, `reset_*` и `email_*` (`aa_text_keys()`).
+
 # Тексты
 
 Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.
@@ -287,6 +329,9 @@ ui <- fluidPage(
 | `attempts_retention_hours`, `token_retention_days` | 24, 30 | сколько хранить попытки и просроченные токены |
 | `roles`, `admin_role` | `admin`, `user`, `viewer` / `admin` | роли |
 | `must_change_default` | `TRUE` | пароль от администратора по умолчанию временный |
+| `reset_enabled` | `FALSE` | восстановление пароля по email (нужны `send_reset` и `reset_base_url`) |
+| `reset_ttl_minutes` | 60 | срок жизни ссылки из письма |
+| `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | лимит писем на пользователя за час и общий за минуту |
 
 Настройки удобно держать в `config.yaml` и читать через `aa_settings_from_list()`: лишние ключи в списке игнорируются, а язык и тексты задаются отдельным аргументом.
 

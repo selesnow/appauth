@@ -22,6 +22,7 @@
 * Ручная блокировка и удаление пользователей, смена роли, сброс пароля, завершение всех сессий. Нельзя заблокировать или удалить себя и последнего активного администратора, а также снять с него роль.
 * Принудительный выход: заблокированный, удалённый, с изменённой ролью или со сброшенным паролем пользователь теряет открытую сессию за интервал проверки (по умолчанию 30 секунд).
 * Смена собственного пароля, обязательная смена временного пароля, который задал администратор, и выход на всех устройствах (`auth$logout_all()`).
+* Восстановление пароля по email: одноразовая ссылка из письма, лимиты на письма, ответ формы не раскрывает, существует ли пользователь (выключено по умолчанию, письмо отправляет функция приложения).
 * Серверные проверки прав (`aa_can()`, `aa_require()`), права из матрицы «право -> роли» или из любого своего источника.
 * Готовые модули: вход, пользователи (со слотами для своих блоков), смена пароля; стили с переменными и светлой темой.
 * Одно место для логирования: хук событий `on_event`, каталог событий `aa_events()`.
@@ -64,6 +65,7 @@ shinyApp(ui, server)
 | База данных | `aa_init_db()`, `aa_prepare_db()`, `aa_schema_version()`, `aa_cleanup()`, `aa_session_connection()` |
 | Пароли | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()` |
 | Пользователи | `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
+| Восстановление пароля | `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()` |
 | Защита входа | `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()` |
 | Сессии | `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_user_session_valid()` |
 | Права | `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()` |

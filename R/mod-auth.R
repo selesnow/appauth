@@ -27,6 +27,18 @@ aa_auth_ui <- function(id) {
 #' верного пароля показывается форма смены пароля, и в приложение пользователь
 #' попадает только после смены.
 #'
+#' @section Восстановление пароля по email:
+#' При `reset_enabled = TRUE` в настройках ([aa_settings()]) на форме входа
+#' появляется ссылка «Забыли пароль?». Пользователь вводит логин или email, ему
+#' уходит письмо со ссылкой `<reset_base_url>/?reset=<токен>`, а ответ на экране
+#' всегда один и тот же, независимо от того, найден ли пользователь. Модуль сам
+#' читает параметр `reset` из адресной строки, убирает его из адреса и показывает
+#' форму нового пароля, если ссылка рабочая. После смены пароля пользователь входит
+#' как обычно: автоматически его не пускают. Модуль сообщает события
+#' `password_reset_requested`, `password_reset_done` и `password_reset_failed`.
+#' Логика без интерфейса: [aa_request_password_reset()] и
+#' [aa_reset_password_with_token()].
+#'
 #' Роль и логин берутся из базы, а не из введённой строки. Подключение `conn`
 #' принадлежит приложению: закрывайте его при завершении сессии.
 #'
@@ -78,6 +90,10 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     current_token <- NULL
     # вошёл с паролем, который задал администратор: пока не сменит, в приложение не пускаем
     pending <- shiny::reactiveVal(NULL)
+    # какая форма показана до входа: "login" или "forgot" (запрос ссылки)
+    mode <- shiny::reactiveVal("login")
+    # токен из ссылки восстановления, по которому показана форма нового пароля
+    reset_pending <- shiny::reactiveVal(NULL)
 
     users_exist <- shiny::reactiveVal(
       tryCatch(aa_users_exist(conn), error = function(e) TRUE)
@@ -122,6 +138,30 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           )
         }
       }
+    }
+
+    # ссылка восстановления пароля из письма: ?reset=<токен>
+    if (isTRUE(settings$reset_enabled)) {
+      shiny::observeEvent(aa_url_search(session), {
+        token <- shiny::parseQueryString(aa_url_search(session))[["reset"]]
+
+        if (!aa_is_string(token) || !is.null(shiny::isolate(user()))) {
+          return()
+        }
+
+        # токен не должен оставаться в адресе: он попадёт в историю и закладки
+        shiny::updateQueryString("?", mode = "replace", session = session)
+
+        login <- tryCatch(aa_reset_token_login(conn, token), error = function(e) NULL)
+
+        if (is.null(login)) {
+          message_text(aa_text(settings, "reset_link_invalid"))
+          emit("password_reset_failed")
+        } else {
+          message_text("")
+          reset_pending(token)
+        }
+      }, once = TRUE)
     }
 
     # автовход по cookie
@@ -211,13 +251,35 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           shiny::actionButton(ns("change_btn"), aa_text(settings, "password_change_button"), class = "aa-login-button"),
           shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
         )
+      } else if (!is.null(reset_pending())) {
+        heading <- aa_text(settings, "reset_title")
+        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "reset_hint"))
+        shiny::tagList(
+          shiny::passwordInput(ns("reset_password"), aa_text(settings, "password_new_label")),
+          shiny::passwordInput(ns("reset_confirm"), aa_text(settings, "password_confirm_label")),
+          shiny::actionButton(ns("reset_btn"), aa_text(settings, "reset_save_button"), class = "aa-login-button"),
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
+          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+        )
+      } else if (users_exist() && identical(mode(), "forgot") && isTRUE(settings$reset_enabled)) {
+        heading <- aa_text(settings, "forgot_title")
+        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "forgot_hint"))
+        shiny::tagList(
+          shiny::textInput(ns("forgot_identifier"), aa_text(settings, "forgot_identifier_label")),
+          shiny::actionButton(ns("forgot_btn"), aa_text(settings, "forgot_button"), class = "aa-login-button"),
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
+          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+        )
       } else if (users_exist()) {
         heading <- title %||% aa_text(settings, "login_title")
         shiny::tagList(
           shiny::textInput(ns("login"), aa_text(settings, "login_label")),
           shiny::passwordInput(ns("password"), aa_text(settings, "password_label")),
           shiny::actionButton(ns("login_btn"), aa_text(settings, "login_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
+          if (isTRUE(settings$reset_enabled)) {
+            shiny::div(class = "aa-login-hint", shiny::actionLink(ns("forgot_link"), aa_text(settings, "forgot_link")))
+          }
         )
       } else {
         heading <- aa_text(settings, "setup_title")
@@ -331,6 +393,69 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       }
     })
 
+    shiny::observeEvent(input$forgot_link, {
+      shiny::req(isTRUE(settings$reset_enabled))
+      message_text("")
+      mode("forgot")
+    })
+
+    shiny::observeEvent(input$back_link, {
+      message_text("")
+      reset_pending(NULL)
+      mode("login")
+    })
+
+    shiny::observeEvent(input$forgot_btn, {
+      shiny::req(isTRUE(settings$reset_enabled))
+
+      res <- tryCatch(
+        aa_request_password_reset(conn, input$forgot_identifier, settings),
+        error = function(e) {
+          message("appauth: не удалось обработать запрос восстановления пароля: ", conditionMessage(e))
+          list(reason = "error", login = NA_character_)
+        }
+      )
+
+      # в журнал уходит причина, пользователю ответ всегда один и тот же
+      emit("password_reset_requested", if (is.na(res$login)) NULL else res$login, res$reason)
+      message_text(aa_text(settings, "forgot_done", as.integer(round(settings$reset_ttl_minutes))))
+    })
+
+    shiny::observeEvent(input$reset_btn, {
+      token <- reset_pending()
+      shiny::req(token)
+
+      if (!identical(input$reset_password, input$reset_confirm)) {
+        message_text(aa_text(settings, "passwords_mismatch"))
+        return()
+      }
+
+      login <- tryCatch(
+        aa_reset_password_with_token(conn, token, input$reset_password, settings),
+        appauth_error_user = function(e) {
+          message_text(conditionMessage(e))
+
+          # ссылка больше не работает: слабый пароль токен не тратит, остальное да
+          if (identical(e$reason, "reset_link_invalid")) {
+            reset_pending(NULL)
+            mode("login")
+            emit("password_reset_failed")
+            message_text(conditionMessage(e))
+          }
+
+          NULL
+        }
+      )
+
+      if (!is.null(login)) {
+        reset_pending(NULL)
+        mode("login")
+        emit("password_reset_done", login)
+        warn_weak(input$reset_password, login)
+        message_text(aa_text(settings, "reset_done"))
+      }
+    })
+
     shiny::observeEvent(input$setup_btn, {
       # пользователя могли создать в другой вкладке или сессии
       if (tryCatch(aa_users_exist(conn), error = function(e) FALSE)) {
@@ -376,4 +501,17 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       token = function() current_token
     )
   })
+}
+
+#' Строка параметров адреса страницы
+#'
+#' Вынесено в функцию, чтобы тесты могли подменить адрес: у mock-сессии Shiny
+#' адресная строка не настраивается.
+#'
+#' @param session Сессия модуля.
+#'
+#' @returns Строка вида `"?reset=abc"` (может быть пустой).
+#' @noRd
+aa_url_search <- function(session) {
+  session$clientData$url_search
 }

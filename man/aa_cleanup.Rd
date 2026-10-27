@@ -12,14 +12,16 @@ aa_cleanup(conn, settings = aa_settings())
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Список (невидимо): \code{login_attempts} (число удалённых попыток входа)
-и \code{auth_sessions} (число удалённых токенов).
+Список (невидимо): \code{login_attempts} (число удалённых попыток входа),
+\code{auth_sessions} (число удалённых токенов) и \code{password_resets} (число удалённых
+токенов восстановления пароля).
 }
 \description{
 Удаляет записи о попытках входа старше \code{attempts_retention_hours} часов, а
 также просроченные и отозванные токены автовхода старше \code{token_retention_days}
-дней. Активные токены и свежие попытки не затрагиваются. Вызывать нужно после
-\code{\link[=aa_init_db]{aa_init_db()}}.
+дней, а также использованные и просроченные токены восстановления пароля
+старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
+после \code{\link[=aa_init_db]{aa_init_db()}}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

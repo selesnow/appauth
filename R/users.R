@@ -240,6 +240,8 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #' @param settings Настройки, результат [aa_settings()].
 #' @param must_change Потребовать смену пароля при первом входе (разумно, если
 #'   пароль задал администратор).
+#' @param email Адрес для восстановления пароля или `NULL` (адрес можно указать
+#'   позже через [aa_set_email()]). Проверяется формат и уникальность.
 #'
 #' @returns `TRUE` (невидимо).
 #' @export
@@ -258,11 +260,18 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #'   )
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_create_user <- function(conn, login, password, role, settings = aa_settings(), must_change = FALSE) {
+aa_create_user <- function(conn, login, password, role, settings = aa_settings(),
+                           must_change = FALSE, email = NULL) {
   aa_check_sqlite(conn)
 
   problem <- aa_new_user_problem(conn, login, password, role, settings)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
+
+  email <- aa_normalize_email(email)
+  if (nzchar(email)) {
+    problem <- aa_email_problem(conn, email)
+    if (!is.null(problem)) aa_abort_problem(settings, problem)
+  }
 
   tryCatch(
     DBI::dbExecute(
@@ -279,6 +288,10 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
       stop(e)
     }
   )
+
+  if (nzchar(email)) {
+    aa_set_email(conn, login, email, settings)
+  }
 
   invisible(TRUE)
 }
@@ -397,7 +410,8 @@ aa_authenticate <- function(conn, login, password) {
 #'
 #' Записывает хеш нового пароля и **отзывает все токены автовхода**
 #' пользователя, чтобы после сброса пароля старые сессии браузера перестали
-#' работать (открытые сессии завершит [aa_session_guard()]). Пароль проверяется
+#' работать (открытые сессии завершит [aa_session_guard()]). Неиспользованные
+#' ссылки восстановления пароля по email тоже перестают работать. Пароль проверяется
 #' по правилам из настроек, при нарушении ошибка класса `appauth_error_user`.
 #'
 #' @inheritParams aa_create_user
@@ -441,6 +455,8 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
       conn, login,
       keep_hash = if (aa_is_string(keep_token)) aa_token_hash(keep_token) else NULL
     )
+    # ссылки восстановления, выданные до смены пароля, больше не нужны
+    aa_invalidate_resets(conn, login)
   }
 
   invisible(n)
@@ -712,6 +728,7 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
 
   if (n > 0) {
     aa_delete_user_tokens(conn, login)
+    aa_delete_user_resets(conn, login)
     # таблицы попыток входа может не быть, это не должно мешать удалению
     tryCatch(aa_clear_attempts(conn, login, settings), error = function(e) NULL)
   }

@@ -75,6 +75,10 @@ aa_events <- function() {
     c("user_blocked",         "Администратор заблокировал пользователя",                       "логин пользователя"),
     c("user_unblocked",       "Администратор разблокировал пользователя",                      "логин пользователя"),
     c("access_denied",        "Отказ в доступе: у роли нет нужного права",                     "название права"),
+    c("password_reset_requested", "Запрос восстановления пароля по email (пользователю ответ всегда одинаковый)", "результат: sent, no_user, no_email, blocked, throttled, send_failed"),
+    c("password_reset_done",  "Пароль изменён по ссылке из письма",                             ""),
+    c("password_reset_failed","Неверная или просроченная ссылка восстановления пароля",         ""),
+    c("email_changed",        "Администратор указал, сменил или удалил email пользователя",     "логин пользователя"),
     c("weak_password_set",    "Принят слабый пароль (режим password_policy = \"warn\")",        "логин и причина: password_common, password_equals_login, password_repeated")
   )
 

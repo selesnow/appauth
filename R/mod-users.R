@@ -203,6 +203,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       }
 
       acting <- acting_user()$login
+      email <- aa_get_email(conn, login)
       lock_seconds <- tryCatch(aa_login_lock_remaining(conn, login, settings), error = function(e) 0L)
       is_blocked <- isTRUE(as.logical(user$blocked))
       block_reason <- aa_check_can_block(conn, login, acting, settings)
@@ -258,6 +259,21 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
               )),
               shiny::column(4, shiny::actionButton(
                 ns("change_role"), aa_text(settings, "role_button"),
+                class = "btn btn-warning w-100", style = "margin-top: 25px;"
+              ))
+            )
+          ),
+          shiny::div(
+            class = "aa-card-section",
+            shiny::h5(aa_text(settings, "email_section")),
+            shiny::fluidRow(
+              shiny::column(8, shiny::textInput(
+                ns("email"), aa_text(settings, "email_label"),
+                value = if (is.na(email)) "" else email,
+                placeholder = aa_text(settings, "email_not_set")
+              )),
+              shiny::column(4, shiny::actionButton(
+                ns("save_email"), aa_text(settings, "email_button"),
                 class = "btn btn-warning w-100", style = "margin-top: 25px;"
               ))
             )
@@ -354,6 +370,19 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         emit("user_role_changed", paste0(login, ": ", role))
         notify(aa_text(settings, "done_role_changed", login))
         version(version() + 1)
+        show_card(login)
+      }
+    })
+
+    shiny::observeEvent(input$save_email, {
+      require_admin()
+      login <- target()
+      email <- input$email
+      cleared <- !nzchar(aa_normalize_email(email))
+
+      if (run_action(function() aa_set_email(conn, login, email, settings))) {
+        emit("email_changed", login)
+        notify(aa_text(settings, if (cleared) "done_email_cleared" else "done_email_saved", login))
         show_card(login)
       }
     })
@@ -455,6 +484,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
           # по умолчанию роль без прав администратора, повышать нужно осознанно
           selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
         ),
+        shiny::textInput(ns("new_user_email"), aa_text(settings, "email_label"), placeholder = aa_text(settings, "email_not_set")),
         shiny::checkboxInput(ns("new_user_must_change"), aa_text(settings, "must_change_label"), value = settings$must_change_default),
         shiny::textOutput(ns("add_message"))
       ))
@@ -477,7 +507,8 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       created <- tryCatch(
         {
           aa_create_user(conn, login, input$new_user_password, role, settings,
-                         must_change = isTRUE(input$new_user_must_change))
+                         must_change = isTRUE(input$new_user_must_change),
+                         email = input$new_user_email)
           TRUE
         },
         appauth_error_user = function(e) {

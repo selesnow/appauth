@@ -10,7 +10,8 @@ aa_create_user(
   password,
   role,
   settings = aa_settings(),
-  must_change = FALSE
+  must_change = FALSE,
+  email = NULL
 )
 }
 \arguments{
@@ -26,6 +27,9 @@ aa_create_user(
 
 \item{must_change}{Потребовать смену пароля при первом входе (разумно, если
 пароль задал администратор).}
+
+\item{email}{Адрес для восстановления пароля или \code{NULL} (адрес можно указать
+позже через \code{\link[=aa_set_email]{aa_set_email()}}). Проверяется формат и уникальность.}
 }
 \value{
 \code{TRUE} (невидимо).

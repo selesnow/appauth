@@ -1,9 +1,10 @@
 # Схема таблиц авторизации и её версионные миграции.
 #
-# Пакет владеет четырьмя таблицами:
-#   users             - пользователи (логин, хеш пароля, роль, признак блокировки);
+# Пакет владеет пятью таблицами:
+#   users             - пользователи (логин, хеш пароля, роль, признак блокировки, email);
 #   auth_sessions     - токены автовхода (хранится sha256 токена);
 #   login_attempts    - попытки входа для защиты от подбора пароля;
+#   password_resets   - одноразовые токены восстановления пароля (хранится sha256 токена);
 #   appauth_migrations - служебная таблица версий миграций.
 #
 # Имена и колонки таблиц совпадают с базами приложения Server Manager, поэтому
@@ -110,6 +111,40 @@ aa_migrations <- function() {
           DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN last_login_at TEXT")
         }
       }
+    ),
+    list(
+      version = 7L,
+      name    = "password_resets_and_email",
+      up      = function(conn) {
+        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+
+        # email хранится в нижнем регистре и допускает NULL: у существующих
+        # пользователей адреса нет; уникальность действует только для заданных адресов
+        if (!"email" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN email TEXT")
+        }
+
+        DBI::dbExecute(conn, "
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL
+        ")
+
+        DBI::dbExecute(conn, "
+          CREATE TABLE IF NOT EXISTS password_resets (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_login TEXT NOT NULL,
+            token_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            expires_at TEXT NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0
+          )
+        ")
+        DBI::dbExecute(conn, "
+          CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets (token_hash)
+        ")
+        DBI::dbExecute(conn, "
+          CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_login, created_at)
+        ")
+      }
     )
   )
 }
@@ -215,14 +250,16 @@ aa_schema_version <- function(conn) {
 #'
 #' Удаляет записи о попытках входа старше `attempts_retention_hours` часов, а
 #' также просроченные и отозванные токены автовхода старше `token_retention_days`
-#' дней. Активные токены и свежие попытки не затрагиваются. Вызывать нужно после
-#' [aa_init_db()].
+#' дней, а также использованные и просроченные токены восстановления пароля
+#' старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
+#' после [aa_init_db()].
 #'
 #' @inheritParams aa_init_db
 #' @param settings Настройки, результат [aa_settings()].
 #'
-#' @returns Список (невидимо): `login_attempts` (число удалённых попыток входа)
-#'   и `auth_sessions` (число удалённых токенов).
+#' @returns Список (невидимо): `login_attempts` (число удалённых попыток входа),
+#'   `auth_sessions` (число удалённых токенов) и `password_resets` (число удалённых
+#'   токенов восстановления пароля).
 #' @export
 #'
 #' @examples
@@ -252,7 +289,17 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     params = list(token_age, token_age)
   )
 
-  invisible(list(login_attempts = attempts, auth_sessions = sessions))
+  # таблицы восстановления пароля может не быть, если схема не достроена
+  resets <- tryCatch(
+    DBI::dbExecute(
+      conn,
+      "DELETE FROM password_resets WHERE expires_at < datetime('now', '-1 days')
+         OR (used = 1 AND created_at < datetime('now', '-1 days'))"
+    ),
+    error = function(e) 0L
+  )
+
+  invisible(list(login_attempts = attempts, auth_sessions = sessions, password_resets = resets))
 }
 
 #' Подготовка базы при запуске приложения
@@ -283,10 +330,11 @@ aa_prepare_db <- function(conn, settings = aa_settings()) {
       message("appauth: применены миграции схемы: ", paste(init$applied, collapse = ", "))
     }
 
-    if (cleaned$login_attempts + cleaned$auth_sessions > 0) {
+    if (cleaned$login_attempts + cleaned$auth_sessions + cleaned$password_resets > 0) {
       message(
         "appauth: удалено устаревших записей: попыток входа ", cleaned$login_attempts,
-        ", токенов ", cleaned$auth_sessions
+        ", токенов ", cleaned$auth_sessions,
+        ", токенов восстановления пароля ", cleaned$password_resets
       )
     }
 
