@@ -70,9 +70,14 @@
         '; SameSite=Lax' + secureFlag();
     });
 
-    // {url}: переход на страницу согласия Google (другие адреса игнорируются)
+    // {url, origin}: переход на страницу согласия Google или на адрес сайта origin, который
+    // передал сервер (другие адреса игнорируются)
     Shiny.addCustomMessageHandler('appauth_redirect', function (msg) {
-      if (typeof msg.url === 'string' && msg.url.indexOf('https://accounts.google.com/') === 0) {
+      if (typeof msg.url !== 'string') return;
+      var toGoogle = msg.url.indexOf('https://accounts.google.com/') === 0;
+      var toOrigin = typeof msg.origin === 'string' && msg.origin.length > 0 &&
+        msg.url.indexOf(msg.origin + '/') === 0;
+      if (toGoogle || toOrigin) {
         window.location.assign(msg.url);
       }
     });

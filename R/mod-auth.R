@@ -61,7 +61,11 @@ aa_auth_ui <- function(id) {
 #' `password_login = FALSE` форма пароля скрыта, а попытки входа по паролю отклоняются
 #' на сервере. Модуль сообщает `login_success` со значением `google` и
 #' `google_login_failed` (причина и email в `value`); пользователю при отказе
-#' показывается общий текст.
+#' показывается общий текст. Если страница открыта не на адресе
+#' `google_redirect_uri` (например, приложение открыто по IP, а возврат настроен на
+#' домен), кнопка переводит пользователя на адрес возврата, и вход начинается там сам
+#' (параметр `?google=1`): `state` лежит в cookie адреса сайта, а cookie по IP и по домену
+#' разные. Вход по паролю и автовход по cookie на каждом адресе работают независимо.
 #'
 #' Роль и логин берутся из базы, а не из введённой строки. Подключение `conn`
 #' принадлежит приложению: закрывайте его при завершении сессии.
@@ -231,8 +235,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     }
 
     if (google_on) {
-      # кнопка: запоминаем state в cookie этого браузера и отправляем его к Google
-      shiny::observeEvent(input$google_btn, {
+      # запоминаем state в cookie этого браузера и отправляем его к Google
+      start_google <- function() {
         if (!is.null(shiny::isolate(user()))) {
           return()
         }
@@ -255,7 +259,27 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           "appauth_set_cookie",
           list(name = oauth_cookie, token = started$state, days = 600 / 86400)
         )
-        session$sendCustomMessage("appauth_redirect", list(url = started$url))
+        aa_redirect(session, started$url, "https://accounts.google.com")
+      }
+
+      # кнопка. state лежит в cookie адреса, с которого открыта страница, а Google вернёт
+      # пользователя на google_redirect_uri: со страницы на другом адресе (например, по IP) вход
+      # нужно начинать на адресе возврата, туда кнопка и переводит (вход стартует там сам)
+      shiny::observeEvent(input$google_btn, {
+        if (!is.null(shiny::isolate(user()))) {
+          return()
+        }
+
+        if (!aa_page_matches(session, settings$google_redirect_uri)) {
+          message_text("")
+          aa_redirect(
+            session, aa_google_hop_url(settings),
+            aa_origin_string(aa_url_origin(settings$google_redirect_uri))
+          )
+          return()
+        }
+
+        start_google()
       })
 
       # возврат от Google: ?code=...&state=... (или ?error=... при отказе пользователя)
@@ -263,6 +287,15 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         query <- shiny::parseQueryString(aa_url_search(session))
         code <- query[["code"]]
         state <- query[["state"]]
+
+        # переход с кнопки на другом адресе (по IP): начинаем вход сразу, без второго клика.
+        # Здесь адрес не сверяется, иначе при неверном определении адреса был бы бесконечный переход
+        if (identical(query[["google"]], "1") && !aa_is_string(code) && !aa_is_string(state) &&
+            is.null(shiny::isolate(user()))) {
+          shiny::updateQueryString("?", mode = "replace", session = session)
+          start_google()
+          return()
+        }
 
         if (!is.null(shiny::isolate(user())) || !aa_is_string(state) ||
             !(aa_is_string(code) || aa_is_string(query[["error"]]))) {

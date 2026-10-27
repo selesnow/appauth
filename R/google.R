@@ -406,6 +406,115 @@ aa_google_complete <- function(conn, settings, code, state) {
   list(ok = TRUE, reason = "ok", email = verified$email, login = user$login[1], role = user$role[1])
 }
 
+#' Разобрать адрес на схему, хост и порт
+#'
+#' @param url Адрес (`https://host[:port][/путь]`).
+#'
+#' @returns Список `scheme`, `host`, `port` (строки, порт по умолчанию подставляется)
+#'   или `NULL`, если адрес не разобрать.
+#' @noRd
+aa_url_origin <- function(url) {
+  if (!aa_is_string(url)) {
+    return(NULL)
+  }
+
+  m <- regmatches(url, regexec("^(https?)://([^/:?#]+)(?::([0-9]+))?", url, perl = TRUE))[[1]]
+
+  if (length(m) == 0) {
+    return(NULL)
+  }
+
+  scheme <- tolower(m[2])
+  port <- if (nzchar(m[4])) m[4] else if (identical(scheme, "https")) "443" else "80"
+
+  list(scheme = scheme, host = tolower(m[3]), port = port)
+}
+
+#' Адрес сайта (схема, хост, порт) строкой, без порта по умолчанию
+#'
+#' @param origin Результат [aa_url_origin()].
+#'
+#' @returns Строка вида `https://sm.example.com`.
+#' @noRd
+aa_origin_string <- function(origin) {
+  default <- identical(origin$port, if (identical(origin$scheme, "https")) "443" else "80")
+
+  paste0(origin$scheme, "://", origin$host, if (!default) paste0(":", origin$port))
+}
+
+#' С какого адреса открыта страница
+#'
+#' Вынесено в функцию, чтобы тесты могли подменить адрес: у mock-сессии Shiny его нет.
+#'
+#' @param session Сессия модуля.
+#'
+#' @returns Результат вида [aa_url_origin()] или `NULL`, если браузер ещё не сообщил адрес.
+#' @noRd
+aa_page_origin <- function(session) {
+  data <- shiny::isolate(session$clientData)
+  protocol <- shiny::isolate(data$url_protocol)
+  hostname <- shiny::isolate(data$url_hostname)
+  port <- shiny::isolate(data$url_port)
+
+  if (!aa_is_string(protocol) || !aa_is_string(hostname)) {
+    return(NULL)
+  }
+
+  aa_url_origin(paste0(protocol, "//", hostname, if (aa_is_string(as.character(port))) paste0(":", port)))
+}
+
+#' Открыта ли страница на адресе возврата Google
+#'
+#' `state` входа лежит в cookie, а cookie принадлежит адресу сайта (по IP и по домену
+#' они разные). Google возвращает пользователя на `google_redirect_uri`, поэтому вход
+#' нужно начинать на том же адресе. Если адрес страницы неизвестен, считаем, что он
+#' совпадает: лишний переход хуже, чем попытка начать вход на месте.
+#'
+#' @param session Сессия модуля.
+#' @param redirect_uri Адрес возврата из настроек.
+#'
+#' @returns `TRUE` или `FALSE`.
+#' @noRd
+aa_page_matches <- function(session, redirect_uri) {
+  page <- aa_page_origin(session)
+  target <- aa_url_origin(redirect_uri)
+
+  if (is.null(page) || is.null(target)) {
+    return(TRUE)
+  }
+
+  identical(page, target)
+}
+
+#' Адрес для перехода на адрес возврата с автозапуском входа
+#'
+#' @param settings Настройки, результат [aa_settings()].
+#'
+#' @returns Адрес возврата с параметром `google=1`.
+#' @noRd
+aa_google_hop_url <- function(settings) {
+  uri <- settings$google_redirect_uri
+
+  paste0(uri, if (grepl("?", uri, fixed = TRUE)) "&" else "?", "google=1")
+}
+
+#' Отправить браузеру команду перейти на адрес
+#'
+#' Браузер выполнит переход только на Google или на адрес сайта `origin`, который
+#' передаёт сервер. Вынесено в функцию, чтобы тесты могли перехватить переход.
+#'
+#' @param session Сессия модуля.
+#' @param url Адрес перехода.
+#' @param origin Адрес сайта, на который переход разрешён (кроме Google).
+#'
+#' @returns Невидимо `NULL`.
+#' @noRd
+aa_redirect <- function(session, url, origin) {
+  session$sendCustomMessage("appauth_redirect", list(url = url, origin = origin))
+
+  invisible(NULL)
+}
+
 #' Ключ текста для причины отказа входа через Google
 #'
 #' @param reason Причина из [aa_google_complete()].

@@ -83,6 +83,21 @@ g_url <- function(search, env = parent.frame()) {
   testthat::local_mocked_bindings(aa_url_search = function(session) search, .package = "appauth", .env = env)
 }
 
+# переходы браузера перехватываются: смотрим, куда и с каким разрешённым адресом отправили
+g_capture_redirects <- function(env = parent.frame()) {
+  box <- new.env()
+  box$calls <- list()
+  testthat::local_mocked_bindings(
+    aa_redirect = function(session, url, origin) box$calls[[length(box$calls) + 1]] <- list(url = url, origin = origin),
+    .package = "appauth", .env = env
+  )
+  box
+}
+
+g_page <- function(url, env = parent.frame()) {
+  testthat::local_mocked_bindings(aa_page_origin = function(session) aa_url_origin(url), .package = "appauth", .env = env)
+}
+
 # --- настройки ----------------------------------------------------------------
 
 test_that("по умолчанию Google выключен, пароль разрешён", {
@@ -427,6 +442,8 @@ test_that("отключённый пароль: попытка входа по �
 
 test_that("кнопка Google создаёт параметры входа и не входит сама", {
   con <- g_db()
+  g_capture_redirects()
+  g_page("https://apps.example.com/")
 
   run_auth(con, {
     session$setInputs(google_btn = 1)
@@ -553,4 +570,132 @@ test_that("тексты Google есть на обоих языках", {
 
 test_that("события Google описаны в каталоге", {
   expect_true("google_login_failed" %in% aa_events()$event)
+})
+
+# --- вход со страницы на другом адресе (по IP) ----------------------------------
+
+test_that("адрес разбирается на схему, хост и порт, порт по умолчанию подставляется", {
+  expect_identical(aa_url_origin("https://sm.Example.com/path?x=1"), list(scheme = "https", host = "sm.example.com", port = "443"))
+  expect_identical(aa_url_origin("http://localhost:3838/")$port, "3838")
+  expect_identical(aa_url_origin("http://127.0.0.1")$port, "80")
+  expect_identical(aa_url_origin("https://94.130.22.47")$host, "94.130.22.47")
+  expect_null(aa_url_origin("ftp://x.com"))
+  expect_null(aa_url_origin("sm.example.com"))
+  expect_null(aa_url_origin(NULL))
+  expect_identical(aa_origin_string(aa_url_origin("https://sm.example.com:443/x")), "https://sm.example.com")
+  expect_identical(aa_origin_string(aa_url_origin("http://localhost:3838/x")), "http://localhost:3838")
+})
+
+test_that("адрес для перехода добавляет google=1 к адресу возврата", {
+  expect_identical(aa_google_hop_url(g_settings()), "https://apps.example.com/?google=1")
+  expect_identical(aa_google_hop_url(g_settings(google_redirect_uri = "https://apps.example.com/app?x=1")),
+                   "https://apps.example.com/app?x=1&google=1")
+})
+
+test_that("кнопка на адресе возврата начинает вход, а не переходит", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_page("https://apps.example.com/")
+
+  run_auth(con, {
+    session$setInputs(google_btn = 1)
+  }, settings = g_settings())
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_length(calls$calls, 1)
+  expect_match(calls$calls[[1]]$url, "^https://accounts.google.com/")
+})
+
+test_that("кнопка на другом адресе (по IP) переводит на адрес возврата и вход там не начинает", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_page("https://94.130.22.47/")
+
+  run_auth(con, {
+    session$setInputs(google_btn = 1)
+    expect_false(session$returned$logged_in())
+  }, settings = g_settings())
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_length(calls$calls, 1)
+  expect_identical(calls$calls[[1]]$url, "https://apps.example.com/?google=1")
+  expect_identical(calls$calls[[1]]$origin, "https://apps.example.com")
+})
+
+test_that("другой порт или схема тоже считаются другим адресом", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_page("http://apps.example.com/")
+
+  run_auth(con, { session$setInputs(google_btn = 1) }, settings = g_settings())
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_match(calls$calls[[1]]$url, "google=1", fixed = TRUE)
+})
+
+test_that("?google=1 запускает вход сразу и не переводит снова, даже если адрес не совпал (нет бесконечного перехода)", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_page("https://94.130.22.47/")
+  g_url("?google=1")
+
+  run_auth(con, {
+    session$flushReact()
+    expect_false(session$returned$logged_in())
+  }, settings = g_settings())
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_length(calls$calls, 1)
+  expect_match(calls$calls[[1]]$url, "^https://accounts.google.com/")
+})
+
+test_that("?google=1 на адресе возврата тоже запускает вход один раз", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_page("https://apps.example.com/")
+  g_url("?google=1")
+
+  run_auth(con, { session$flushReact() }, settings = g_settings())
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_length(calls$calls, 1)
+})
+
+test_that("без включённого Google параметр google=1 ничего не запускает", {
+  con <- g_db()
+  calls <- g_capture_redirects()
+  g_url("?google=1")
+
+  run_auth(con, { session$flushReact() })
+
+  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_length(calls$calls, 0)
+})
+
+test_that("параметр google=1 вместе с кодом возврата не мешает обычному завершению входа", {
+  g_fake_jwks()
+  con <- g_db()
+  settings <- g_settings()
+  g_fake_exchange(con)
+  started <- aa_google_start(con, settings)
+  calls <- g_capture_redirects()
+  g_url(paste0("?google=1&code=abc&state=", started$state))
+
+  run_auth(con, {
+    session$flushReact()
+    session$setInputs(oauth_cookie = started$state)
+    expect_true(session$returned$logged_in())
+  }, settings = settings)
+
+  expect_length(calls$calls, 0)
+})
+
+test_that("администратор указывает email без проверок домена, пароля и кода: только формат и уникальность", {
+  con <- g_db()
+  settings <- g_settings(google_domains = "example.com")
+
+  expect_no_error(aa_set_email(con, "cat", "cat@gmail.com", settings))
+  expect_identical(aa_get_email(con, "cat"), "cat@gmail.com")
+  expect_error(aa_set_email(con, "cat", "ann@example.com", settings), class = "appauth_error_user")
+  expect_error(aa_set_email(con, "cat", "не-адрес", settings), class = "appauth_error_user")
 })
