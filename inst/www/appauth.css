@@ -171,3 +171,7 @@ table.dataTable tbody tr.aa-row-locked > td.sorting_1 {
   color: var(--aa-muted);
   font-size: 0.85em;
 }
+
+/* кнопка копирования рядом с ключом и резервными кодами */
+.aa-copy { margin-left: 4px; }
+.aa-totp-codes + .aa-copy { margin: 6px 0 0 0; }

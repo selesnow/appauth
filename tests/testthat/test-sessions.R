@@ -238,3 +238,45 @@ test_that("логин другого регистра не считается т
 
   expect_equal(aa_user_session_valid(con, "Kiruka", "user")$reason, "deleted")
 })
+
+test_that("aa_active_autologins считает только действующие токены автовхода", {
+  con <- users_db()
+  raw_user(con, "ivan")
+  raw_user(con, "olga")
+
+  expect_identical(aa_active_autologins(con, "ivan"), 0L)
+  expect_identical(nrow(aa_active_autologins(con)), 0L)
+
+  t1 <- aa_issue_token(con, "ivan")
+  t2 <- aa_issue_token(con, "ivan")
+  aa_issue_token(con, "olga")
+
+  expect_identical(aa_active_autologins(con, "ivan"), 2L)
+  expect_identical(aa_active_autologins(con, "olga"), 1L)
+
+  all <- aa_active_autologins(con)
+  expect_setequal(all$login, c("ivan", "olga"))
+  expect_identical(all$n[all$login == "ivan"], 2L)
+
+  # отозванный и истёкший токены не считаются
+  aa_revoke_token(con, t1)
+  expect_identical(aa_active_autologins(con, "ivan"), 1L)
+
+  DBI::dbExecute(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds') WHERE token_hash = ?", params = list(aa_token_hash(t2)))
+  expect_identical(aa_active_autologins(con, "ivan"), 0L)
+  expect_identical(aa_active_autologins(con, "olga"), 1L)
+})
+
+test_that("aa_active_autologins: логин с другим регистром, пустой логин, нет таблицы", {
+  con <- users_db()
+  raw_user(con, "ivan")
+  aa_issue_token(con, "ivan")
+
+  expect_identical(aa_active_autologins(con, "IVAN"), 0L)
+  expect_identical(aa_active_autologins(con, NA_character_), 0L)
+  expect_identical(aa_active_autologins(con, ""), 0L)
+
+  DBI::dbExecute(con, "DROP TABLE auth_sessions")
+  expect_identical(aa_active_autologins(con, "ivan"), 0L)
+  expect_identical(nrow(aa_active_autologins(con)), 0L)
+})

@@ -36,7 +36,7 @@ groups <- list(
   list(file = "api-login-protection-sessions.md", title = "Защита входа и сессии",
        fns = c("aa_login_gate", "aa_record_attempt", "aa_login_lock_remaining", "aa_global_throttled",
                "aa_clear_attempts", "aa_issue_token", "aa_find_session_user", "aa_revoke_token",
-               "aa_revoke_sessions", "aa_user_session_valid")),
+               "aa_revoke_sessions", "aa_active_autologins", "aa_user_session_valid")),
   list(file = "api-permissions-events.md", title = "Права и события",
        fns = c("aa_permissions_from_matrix", "aa_can", "aa_require", "aa_events", "aa_event_logger")),
   list(file = "api-modules.md",         title = "Модули интерфейса и помощники приложения",

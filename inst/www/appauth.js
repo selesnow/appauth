@@ -24,6 +24,44 @@
     }
   });
 
+  // Кнопки копирования: .aa-copy, текст в атрибуте data-copy. По HTTPS работает буфер
+  // браузера, иначе (и в окнах Bootstrap с ловушкой фокуса) копируем через скрытое поле
+  function copyText(text, host) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      var area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      (host || document.body).appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+      (host || document.body).removeChild(area);
+      if (ok) { resolve(); } else { reject(new Error('copy failed')); }
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var button = e.target && e.target.closest ? e.target.closest('.aa-copy') : null;
+    if (!button) return;
+    var text = button.getAttribute('data-copy');
+    if (text === null) return;
+    copyText(text, button.parentNode).then(function () {
+      if (button.getAttribute('data-copied') === '1') return;
+      var original = button.innerHTML;
+      button.setAttribute('data-copied', '1');
+      button.textContent = '\u2713 ' + (button.getAttribute('data-done') || '');
+      setTimeout(function () {
+        button.innerHTML = original;
+        button.removeAttribute('data-copied');
+      }, 1500);
+    });
+  });
+
   function register() {
     // {name, token, days}
     Shiny.addCustomMessageHandler('appauth_set_cookie', function (msg) {

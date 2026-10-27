@@ -156,15 +156,30 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       require_admin()
       data <- overview()
 
+      # галочка или тире для признаков; колонка 2FA нужна, только если 2FA включена в настройках
+      mark <- function(x) ifelse(x == 1, "\u2713", "\u2013")
+
       shown <- data.frame(
-        data$login, data$role, data$status, data$created, data$last_login, data$state,
+        data$login, data$role, data$status, data$created, data$last_login, mark(data$has_email),
         stringsAsFactors = FALSE
       )
-      names(shown) <- c(
+      labels <- c(
         aa_text(settings, "col_login"), aa_text(settings, "col_role"),
         aa_text(settings, "col_status"), aa_text(settings, "col_created"),
-        aa_text(settings, "col_last_login"), "state"
+        aa_text(settings, "col_last_login"), aa_text(settings, "col_email")
       )
+
+      if (isTRUE(settings$totp_enabled)) {
+        shown[[ncol(shown) + 1]] <- mark(data$totp_on)
+        labels <- c(labels, aa_text(settings, "col_totp"))
+      }
+
+      shown[[ncol(shown) + 1]] <- data$autologins
+      shown[[ncol(shown) + 1]] <- data$state
+      names(shown) <- c(labels, aa_text(settings, "col_autologins"), "state")
+
+      # последняя колонка служебная (state), перед ней признаки по центру
+      state_col <- ncol(shown) - 1L
 
       DT::datatable(
         shown,
@@ -174,11 +189,14 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         options = list(
           dom = "t",
           paging = FALSE,
-          columnDefs = list(list(visible = FALSE, targets = 5)),
+          columnDefs = list(
+            list(visible = FALSE, targets = state_col),
+            list(className = "dt-center", targets = 5:(state_col - 1L))
+          ),
           rowCallback = DT::JS(
             "function(row, data) {",
-            "  if (data[5] === 'blocked') { $(row).addClass('aa-row-blocked'); }",
-            "  else if (data[5] === 'locked') { $(row).addClass('aa-row-locked'); }",
+            sprintf("  if (data[%d] === 'blocked') { $(row).addClass('aa-row-blocked'); }", state_col),
+            sprintf("  else if (data[%d] === 'locked') { $(row).addClass('aa-row-locked'); }", state_col),
             "}"
           )
         ),

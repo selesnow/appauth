@@ -18,7 +18,10 @@ aa_users_overview(conn, settings = aa_settings())
 \code{status} (текст статуса на языке настроек, для \code{"ok"} пустая строка), а
 также \code{created_at} и \code{last_login_at} (даты из базы по UTC, как в
 \code{\link[=aa_get_user]{aa_get_user()}}) и \code{created} и \code{last_login} (те же даты для показа:
-местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»).
+местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»),
+а также \code{has_email} (1, если для восстановления пароля указан email, адрес в
+сводку не попадает), \code{totp_on} (1, если у пользователя включена 2FA) и
+\code{autologins} (сколько действующих автовходов, см. \code{\link[=aa_active_autologins]{aa_active_autologins()}}).
 }
 \description{
 Список пользователей с признаками, которые нужны для таблицы на вкладке

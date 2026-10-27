@@ -341,3 +341,44 @@ test_that("после выхода (пользователя нет) табли�
 
   expect_length(log$events, 0)
 })
+
+test_that("таблица показывает email, 2FA и автовходы галочками и числами", {
+  con <- users_fixture()
+  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-tests")
+  aa_set_email(con, "ivan", "ivan@example.com", settings)
+  aa_issue_token(con, "ivan")
+
+  run_users(con, settings = settings, {
+    session$flushReact()
+    json <- paste(as.character(output$table), collapse = "")
+
+    # данные таблицы серверные: заголовки и колонки смотрим в описании таблицы, значения в данных модуля
+    expect_match(json, "<th>Email<", fixed = TRUE)
+    expect_match(json, "<th>2FA<", fixed = TRUE)
+    expect_match(json, "<th>Автовходов<", fixed = TRUE)
+    expect_match(json, "dt-center", fixed = TRUE)
+    expect_false(grepl("ivan@example.com", json, fixed = TRUE))
+
+    data <- overview()
+    expect_identical(data$has_email[data$login == "ivan"], 1L)
+    expect_identical(data$has_email[data$login == "boss"], 0L)
+    expect_identical(data$autologins[data$login == "ivan"], 1L)
+    expect_identical(data$totp_on[data$login == "ivan"], 0L)
+    # служебная колонка: state остаётся последней, подсветка строк берёт её индекс
+    expect_match(json, "data[8] === 'blocked'", fixed = TRUE)
+  })
+})
+
+test_that("при выключенной 2FA колонки 2FA нет, индекс служебной колонки сдвигается", {
+  con <- users_fixture()
+
+  run_users(con, {
+    session$flushReact()
+    json <- paste(as.character(output$table), collapse = "")
+
+    expect_match(json, "<th>Email<", fixed = TRUE)
+    expect_false(grepl("<th>2FA<", json, fixed = TRUE))
+    expect_match(json, "<th>Автовходов<", fixed = TRUE)
+    expect_match(json, "data[7] === 'blocked'", fixed = TRUE)
+  })
+})

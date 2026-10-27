@@ -2,6 +2,7 @@
 
 S3method(print,aa_settings)
 S3method(print,aa_texts)
+export(aa_active_autologins)
 export(aa_app_head)
 export(aa_auth_server)
 export(aa_auth_ui)

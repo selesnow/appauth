@@ -688,3 +688,63 @@ test_that("каталог событий и тексты содержат клю
   expect_identical(names(aa_texts("ru")), names(aa_texts("en")))
   expect_match(aa_text(aa_settings(), "totp_recovery_left", 3), "3")
 })
+
+test_that("модуль: кнопка копирования ключа для ручного ввода, текст без пробелов", {
+  con <- users_db()
+  raw_user(con, "ivan", password = aa_hash_password("secret123"))
+  settings <- totp_settings()
+
+  shiny::testServer(aa_totp_server, args = totp_module_args(con, settings = settings), expr = {
+    session$flushReact()
+    expect_false(grepl("aa-copy", as.character(output$main$html), fixed = TRUE))
+
+    session$setInputs(start = 1)
+    secret <- enrolling()$secret
+    html <- paste(as.character(output$main$html), collapse = "")
+
+    expect_match(html, "aa-copy", fixed = TRUE)
+    # копируется сам секрет (без пробелов, которыми он разбит для чтения)
+    expect_match(html, sprintf('data-copy="%s"', secret), fixed = TRUE)
+    expect_match(html, aa_text(settings, "copy_button"), fixed = TRUE)
+    expect_match(html, aa_text(settings, "copy_done"), fixed = TRUE)
+  })
+})
+
+test_that("модуль: в окне резервных кодов есть кнопка копирования всех кодов", {
+  con <- users_db()
+  raw_user(con, "ivan", password = aa_hash_password("secret123"))
+  settings <- totp_settings()
+
+  store <- new.env()
+  store$html <- NULL
+  testthat::local_mocked_bindings(
+    showModal = function(ui, ...) store$html <- paste(as.character(ui), collapse = ""),
+    .package = "shiny"
+  )
+
+  shiny::testServer(aa_totp_server, args = totp_module_args(con, settings = settings), expr = {
+    session$setInputs(start = 1)
+    session$setInputs(code = aa_totp_code(enrolling()$secret), confirm = 1)
+  })
+
+  html <- store$html
+  expect_match(html, "aa-totp-codes", fixed = TRUE)
+  expect_match(html, "aa-copy", fixed = TRUE)
+
+  # в атрибуте все 10 кодов, по одному в строке
+  copied <- sub('.*data-copy="([^"]*)".*', "\\1", gsub("\n", "&#10;", html, fixed = TRUE))
+  codes <- strsplit(gsub("&#10;", "\n", copied, fixed = TRUE), "\n", fixed = TRUE)[[1]]
+  expect_length(codes, 10)
+  expect_true(all(nzchar(codes)))
+})
+
+test_that("тексты кнопок копирования и колонок таблицы есть на русском и английском", {
+  keys <- c("copy_button", "copy_done", "col_email", "col_totp", "col_autologins")
+  for (lang in c("ru", "en")) {
+    texts <- aa_texts(lang)
+    expect_true(all(keys %in% names(texts)), info = lang)
+    expect_true(all(nzchar(unlist(texts[keys]))), info = lang)
+  }
+  expect_identical(aa_text(aa_settings(), "copy_done"), "Скопировано")
+  expect_identical(aa_text(aa_settings(texts = aa_texts("en")), "copy_done"), "Copied")
+})

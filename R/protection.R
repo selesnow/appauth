@@ -270,7 +270,10 @@ aa_login_gate <- function(conn, login, settings = aa_settings()) {
 #'   `status` (текст статуса на языке настроек, для `"ok"` пустая строка), а
 #'   также `created_at` и `last_login_at` (даты из базы по UTC, как в
 #'   [aa_get_user()]) и `created` и `last_login` (те же даты для показа:
-#'   местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»).
+#'   местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»),
+#'   а также `has_email` (1, если для восстановления пароля указан email, адрес в
+#'   сводку не попадает), `totp_on` (1, если у пользователя включена 2FA) и
+#'   `autologins` (сколько действующих автовходов, см. [aa_active_autologins()]).
 #' @export
 #'
 #' @examples
@@ -292,9 +295,36 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
       state = character(), lock_seconds = integer(), status = character(),
       created_at = character(), last_login_at = character(),
       created = character(), last_login = character(),
+      has_email = integer(), totp_on = integer(), autologins = integer(),
       stringsAsFactors = FALSE
     ))
   }
+
+  # email и 2FA: в старой схеме колонок может не быть, тогда считаем, что не указаны
+  flags <- tryCatch(
+    DBI::dbGetQuery(
+      conn,
+      "SELECT login,
+              CASE WHEN email IS NULL OR email = '' THEN 0 ELSE 1 END AS has_email,
+              CASE WHEN totp_enabled = 1 THEN 1 ELSE 0 END AS totp_on
+       FROM users"
+    ),
+    error = function(e) NULL
+  )
+  by_login <- function(column) {
+    if (is.null(flags)) {
+      return(rep(0L, nrow(users)))
+    }
+    as.integer(flags[[column]][match(users$login, flags$login)])
+  }
+  has_email <- by_login("has_email")
+  totp_on <- by_login("totp_on")
+  has_email[is.na(has_email)] <- 0L
+  totp_on[is.na(totp_on)] <- 0L
+
+  autologin_counts <- aa_active_autologins(conn)
+  autologins <- autologin_counts$n[match(users$login, autologin_counts$login)]
+  autologins[is.na(autologins)] <- 0L
 
   lock_seconds <- vapply(users$login, function(login) {
     tryCatch(aa_login_lock_remaining(conn, login, settings), error = function(e) 0L)
@@ -322,6 +352,9 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
     last_login_at = as.character(users$last_login_at),
     created       = aa_format_db_time(users$created_at, aa_text(settings, "date_unknown")),
     last_login    = aa_format_db_time(users$last_login_at, aa_text(settings, "date_never")),
+    has_email     = has_email,
+    totp_on       = totp_on,
+    autologins    = as.integer(autologins),
     stringsAsFactors = FALSE
   )
 }

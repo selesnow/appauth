@@ -346,7 +346,7 @@ test_that("обзор пользователей: состояния, стату
 
   ov <- aa_users_overview(con)
 
-  expect_identical(names(ov), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login"))
+  expect_identical(names(ov), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login", "has_email", "totp_on", "autologins"))
   expect_identical(ov$login, c("boss", "worker", "viewer1", "both"))
   expect_identical(ov$state, c("ok", "blocked", "locked", "blocked"))
   expect_identical(ov$status[1], "")
@@ -363,7 +363,7 @@ test_that("обзор пользователей на английском и с
 
   empty <- aa_users_overview(con)
   expect_identical(nrow(empty), 0L)
-  expect_identical(names(empty), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login"))
+  expect_identical(names(empty), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login", "has_email", "totp_on", "autologins"))
 
   raw_user(con, "worker", "user", blocked = 1)
   en <- aa_users_overview(con, aa_settings(texts = aa_texts("en")))
@@ -387,4 +387,50 @@ test_that("обзор пользователей не раскрывает па�
 
   expect_false("password" %in% names(aa_users_overview(con)))
   expect_error(aa_users_overview(list()), class = "appauth_error_connection")
+})
+
+test_that("aa_users_overview: email, 2FA и автовходы по пользователям", {
+  con <- users_db()
+  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-tests")
+  raw_user(con, "ivan")
+  raw_user(con, "olga")
+  raw_user(con, "boss")
+
+  aa_set_email(con, "ivan", "ivan@example.com", settings)
+  setup <- aa_totp_setup(con, "olga", settings)
+  aa_totp_enable(con, "olga", aa_totp_code(setup$secret), settings)
+  aa_issue_token(con, "ivan")
+  aa_issue_token(con, "ivan")
+  aa_issue_token(con, "boss")
+
+  data <- aa_users_overview(con, settings)
+  row <- function(login) data[data$login == login, ]
+
+  expect_identical(row("ivan")$has_email, 1L)
+  expect_identical(row("olga")$has_email, 0L)
+  expect_identical(row("ivan")$totp_on, 0L)
+  expect_identical(row("olga")$totp_on, 1L)
+  expect_identical(row("ivan")$autologins, 2L)
+  expect_identical(row("boss")$autologins, 1L)
+  expect_identical(row("olga")$autologins, 0L)
+
+  # адрес и секрет в сводку не попадают
+  expect_false(any(c("email", "totp_secret") %in% names(data)))
+  expect_false(any(grepl("ivan@example.com", unlist(data), fixed = TRUE)))
+})
+
+test_that("aa_users_overview: пустая таблица и старая схема без email и 2FA", {
+  con <- users_db()
+  empty <- aa_users_overview(con)
+  expect_identical(nrow(empty), 0L)
+  expect_true(all(c("has_email", "totp_on", "autologins") %in% names(empty)))
+
+  # старая схема: колонок email и totp_enabled нет, сводка не падает, признаки равны нулю
+  old <- new_db()
+  DBI::dbExecute(old, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT, password TEXT, role TEXT, blocked INTEGER DEFAULT 0, created_at TEXT, last_login_at TEXT)")
+  DBI::dbExecute(old, "INSERT INTO users (login, password, role) VALUES ('ivan', 'x', 'user')")
+  data <- aa_users_overview(old)
+  expect_identical(data$has_email, 0L)
+  expect_identical(data$totp_on, 0L)
+  expect_identical(data$autologins, 0L)
 })

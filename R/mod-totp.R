@@ -42,6 +42,27 @@ aa_totp_qr_html <- function(uri) {
   )
 }
 
+#' Кнопка копирования текста в буфер обмена
+#'
+#' Текст лежит в атрибуте `data-copy` и копируется скриптом из [aa_app_head()] (по
+#' HTTPS через буфер браузера, иначе через скрытое поле). Текст уже виден на странице,
+#' поэтому кнопка не раскрывает ничего нового.
+#'
+#' @param text Что копировать.
+#' @param settings Настройки (тексты кнопки).
+#'
+#' @returns Элемент интерфейса Shiny.
+#' @noRd
+aa_copy_button <- function(text, settings) {
+  shiny::tags$button(
+    type = "button",
+    class = "btn btn-default btn-sm aa-copy",
+    `data-copy` = text,
+    `data-done` = aa_text(settings, "copy_done"),
+    shiny::icon("copy"), " ", aa_text(settings, "copy_button")
+  )
+}
+
 #' Модуль двухфакторной аутентификации: сервер
 #'
 #' Пользователь сам включает и выключает двухфакторную аутентификацию (TOTP):
@@ -146,7 +167,8 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
           if (!is.null(qr)) shiny::div(class = "aa-totp-qr", style = "max-width: 220px;", qr),
           shiny::p(
             aa_text(settings, "totp_secret_label"), ": ",
-            shiny::tags$code(gsub("(.{4})", "\\1 ", setup$secret))
+            shiny::tags$code(gsub("(.{4})", "\\1 ", setup$secret)), " ",
+            aa_copy_button(setup$secret, settings)
           ),
           shiny::textInput(ns("code"), aa_text(settings, "totp_code_label")),
           shiny::actionButton(ns("confirm"), aa_text(settings, "totp_confirm_button"), class = "btn btn-success"), " ",
@@ -225,7 +247,8 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
         easyClose = FALSE,
         footer = shiny::modalButton(aa_text(settings, "button_close")),
         shiny::p(aa_text(settings, "totp_recovery_hint")),
-        shiny::tags$pre(class = "aa-totp-codes", paste(codes, collapse = "\n"))
+        shiny::tags$pre(class = "aa-totp-codes", paste(codes, collapse = "\n")),
+        aa_copy_button(paste(codes, collapse = "\n"), settings)
       ))
     })
 

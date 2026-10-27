@@ -140,6 +140,55 @@ aa_token_active <- function(conn, token) {
   n > 0
 }
 
+#' Сколько действующих автовходов у пользователей
+#'
+#' Считает токены автовхода, которые не отозваны и не истекли: столько устройств
+#' сейчас «помнят» вход пользователя (cookie), то есть могут войти без пароля.
+#' Это не число открытых вкладок: приложение их не отслеживает. Если таблицы
+#' токенов нет или к ней не удалось обратиться, считается, что токенов нет.
+#'
+#' @param conn Подключение к базе SQLite.
+#' @param login Логин пользователя или `NULL`.
+#'
+#' @returns Для заданного `login` целое число (0, если токенов нет). При `login = NULL`
+#'   таблица с колонками `login` и `n` для пользователей, у которых есть действующие
+#'   токены.
+#' @export
+#'
+#' @examples
+#' if (requireNamespace("RSQLite", quietly = TRUE)) {
+#'   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+#'   aa_init_db(conn)
+#'   aa_create_first_admin(conn, "boss", "boss-password")
+#'   aa_issue_token(conn, "boss")
+#'   aa_active_autologins(conn, "boss")
+#'   DBI::dbDisconnect(conn)
+#' }
+aa_active_autologins <- function(conn, login = NULL) {
+  aa_check_sqlite(conn)
+
+  counts <- tryCatch(
+    DBI::dbGetQuery(
+      conn,
+      "SELECT user_login AS login, COUNT(*) AS n FROM auth_sessions
+       WHERE revoked = 0 AND expires_at > datetime('now')
+       GROUP BY user_login"
+    ),
+    error = function(e) data.frame(login = character(), n = integer(), stringsAsFactors = FALSE)
+  )
+  counts$n <- as.integer(counts$n)
+
+  if (is.null(login)) {
+    return(counts)
+  }
+  if (!aa_is_string(login)) {
+    return(0L)
+  }
+
+  n <- counts$n[counts$login == login]
+  if (length(n) == 0) 0L else n[1]
+}
+
 #' Проверить, что открытая сессия всё ещё действует
 #'
 #' Вызывается периодически (интервал `session_check_seconds`), чтобы блокировка,
