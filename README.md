@@ -23,6 +23,7 @@
 * Принудительный выход: заблокированный, удалённый, с изменённой ролью или со сброшенным паролем пользователь теряет открытую сессию за интервал проверки (по умолчанию 30 секунд).
 * Смена собственного пароля, обязательная смена временного пароля, который задал администратор, и выход на всех устройствах (`auth$logout_all()`).
 * Восстановление пароля по email: одноразовая ссылка из письма, лимиты на письма, ответ формы не раскрывает, существует ли пользователь (выключено по умолчанию, письмо отправляет функция приложения).
+* Двухфакторная аутентификация (TOTP): добровольная, код из приложения-аутентификатора и 10 резервных кодов, секрет в базе зашифрован, неверные коды блокируют логин, сброс администратором (выключено по умолчанию).
 * Серверные проверки прав (`aa_can()`, `aa_require()`), права из матрицы «право -> роли» или из любого своего источника.
 * Готовые модули: вход, пользователи (со слотами для своих блоков), смена пароля; стили с переменными и светлой темой.
 * Одно место для логирования: хук событий `on_event`, каталог событий `aa_events()`.
@@ -66,11 +67,12 @@ shinyApp(ui, server)
 | Пароли | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()` |
 | Пользователи | `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
 | Восстановление пароля | `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()` |
+| Двухфакторная аутентификация | `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()` |
 | Защита входа | `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()` |
 | Сессии | `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_user_session_valid()` |
 | Права | `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()` |
 | События | `aa_events()` |
-| Модули интерфейса | `aa_app_head()`, `aa_auth_ui()` и `aa_auth_server()`, `aa_users_ui()` и `aa_users_server()`, `aa_password_ui()` и `aa_password_server()` |
+| Модули интерфейса | `aa_app_head()`, `aa_auth_ui()` и `aa_auth_server()`, `aa_users_ui()` и `aa_users_server()`, `aa_password_ui()` и `aa_password_server()`, `aa_totp_ui()` и `aa_totp_server()` |
 | Помощники приложения | `aa_session_guard()`, `aa_register_module()` |
 
 Справка по каждой функции: `?aa_authenticate` и так далее.
@@ -96,7 +98,7 @@ shinyApp(ui, server)
 
 ## Ограничения
 
-Известные ограничения (cookie без `HttpOnly`, блокировка по логину, только SQLite, нет двухфакторной защиты, независимого аудита не было) перечислены в виньетке `architecture-and-security`.
+Известные ограничения (cookie без `HttpOnly`, блокировка по логину, только SQLite, двухфакторная защита добровольная и только TOTP, независимого аудита не было) перечислены в виньетке `architecture-and-security`.
 
 ## Разработка
 

@@ -204,6 +204,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
 
       acting <- acting_user()$login
       email <- aa_get_email(conn, login)
+      totp_on <- isTRUE(settings$totp_enabled) && aa_totp_enabled(conn, login)
       lock_seconds <- tryCatch(aa_login_lock_remaining(conn, login, settings), error = function(e) 0L)
       is_blocked <- isTRUE(as.logical(user$blocked))
       block_reason <- aa_check_can_block(conn, login, acting, settings)
@@ -248,6 +249,19 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
               shiny::span(aa_text(settings, "card_signin_ok"))
             }
           ),
+          if (isTRUE(settings$totp_enabled)) {
+            shiny::div(
+              shiny::strong(paste0(aa_text(settings, "card_totp"), ": ")),
+              if (totp_on) {
+                shiny::tagList(
+                  shiny::span(aa_text(settings, "totp_status_on")), " ",
+                  shiny::actionButton(ns("reset_totp"), aa_text(settings, "totp_reset_button"), class = "btn btn-warning btn-sm")
+                )
+              } else {
+                shiny::span(aa_text(settings, "totp_status_off"))
+              }
+            )
+          },
           shiny::tags$hr(),
           shiny::div(
             class = "aa-card-section",
@@ -405,6 +419,17 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         shiny::removeModal()
         card_login(NULL)
       }
+    })
+
+    # потеря телефона: администратор сбрасывает 2FA, сессии пользователя завершаются
+    shiny::observeEvent(input$reset_totp, {
+      require_admin()
+      login <- target()
+      aa_totp_disable(conn, login)
+      aa_revoke_sessions(conn, login)
+      emit("totp_reset", login)
+      notify(aa_text(settings, "done_totp_reset", login))
+      show_card(login)
     })
 
     shiny::observeEvent(input$revoke, {

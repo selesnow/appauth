@@ -177,6 +177,7 @@ DBI::dbDisconnect(conn)
 | Английский интерфейс | `aa_settings(texts = aa_texts("en"))` |
 | Свой текст кнопки | `aa_texts("ru", login_button = "Войти в систему")` |
 | Пароль от администратора постоянный | `aa_settings(must_change_default = FALSE)` |
+| Двухфакторная аутентификация (TOTP) | `aa_settings(totp_enabled = TRUE, totp_key = ...)` и `aa_totp_server()` в личном кабинете, рецепт в виньетке `extension-points` |
 | Восстановление пароля по email | `aa_settings(reset_enabled = TRUE, send_reset = ..., reset_base_url = ...)`, рецепт в виньетке `extension-points` |
 | Свои права (не матрица) | функция `function(user)` вместо `aa_permissions_from_matrix()` |
 | Свой блок в карточке пользователя | `extra_card_ui` и `extra_card_server` в `aa_users_server()` |

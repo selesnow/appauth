@@ -27,6 +27,16 @@ aa_auth_ui <- function(id) {
 #' верного пароля показывается форма смены пароля, и в приложение пользователь
 #' попадает только после смены.
 #'
+#' @section Двухфакторная аутентификация:
+#' При `totp_enabled = TRUE` в настройках ([aa_settings()]) пользователь, у которого
+#' включена 2FA ([aa_totp_server()]), после верного пароля вводит код из
+#' приложения-аутентификатора или резервный код. До этого токен автовхода не
+#' выдаётся, а успешная попытка входа не записывается: неверные коды считаются
+#' неудачными попытками входа, и логин блокируется по тем же правилам, что и при
+#' переборе пароля. Вход по cookie автовхода второй фактор не спрашивает (cookie
+#' выдан после его прохождения). Модуль сообщает события `totp_failed` и
+#' `recovery_code_used`.
+#'
 #' @section Восстановление пароля по email:
 #' При `reset_enabled = TRUE` в настройках ([aa_settings()]) на форме входа
 #' появляется ссылка «Забыли пароль?». Пользователь вводит логин или email, ему
@@ -90,6 +100,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     current_token <- NULL
     # вошёл с паролем, который задал администратор: пока не сменит, в приложение не пускаем
     pending <- shiny::reactiveVal(NULL)
+    # пароль верен, ждём код второго фактора: list(login, role, must_change, old)
+    second_factor <- shiny::reactiveVal(NULL)
     # какая форма показана до входа: "login" или "forgot" (запрос ссылки)
     mode <- shiny::reactiveVal("login")
     # токен из ссылки восстановления, по которому показана форма нового пароля
@@ -242,7 +254,16 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       ns <- session$ns
       hint <- NULL
 
-      fields <- if (!is.null(pending())) {
+      fields <- if (!is.null(second_factor())) {
+        heading <- aa_text(settings, "totp_title")
+        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "totp_hint"))
+        shiny::tagList(
+          shiny::textInput(ns("totp_code"), aa_text(settings, "totp_code_label")),
+          shiny::actionButton(ns("totp_btn"), aa_text(settings, "totp_button"), class = "aa-login-button"),
+          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
+          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+        )
+      } else if (!is.null(pending())) {
         heading <- aa_text(settings, "must_change_title")
         hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "must_change_hint"))
         shiny::tagList(
@@ -336,6 +357,17 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         return()
       }
 
+      if (!is.null(res) && isTRUE(settings$totp_enabled) && aa_totp_enabled(conn, res$login[1])) {
+        # пароль верен, но нужен код: успешную попытку не записываем (она обнулила бы
+        # счётчик неудач, и код можно было бы подбирать бесконечно), токен не выдаём
+        message_text("")
+        second_factor(list(
+          login = res$login[1], role = res$role[1],
+          must_change = isTRUE(res$must_change[1] == 1), old = password
+        ))
+        return()
+      }
+
       if (!is.null(res)) {
         try(aa_record_attempt(conn, login, success = TRUE, settings = settings), silent = TRUE)
 
@@ -401,6 +433,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
     shiny::observeEvent(input$back_link, {
       message_text("")
+      second_factor(NULL)
       reset_pending(NULL)
       mode("login")
     })
@@ -454,6 +487,57 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         warn_weak(input$reset_password, login)
         message_text(aa_text(settings, "reset_done"))
       }
+    })
+
+    shiny::observeEvent(input$totp_btn, {
+      waiting <- second_factor()
+      shiny::req(waiting)
+
+      gate <- aa_login_gate(conn, waiting$login, settings)
+      if (!gate$allowed) {
+        message_text(gate$message)
+        emit(if (gate$reason == "throttled") "login_throttled" else "login_locked", waiting$login, gate$seconds)
+        return()
+      }
+
+      checked <- tryCatch(
+        aa_verify_second_factor(conn, waiting$login, input$totp_code, settings),
+        error = function(e) {
+          message("appauth: не удалось проверить второй фактор: ", conditionMessage(e))
+          list(ok = FALSE, method = NA_character_)
+        }
+      )
+
+      if (!isTRUE(checked$ok)) {
+        try(aa_record_attempt(conn, waiting$login, success = FALSE, settings = settings), silent = TRUE)
+        emit("totp_failed", waiting$login)
+
+        gate <- aa_login_gate(conn, waiting$login, settings)
+        if (!gate$allowed && gate$reason == "locked") {
+          # блокировка: начинать нужно с пароля (когда она закончится)
+          second_factor(NULL)
+          message_text(gate$message)
+          emit("login_locked", waiting$login, gate$seconds)
+        } else {
+          message_text(aa_text(settings, "totp_wrong"))
+        }
+        return()
+      }
+
+      try(aa_record_attempt(conn, waiting$login, success = TRUE, settings = settings), silent = TRUE)
+      if (identical(checked$method, "recovery")) {
+        emit("recovery_code_used", waiting$login)
+      }
+      second_factor(NULL)
+
+      if (isTRUE(waiting$must_change)) {
+        message_text("")
+        pending(list(login = waiting$login, role = waiting$role, old = waiting$old))
+        return()
+      }
+
+      finish_login(waiting$login, waiting$role)
+      emit("login_success", waiting$login)
     })
 
     shiny::observeEvent(input$setup_btn, {

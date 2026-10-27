@@ -30,6 +30,9 @@ groups <- list(
   list(file = "api-password-reset.md",  title = "Восстановление пароля по email",
        fns = c("aa_set_email", "aa_get_email", "aa_request_password_reset", "aa_reset_token_login",
                "aa_reset_password_with_token")),
+  list(file = "api-two-factor.md",      title = "Двухфакторная аутентификация (TOTP)",
+       fns = c("aa_totp_setup", "aa_totp_enable", "aa_totp_disable", "aa_totp_enabled", "aa_verify_second_factor",
+               "aa_recovery_codes_left", "aa_totp_secret", "aa_totp_uri", "aa_totp_code")),
   list(file = "api-login-protection-sessions.md", title = "Защита входа и сессии",
        fns = c("aa_login_gate", "aa_record_attempt", "aa_login_lock_remaining", "aa_global_throttled",
                "aa_clear_attempts", "aa_issue_token", "aa_find_session_user", "aa_revoke_token",
@@ -38,7 +41,8 @@ groups <- list(
        fns = c("aa_permissions_from_matrix", "aa_can", "aa_require", "aa_events", "aa_event_logger")),
   list(file = "api-modules.md",         title = "Модули интерфейса и помощники приложения",
        fns = c("aa_app_head", "aa_auth_ui", "aa_auth_server", "aa_users_ui", "aa_users_server",
-               "aa_password_ui", "aa_password_server", "aa_session_guard", "aa_register_module"))
+               "aa_password_ui", "aa_password_server", "aa_totp_ui", "aa_totp_server",
+               "aa_session_guard", "aa_register_module"))
 )
 
 exported <- sort(getNamespaceExports("appauth"))

@@ -61,6 +61,19 @@
 #'   одному пользователю за час, остальные запросы молча игнорируются.
 #' @param reset_max_per_minute Общий лимит писем восстановления по всем
 #'   пользователям за минуту (защита от рассылки спама).
+#' @param totp_enabled Включить двухфакторную аутентификацию (одноразовые коды
+#'   TOTP из приложения-аутентификатора). По умолчанию `FALSE`. Требует `totp_key`.
+#'   Двухфакторная защита добровольная: каждый пользователь включает её сам в
+#'   модуле [aa_totp_server()], а у кого она включена, тот вводит код при входе по
+#'   паролю.
+#' @param totp_key Ключ шифрования секретов TOTP в базе, строка не короче 16
+#'   символов (например, из переменной среды). **Хранить вне базы и вне репозитория.**
+#'   Если ключ потерять или заменить, существующие секреты расшифровать не удастся,
+#'   и пользователям придётся подключать 2FA заново (администратор сбрасывает её в
+#'   карточке).
+#' @param totp_issuer Название сервиса, которое покажет приложение-аутентификатор.
+#' @param totp_window На сколько 30-секундных шагов в обе стороны допускается
+#'   расхождение часов (0 до 5, по умолчанию 1).
 #' @param texts Тексты интерфейса, результат [aa_texts()].
 #'
 #' @returns Список настроек класса `aa_settings`.
@@ -108,6 +121,10 @@ aa_settings <- function(
     reset_ttl_minutes            = 60,
     reset_max_per_hour           = 3,
     reset_max_per_minute         = 10,
+    totp_enabled                 = FALSE,
+    totp_key                     = NULL,
+    totp_issuer                  = "appauth",
+    totp_window                  = 1,
     texts                        = aa_texts("ru")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
@@ -122,6 +139,7 @@ aa_settings <- function(
   aa_check_positive(reset_ttl_minutes, "reset_ttl_minutes")
   aa_check_positive(reset_max_per_hour, "reset_max_per_hour")
   aa_check_positive(reset_max_per_minute, "reset_max_per_minute")
+  aa_check_flag(totp_enabled, "totp_enabled")
   aa_check_positive(session_days, "session_days")
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
@@ -151,6 +169,35 @@ aa_settings <- function(
   if (reset_enabled && !(is.function(send_reset) && aa_is_string(reset_base_url))) {
     rlang::abort(
       "Для `reset_enabled = TRUE` нужны функция `send_reset` и адрес приложения `reset_base_url`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!(is.null(totp_key) || (is.character(totp_key) && length(totp_key) == 1 && !is.na(totp_key)))) {
+    rlang::abort(
+      "Параметр `totp_key` должен быть строкой или `NULL`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (totp_enabled && !(aa_is_string(totp_key) && nchar(totp_key) >= 16)) {
+    rlang::abort(
+      "Для `totp_enabled = TRUE` нужен ключ шифрования `totp_key` (строка не короче 16 символов).",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!aa_is_string(totp_issuer)) {
+    rlang::abort(
+      "Параметр `totp_issuer` должен быть непустой строкой.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!(is.numeric(totp_window) && length(totp_window) == 1 && is.finite(totp_window) &&
+        totp_window >= 0 && totp_window <= 5 && totp_window == round(totp_window))) {
+    rlang::abort(
+      "Параметр `totp_window` должен быть целым числом от 0 до 5.",
       class = "appauth_error_settings"
     )
   }
@@ -207,6 +254,10 @@ aa_settings <- function(
       reset_ttl_minutes            = reset_ttl_minutes,
       reset_max_per_hour           = reset_max_per_hour,
       reset_max_per_minute         = reset_max_per_minute,
+      totp_enabled                 = totp_enabled,
+      totp_key                     = totp_key,
+      totp_issuer                  = totp_issuer,
+      totp_window                  = totp_window,
       texts                        = texts
     ),
     class = "aa_settings"
@@ -259,6 +310,7 @@ print.aa_settings <- function(x, ...) {
   cat("  Восстановление пароля по email: ",
       if (x$reset_enabled) paste0("включено, ссылка действует ", x$reset_ttl_minutes, " мин.") else "выключено",
       "\n", sep = "")
+  cat("  Двухфакторная аутентификация: ", if (x$totp_enabled) "включена (добровольная)" else "выключена", "\n", sep = "")
   cat("  Роли: ", paste(x$roles, collapse = ", "),
       " (администратор: ", x$admin_role, ")\n", sep = "")
   cat("  Язык интерфейса: ", attr(x$texts, "lang"), "\n", sep = "")

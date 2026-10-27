@@ -32,6 +32,11 @@ settings <- aa_settings(
   reset_enabled = TRUE,
   send_reset = send_reset,
   reset_base_url = Sys.getenv("APPAUTH_EXAMPLE_URL", "http://127.0.0.1:3838"),
+  # двухфакторная аутентификация: ключ шифрования секретов в настоящем приложении берут
+  # из переменной среды и держат вне репозитория; здесь значение для примера
+  totp_enabled = TRUE,
+  totp_key = Sys.getenv("APPAUTH_EXAMPLE_TOTP_KEY", "example-only-key-change-me-0123456789"),
+  totp_issuer = "Reports portal",
   texts = aa_texts("en", login_title = "Reports portal", login_button = "Sign in")
 )
 
@@ -78,6 +83,7 @@ server <- function(input, output, session) {
   )
   aa_session_guard(auth, conn, settings)
   aa_password_server("password", conn, auth, settings, on_event = log_event)
+  aa_totp_server("totp", conn, auth, settings, on_event = log_event)
 
   # слот карточки пользователя: блок прав приложения
   card_ui <- function(login, ns) {
@@ -133,7 +139,7 @@ server <- function(input, output, session) {
         tabPanel("Export", actionButton("export", "Export to CSV"))
       },
       if (aa_can(user, "users", provider)) tabPanel("Users", aa_users_ui("users")),
-      tabPanel("Profile", aa_password_ui("password"), hr(), actionButton("logout", "Sign out"))
+      tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"), hr(), actionButton("logout", "Sign out"))
     )
 
     do.call(tabsetPanel, Filter(Negate(is.null), tabs))

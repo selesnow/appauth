@@ -1,10 +1,11 @@
 # Схема таблиц авторизации и её версионные миграции.
 #
-# Пакет владеет пятью таблицами:
+# Пакет владеет шестью таблицами:
 #   users             - пользователи (логин, хеш пароля, роль, признак блокировки, email);
 #   auth_sessions     - токены автовхода (хранится sha256 токена);
 #   login_attempts    - попытки входа для защиты от подбора пароля;
 #   password_resets   - одноразовые токены восстановления пароля (хранится sha256 токена);
+#   totp_recovery     - резервные коды двухфакторной аутентификации (хранится sha256 кода);
 #   appauth_migrations - служебная таблица версий миграций.
 #
 # Имена и колонки таблиц совпадают с базами приложения Server Manager, поэтому
@@ -143,6 +144,40 @@ aa_migrations <- function() {
         ")
         DBI::dbExecute(conn, "
           CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_login, created_at)
+        ")
+      }
+    ),
+    list(
+      version = 8L,
+      name    = "totp_two_factor",
+      up      = function(conn) {
+        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+
+        # секрет хранится зашифрованным (см. aa_totp_seal), у существующих пользователей
+        # двухфакторная аутентификация выключена
+        if (!"totp_secret" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_secret TEXT")
+        }
+
+        if (!"totp_enabled" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
+        }
+
+        if (!"totp_last_step" %in% cols) {
+          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0")
+        }
+
+        DBI::dbExecute(conn, "
+          CREATE TABLE IF NOT EXISTS totp_recovery (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_login TEXT NOT NULL,
+            code_hash  TEXT NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )
+        ")
+        DBI::dbExecute(conn, "
+          CREATE INDEX IF NOT EXISTS idx_totp_recovery_user ON totp_recovery (user_login, code_hash)
         ")
       }
     )
