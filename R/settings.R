@@ -74,6 +74,32 @@
 #' @param totp_issuer Название сервиса, которое покажет приложение-аутентификатор.
 #' @param totp_window На сколько 30-секундных шагов в обе стороны допускается
 #'   расхождение часов (0 до 5, по умолчанию 1).
+#' @param google_enabled Включить вход через Google (OpenID Connect): на форме входа
+#'   появляется кнопка «Войти через Google». По умолчанию `FALSE`. Требует
+#'   `google_client_id`, `google_client_secret` и `google_redirect_uri`. Вход получает
+#'   только пользователь, который уже есть в базе и у которого указан email, равный
+#'   адресу Google-аккаунта: новых пользователей вход не создаёт, роль берётся из базы.
+#'   Двухфакторный код приложения при входе через Google не спрашивается (подтверждение
+#'   делает сам Google).
+#' @param google_client_id,google_client_secret Идентификатор и секрет OAuth-клиента
+#'   (тип «Web application») из Google Cloud Console. **Секрет хранить вне базы и вне
+#'   репозитория** (например, в переменной среды).
+#' @param google_redirect_uri Адрес, на который Google возвращает пользователя: адрес
+#'   приложения как его открывают пользователи, например
+#'   `"https://apps.example.com/"`. Он должен в точности совпадать с адресом в списке
+#'   «Authorized redirect URIs» OAuth-клиента. Допускается `https://`, а для разработки
+#'   `http://localhost`.
+#' @param google_domains Допустимые домены организации (вектор, например
+#'   `c("example.com", "example.net")`). Если задан, вход принимается только для
+#'   аккаунтов, у которых в подписанном токене Google указан один из этих доменов (`hd`,
+#'   основной домен организации Workspace) и домен email тоже входит в список. Если у
+#'   организации есть вторичные домены, укажите в списке и основной, и вторичные. Пустое
+#'   значение (`NULL`) отключает проверку домена, тогда решает совпадение email с
+#'   пользователем в базе.
+#' @param password_login Разрешить вход по логину и паролю. По умолчанию `TRUE`.
+#'   `FALSE` скрывает форму пароля и «Забыли пароль?» и отклоняет такие попытки на
+#'   сервере; возможно только вместе с `google_enabled = TRUE`, иначе войти было бы
+#'   нечем. Создание первого администратора на пустой базе остаётся.
 #' @param texts Тексты интерфейса, результат [aa_texts()].
 #'
 #' @returns Список настроек класса `aa_settings`.
@@ -88,6 +114,15 @@
 #'   reset_enabled  = TRUE,
 #'   reset_base_url = "https://apps.example.com/my_app",
 #'   send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+#' )
+#'
+#' # вход через Google (секрет из переменной среды), пароль остаётся запасным
+#' settings <- aa_settings(
+#'   google_enabled       = TRUE,
+#'   google_client_id     = "1234-abc.apps.googleusercontent.com",
+#'   google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret"),
+#'   google_redirect_uri  = "https://apps.example.com/",
+#'   google_domains       = c("example.com", "example.net")
 #' )
 #'
 #' # более строгая защита, английский интерфейс и свои роли
@@ -125,6 +160,12 @@ aa_settings <- function(
     totp_key                     = NULL,
     totp_issuer                  = "appauth",
     totp_window                  = 1,
+    google_enabled               = FALSE,
+    google_client_id             = NULL,
+    google_client_secret         = NULL,
+    google_redirect_uri          = NULL,
+    google_domains               = NULL,
+    password_login               = TRUE,
     texts                        = aa_texts("ru")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
@@ -140,6 +181,8 @@ aa_settings <- function(
   aa_check_positive(reset_max_per_hour, "reset_max_per_hour")
   aa_check_positive(reset_max_per_minute, "reset_max_per_minute")
   aa_check_flag(totp_enabled, "totp_enabled")
+  aa_check_flag(google_enabled, "google_enabled")
+  aa_check_flag(password_login, "password_login")
   aa_check_positive(session_days, "session_days")
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
@@ -202,6 +245,50 @@ aa_settings <- function(
     )
   }
 
+  # домены из конфига приходят списком, из кода вектором: приводим к нижнему регистру
+  google_domains <- tolower(trimws(as.character(unlist(google_domains))))
+  google_domains <- unique(google_domains[!is.na(google_domains) & nzchar(google_domains)])
+
+  if (!all(grepl("^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\.[a-z]{2,}$", google_domains))) {
+    rlang::abort(
+      "Параметр `google_domains` должен содержать домены вида `example.com`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  for (field in c("google_client_id", "google_client_secret", "google_redirect_uri")) {
+    value <- get(field)
+
+    if (!(is.null(value) || (is.character(value) && length(value) == 1 && !is.na(value)))) {
+      rlang::abort(
+        paste0("Параметр `", field, "` должен быть строкой или `NULL`."),
+        class = "appauth_error_settings"
+      )
+    }
+  }
+
+  if (google_enabled && !(aa_is_string(google_client_id) && aa_is_string(google_client_secret) &&
+                          aa_is_string(google_redirect_uri))) {
+    rlang::abort(
+      "Для `google_enabled = TRUE` нужны `google_client_id`, `google_client_secret` и `google_redirect_uri`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (google_enabled && !grepl("^(https://[^/\\s]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/\\S*)?$", google_redirect_uri, perl = TRUE)) {
+    rlang::abort(
+      "Параметр `google_redirect_uri` должен быть адресом `https://...` (для разработки `http://localhost`).",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!password_login && !google_enabled) {
+    rlang::abort(
+      "Вход по паролю можно отключить (`password_login = FALSE`) только вместе с `google_enabled = TRUE`.",
+      class = "appauth_error_settings"
+    )
+  }
+
   if (password_min > password_max) {
     rlang::abort(
       "Параметр `password_min` не может быть больше `password_max`.",
@@ -258,6 +345,12 @@ aa_settings <- function(
       totp_key                     = totp_key,
       totp_issuer                  = totp_issuer,
       totp_window                  = totp_window,
+      google_enabled               = google_enabled,
+      google_client_id             = google_client_id,
+      google_client_secret         = google_client_secret,
+      google_redirect_uri          = google_redirect_uri,
+      google_domains               = google_domains,
+      password_login               = password_login,
       texts                        = texts
     ),
     class = "aa_settings"
@@ -311,6 +404,14 @@ print.aa_settings <- function(x, ...) {
       if (x$reset_enabled) paste0("включено, ссылка действует ", x$reset_ttl_minutes, " мин.") else "выключено",
       "\n", sep = "")
   cat("  Двухфакторная аутентификация: ", if (x$totp_enabled) "включена (добровольная)" else "выключена", "\n", sep = "")
+  cat("  Вход по паролю: ", if (x$password_login) "разрешён" else "отключён", "
+", sep = "")
+  cat("  Вход через Google: ",
+      if (x$google_enabled) {
+        paste0("включён", if (length(x$google_domains)) paste0(" (домены: ", paste(x$google_domains, collapse = ", "), ")") else "")
+      } else "выключен",
+      "
+", sep = "")
   cat("  Роли: ", paste(x$roles, collapse = ", "),
       " (администратор: ", x$admin_role, ")\n", sep = "")
   cat("  Язык интерфейса: ", attr(x$texts, "lang"), "\n", sep = "")

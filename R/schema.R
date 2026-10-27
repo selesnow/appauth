@@ -1,11 +1,12 @@
 # Схема таблиц авторизации и её версионные миграции.
 #
-# Пакет владеет шестью таблицами:
+# Пакет владеет семью таблицами:
 #   users             - пользователи (логин, хеш пароля, роль, признак блокировки, email);
 #   auth_sessions     - токены автовхода (хранится sha256 токена);
 #   login_attempts    - попытки входа для защиты от подбора пароля;
 #   password_resets   - одноразовые токены восстановления пароля (хранится sha256 токена);
 #   totp_recovery     - резервные коды двухфакторной аутентификации (хранится sha256 кода);
+#   oauth_states      - одноразовые параметры входа через Google (хранится sha256 state);
 #   appauth_migrations - служебная таблица версий миграций.
 #
 # Имена и колонки таблиц совпадают с базами приложения Server Manager, поэтому
@@ -180,6 +181,28 @@ aa_migrations <- function() {
           CREATE INDEX IF NOT EXISTS idx_totp_recovery_user ON totp_recovery (user_login, code_hash)
         ")
       }
+    ),
+    list(
+      version = 9L,
+      name    = "oauth_states",
+      up      = function(conn) {
+        # вход через Google: state хранится только в виде sha256, запись живёт минуты и
+        # используется один раз; nonce и PKCE-проверка нужны при возврате от Google
+        DBI::dbExecute(conn, "
+          CREATE TABLE IF NOT EXISTS oauth_states (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            state_hash    TEXT NOT NULL,
+            nonce         TEXT NOT NULL,
+            code_verifier TEXT NOT NULL,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            expires_at    TEXT NOT NULL,
+            used          INTEGER NOT NULL DEFAULT 0
+          )
+        ")
+        DBI::dbExecute(conn, "
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_states_hash ON oauth_states (state_hash)
+        ")
+      }
     )
   )
 }
@@ -286,7 +309,7 @@ aa_schema_version <- function(conn) {
 #' Удаляет записи о попытках входа старше `attempts_retention_hours` часов, а
 #' также просроченные и отозванные токены автовхода старше `token_retention_days`
 #' дней, а также использованные и просроченные токены восстановления пароля
-#' старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
+#' и параметры входа через Google старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
 #' после [aa_init_db()].
 #'
 #' @inheritParams aa_init_db
@@ -294,7 +317,8 @@ aa_schema_version <- function(conn) {
 #'
 #' @returns Список (невидимо): `login_attempts` (число удалённых попыток входа),
 #'   `auth_sessions` (число удалённых токенов) и `password_resets` (число удалённых
-#'   токенов восстановления пароля).
+#'   токенов восстановления пароля) и `oauth_states` (число удалённых параметров входа
+#'   через Google).
 #' @export
 #'
 #' @examples
@@ -334,7 +358,15 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     error = function(e) 0L
   )
 
-  invisible(list(login_attempts = attempts, auth_sessions = sessions, password_resets = resets))
+  oauth <- tryCatch(
+    DBI::dbExecute(conn, "DELETE FROM oauth_states WHERE expires_at < datetime('now', '-1 days')"),
+    error = function(e) 0L
+  )
+
+  invisible(list(
+    login_attempts = attempts, auth_sessions = sessions, password_resets = resets,
+    oauth_states = oauth
+  ))
 }
 
 #' Подготовка базы при запуске приложения

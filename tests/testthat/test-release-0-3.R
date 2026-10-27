@@ -39,7 +39,7 @@ test_that("миграция достраивает колонки в сущес�
   after <- aa_get_user(con, "old")
   expect_equal(after$login, "old")
   expect_true(is.na(after$created_at))
-  expect_identical(aa_schema_version(con), 8L)
+  expect_identical(aa_schema_version(con), 9L)
 })
 
 test_that("вход по паролю обновляет last_login_at, вход по cookie не обновляет", {

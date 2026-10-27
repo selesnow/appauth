@@ -70,6 +70,13 @@
         '; SameSite=Lax' + secureFlag();
     });
 
+    // {url}: переход на страницу согласия Google (другие адреса игнорируются)
+    Shiny.addCustomMessageHandler('appauth_redirect', function (msg) {
+      if (typeof msg.url === 'string' && msg.url.indexOf('https://accounts.google.com/') === 0) {
+        window.location.assign(msg.url);
+      }
+    });
+
     // {name}
     Shiny.addCustomMessageHandler('appauth_clear_cookie', function (msg) {
       document.cookie = encodeURIComponent(msg.name) + '=; path=/; max-age=0; SameSite=Lax' + secureFlag();

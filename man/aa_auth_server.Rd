@@ -82,6 +82,22 @@ aa_auth_server(
 \code{password_reset_requested}, \code{password_reset_done} и \code{password_reset_failed}.
 Логика без интерфейса: \code{\link[=aa_request_password_reset]{aa_request_password_reset()}} и
 \code{\link[=aa_reset_password_with_token]{aa_reset_password_with_token()}}.
+}
+
+\section{Вход через Google}{
+
+При \code{google_enabled = TRUE} в настройках (\code{\link[=aa_settings]{aa_settings()}}) на форме входа появляется
+кнопка «Войти через Google». Пользователь подтверждает вход у Google и возвращается
+на \code{google_redirect_uri}; пакет проверяет подпись и содержимое токена Google, домен
+организации (\code{google_domains}) и находит пользователя \strong{по email среди уже созданных}:
+новых пользователей вход не создаёт, роль берётся из базы, заблокированный
+пользователь не входит. Двухфакторный код приложения при этом не спрашивается
+(подтверждение делает Google). \code{state} из адреса сверяется с коротким cookie
+браузера, начавшего вход, поэтому чужую ссылку возврата подсунуть нельзя. При
+\code{password_login = FALSE} форма пароля скрыта, а попытки входа по паролю отклоняются
+на сервере. Модуль сообщает \code{login_success} со значением \code{google} и
+\code{google_login_failed} (причина и email в \code{value}); пользователю при отказе
+показывается общий текст.
 
 Роль и логин берутся из базы, а не из введённой строки. Подключение \code{conn}
 принадлежит приложению: закрывайте его при завершении сессии.

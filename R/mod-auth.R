@@ -49,6 +49,20 @@ aa_auth_ui <- function(id) {
 #' Логика без интерфейса: [aa_request_password_reset()] и
 #' [aa_reset_password_with_token()].
 #'
+#' @section Вход через Google:
+#' При `google_enabled = TRUE` в настройках ([aa_settings()]) на форме входа появляется
+#' кнопка «Войти через Google». Пользователь подтверждает вход у Google и возвращается
+#' на `google_redirect_uri`; пакет проверяет подпись и содержимое токена Google, домен
+#' организации (`google_domains`) и находит пользователя **по email среди уже созданных**:
+#' новых пользователей вход не создаёт, роль берётся из базы, заблокированный
+#' пользователь не входит. Двухфакторный код приложения при этом не спрашивается
+#' (подтверждение делает Google). `state` из адреса сверяется с коротким cookie
+#' браузера, начавшего вход, поэтому чужую ссылку возврата подсунуть нельзя. При
+#' `password_login = FALSE` форма пароля скрыта, а попытки входа по паролю отклоняются
+#' на сервере. Модуль сообщает `login_success` со значением `google` и
+#' `google_login_failed` (причина и email в `value`); пользователю при отказе
+#' показывается общий текст.
+#'
 #' Роль и логин берутся из базы, а не из введённой строки. Подключение `conn`
 #' принадлежит приложению: закрывайте его при завершении сессии.
 #'
@@ -106,6 +120,12 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     mode <- shiny::reactiveVal("login")
     # токен из ссылки восстановления, по которому показана форма нового пароля
     reset_pending <- shiny::reactiveVal(NULL)
+    # параметры возврата от Google (code, state), пока ждём cookie браузера для сверки
+    google_callback <- shiny::reactiveVal(NULL)
+    google_on <- isTRUE(settings$google_enabled)
+    # настройки собраны aa_settings(), но на всякий случай отсутствие поля не отключает пароль
+    password_on <- !identical(settings$password_login, FALSE)
+    oauth_cookie <- paste0(cookie_name, "_oauth")
 
     users_exist <- shiny::reactiveVal(
       tryCatch(aa_users_exist(conn), error = function(e) TRUE)
@@ -153,7 +173,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     }
 
     # ссылка восстановления пароля из письма: ?reset=<токен>
-    if (isTRUE(settings$reset_enabled)) {
+    if (isTRUE(settings$reset_enabled) && password_on) {
       shiny::observeEvent(aa_url_search(session), {
         token <- shiny::parseQueryString(aa_url_search(session))[["reset"]]
 
@@ -202,6 +222,92 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         finish_login(found$login, found$role, issue_token = FALSE)
         emit("login_success", found$login, "cookie")
       })
+    }
+
+    # вход через Google ------------------------------------------------------------
+    google_fail <- function(reason, email = NULL) {
+      message_text(aa_text(settings, aa_google_text_key(reason)))
+      emit("google_login_failed", NULL, paste(c(reason, if (aa_is_string(email)) email), collapse = " "))
+    }
+
+    if (google_on) {
+      # кнопка: запоминаем state в cookie этого браузера и отправляем его к Google
+      shiny::observeEvent(input$google_btn, {
+        if (!is.null(shiny::isolate(user()))) {
+          return()
+        }
+
+        started <- tryCatch(
+          aa_google_start(conn, settings),
+          error = function(e) {
+            message("appauth: не удалось начать вход через Google: ", conditionMessage(e))
+            NULL
+          }
+        )
+
+        if (is.null(started)) {
+          google_fail("start_failed")
+          return()
+        }
+
+        message_text("")
+        session$sendCustomMessage(
+          "appauth_set_cookie",
+          list(name = oauth_cookie, token = started$state, days = 600 / 86400)
+        )
+        session$sendCustomMessage("appauth_redirect", list(url = started$url))
+      })
+
+      # возврат от Google: ?code=...&state=... (или ?error=... при отказе пользователя)
+      shiny::observeEvent(aa_url_search(session), {
+        query <- shiny::parseQueryString(aa_url_search(session))
+        code <- query[["code"]]
+        state <- query[["state"]]
+
+        if (!is.null(shiny::isolate(user())) || !aa_is_string(state) ||
+            !(aa_is_string(code) || aa_is_string(query[["error"]]))) {
+          return()
+        }
+
+        # код и state не должны оставаться в адресной строке
+        shiny::updateQueryString("?", mode = "replace", session = session)
+
+        if (!aa_is_string(code)) {
+          google_fail("cancelled")
+          return()
+        }
+
+        google_callback(list(code = code, state = state))
+        session$sendCustomMessage("appauth_read_cookie", list(name = oauth_cookie, input = session$ns("oauth_cookie")))
+      }, once = TRUE)
+
+      # cookie браузера должен совпасть со state из адреса: так вход заканчивается
+      # только в том браузере, который его начал
+      shiny::observeEvent(input$oauth_cookie, {
+        callback <- shiny::isolate(google_callback())
+        shiny::req(callback)
+        google_callback(NULL)
+        session$sendCustomMessage("appauth_clear_cookie", list(name = oauth_cookie))
+
+        if (!is.null(shiny::isolate(user()))) {
+          return()
+        }
+
+        if (!aa_is_string(input$oauth_cookie) || !identical(input$oauth_cookie, callback$state)) {
+          google_fail("bad_browser")
+          return()
+        }
+
+        res <- aa_google_complete(conn, settings, callback$code, callback$state)
+
+        if (!isTRUE(res$ok)) {
+          google_fail(res$reason, res$email)
+          return()
+        }
+
+        finish_login(res$login, res$role)
+        emit("login_success", res$login, "google")
+      }, ignoreNULL = FALSE, ignoreInit = TRUE)
     }
 
     logout <- function(reason = NULL, reload = FALSE) {
@@ -294,11 +400,25 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       } else if (users_exist()) {
         heading <- title %||% aa_text(settings, "login_title")
         shiny::tagList(
-          shiny::textInput(ns("login"), aa_text(settings, "login_label")),
-          shiny::passwordInput(ns("password"), aa_text(settings, "password_label")),
-          shiny::actionButton(ns("login_btn"), aa_text(settings, "login_button"), class = "aa-login-button"),
+          if (password_on) {
+            shiny::tagList(
+              shiny::textInput(ns("login"), aa_text(settings, "login_label")),
+              shiny::passwordInput(ns("password"), aa_text(settings, "password_label")),
+              shiny::actionButton(ns("login_btn"), aa_text(settings, "login_button"), class = "aa-login-button")
+            )
+          },
+          if (google_on) {
+            shiny::tagList(
+              if (password_on) shiny::div(class = "aa-login-or", aa_text(settings, "google_or")),
+              shiny::actionButton(
+                ns("google_btn"),
+                shiny::tagList(aa_google_icon(), aa_text(settings, "google_button")),
+                class = "aa-login-button aa-google-button"
+              )
+            )
+          },
           shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
-          if (isTRUE(settings$reset_enabled)) {
+          if (isTRUE(settings$reset_enabled) && password_on) {
             shiny::div(class = "aa-login-hint", shiny::actionLink(ns("forgot_link"), aa_text(settings, "forgot_link")))
           }
         )
@@ -332,6 +452,13 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     shiny::observeEvent(input$login_btn, {
       login <- input$login
       password <- input$password
+
+      # защита на сервере: скрытая форма не заменяет проверку
+      if (!password_on) {
+        message_text(aa_text(settings, "password_login_disabled"))
+        emit("login_failed", NULL, "password_disabled")
+        return()
+      }
 
       if (!aa_is_string(login) || !aa_is_string(password)) {
         message_text(aa_text(settings, "bad_credentials"))
@@ -426,7 +553,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     })
 
     shiny::observeEvent(input$forgot_link, {
-      shiny::req(isTRUE(settings$reset_enabled))
+      shiny::req(isTRUE(settings$reset_enabled), password_on)
       message_text("")
       mode("forgot")
     })
@@ -439,7 +566,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     })
 
     shiny::observeEvent(input$forgot_btn, {
-      shiny::req(isTRUE(settings$reset_enabled))
+      shiny::req(isTRUE(settings$reset_enabled), password_on)
 
       res <- tryCatch(
         aa_request_password_reset(conn, input$forgot_identifier, settings),
@@ -585,6 +712,21 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       token = function() current_token
     )
   })
+}
+
+#' Значок Google для кнопки входа
+#'
+#' @returns Элемент интерфейса Shiny (встроенный SVG).
+#' @noRd
+aa_google_icon <- function() {
+  shiny::HTML(paste0(
+    '<svg viewBox="0 0 48 48" aria-hidden="true">',
+    '<path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>',
+    '<path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>',
+    '<path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>',
+    '<path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>',
+    '</svg>'
+  ))
 }
 
 #' Строка параметров адреса страницы

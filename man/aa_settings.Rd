@@ -30,6 +30,12 @@ aa_settings(
   totp_key = NULL,
   totp_issuer = "appauth",
   totp_window = 1,
+  google_enabled = FALSE,
+  google_client_id = NULL,
+  google_client_secret = NULL,
+  google_redirect_uri = NULL,
+  google_domains = NULL,
+  password_login = TRUE,
   texts = aa_texts("ru")
 )
 }
@@ -117,6 +123,37 @@ TOTP из приложения-аутентификатора). По умолч�
 \item{totp_window}{На сколько 30-секундных шагов в обе стороны допускается
 расхождение часов (0 до 5, по умолчанию 1).}
 
+\item{google_enabled}{Включить вход через Google (OpenID Connect): на форме входа
+появляется кнопка «Войти через Google». По умолчанию \code{FALSE}. Требует
+\code{google_client_id}, \code{google_client_secret} и \code{google_redirect_uri}. Вход получает
+только пользователь, который уже есть в базе и у которого указан email, равный
+адресу Google-аккаунта: новых пользователей вход не создаёт, роль берётся из базы.
+Двухфакторный код приложения при входе через Google не спрашивается (подтверждение
+делает сам Google).}
+
+\item{google_client_id, google_client_secret}{Идентификатор и секрет OAuth-клиента
+(тип «Web application») из Google Cloud Console. \strong{Секрет хранить вне базы и вне
+репозитория} (например, в переменной среды).}
+
+\item{google_redirect_uri}{Адрес, на который Google возвращает пользователя: адрес
+приложения как его открывают пользователи, например
+\code{"https://apps.example.com/"}. Он должен в точности совпадать с адресом в списке
+«Authorized redirect URIs» OAuth-клиента. Допускается \verb{https://}, а для разработки
+\verb{http://localhost}.}
+
+\item{google_domains}{Допустимые домены организации (вектор, например
+\code{c("example.com", "example.net")}). Если задан, вход принимается только для
+аккаунтов, у которых в подписанном токене Google указан один из этих доменов (\code{hd},
+основной домен организации Workspace) и домен email тоже входит в список. Если у
+организации есть вторичные домены, укажите в списке и основной, и вторичные. Пустое
+значение (\code{NULL}) отключает проверку домена, тогда решает совпадение email с
+пользователем в базе.}
+
+\item{password_login}{Разрешить вход по логину и паролю. По умолчанию \code{TRUE}.
+\code{FALSE} скрывает форму пароля и «Забыли пароль?» и отклоняет такие попытки на
+сервере; возможно только вместе с \code{google_enabled = TRUE}, иначе войти было бы
+нечем. Создание первого администратора на пустой базе остаётся.}
+
 \item{texts}{Тексты интерфейса, результат \code{\link[=aa_texts]{aa_texts()}}.}
 }
 \value{
@@ -149,6 +186,15 @@ settings <- aa_settings(
   reset_enabled  = TRUE,
   reset_base_url = "https://apps.example.com/my_app",
   send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+)
+
+# вход через Google (секрет из переменной среды), пароль остаётся запасным
+settings <- aa_settings(
+  google_enabled       = TRUE,
+  google_client_id     = "1234-abc.apps.googleusercontent.com",
+  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret"),
+  google_redirect_uri  = "https://apps.example.com/",
+  google_domains       = c("example.com", "example.net")
 )
 
 # более строгая защита, английский интерфейс и свои роли

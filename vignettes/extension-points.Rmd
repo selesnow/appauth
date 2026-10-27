@@ -301,6 +301,27 @@ tabPanel("Профиль", aa_password_ui("password"), hr(), aa_totp_ui("totp"))
 
 Тексты формы меняются ключами `totp_*` и `card_totp` (`aa_text_keys()`).
 
+# Вход через Google
+
+Вход через Google (OpenID Connect) включается настройками и ничего не создаёт сам: войти может только пользователь, который уже есть в базе и у которого указан email, равный адресу Google-аккаунта. Роль берётся из базы, заблокированный пользователь не входит, двухфакторный код приложения не спрашивается.
+
+**Что нужно в Google.** В Google Cloud Console (проект в вашей организации Workspace) на экране согласия выбрать тип **Internal**, затем создать OAuth-клиент типа **Web application** и в «Authorized redirect URIs» указать адрес приложения в точности как его открывают пользователи, например `https://apps.example.com/`. Адрес должен быть на домене с HTTPS: для IP-адресов Google возврат не разрешает. Тип Internal пускает только аккаунты вашей организации Workspace, для аккаунтов из других организаций нужен тип External (тогда ограничивает список `google_domains` и наличие пользователя в базе).
+
+```r
+settings <- aa_settings(
+  google_enabled       = TRUE,
+  google_client_id     = Sys.getenv("GOOGLE_OAUTH_CLIENT_ID"),
+  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),   # секрет хранить вне репозитория
+  google_redirect_uri  = "https://apps.example.com/",
+  google_domains       = c("example.com", "example.net"),            # допустимые домены организации
+  password_login       = TRUE                                        # FALSE: только Google (нужен google_enabled)
+)
+```
+
+Дальше приложение ничего не меняет: `aa_auth_ui()` и `aa_auth_server()` сами показывают кнопку и обрабатывают возврат от Google. Событие `login_success` приходит со значением `google`, отказы приходят событием `google_login_failed` (причина и email в `value`: `no_user`, `blocked`, `domain`, `bad_browser` и другие), пользователю показывается общий текст. Для входа у пользователя должен быть указан email (`aa_set_email()` или карточка пользователя).
+
+`password_login = FALSE` скрывает форму пароля и ссылку «Забыли пароль?», а попытки входа по паролю отклоняются на сервере. Прежде чем отключать пароль, проверьте, что хотя бы у одного администратора указан email и вход через Google у него работает: иначе после отключения войти будет нечем.
+
 # Тексты
 
 Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.

@@ -117,6 +117,14 @@ aa_texts_ru <- list(
   reset_save_button        = "Сохранить пароль",
   reset_link_invalid       = "Ссылка недействительна или устарела. Запросите восстановление пароля заново.",
   reset_done               = "Пароль изменён. Войдите с новым паролем.",
+  # вход через Google
+  google_button            = "Войти через Google",
+  google_or                = "или",
+  google_failed            = "Не удалось войти через Google. Попробуйте ещё раз.",
+  google_cancelled         = "Вход через Google отменён.",
+  google_no_user           = "Для этого аккаунта Google доступ не предоставлен. Обратитесь к администратору.",
+  google_domain            = "Этот аккаунт Google не относится к разрешённым доменам организации.",
+  password_login_disabled  = "Вход по паролю отключён. Используйте вход через Google.",
   # email пользователя
   email_section            = "Email для восстановления пароля",
   email_label              = "Email",
@@ -274,6 +282,14 @@ aa_texts_en <- list(
   reset_save_button        = "Save password",
   reset_link_invalid       = "The link is invalid or has expired. Request password recovery again.",
   reset_done               = "Password changed. Sign in with the new password.",
+  # Google sign-in
+  google_button            = "Sign in with Google",
+  google_or                = "or",
+  google_failed            = "Could not sign in with Google. Please try again.",
+  google_cancelled         = "Google sign-in was cancelled.",
+  google_no_user           = "This Google account has not been granted access. Contact an administrator.",
+  google_domain            = "This Google account does not belong to the allowed organization domains.",
+  password_login_disabled  = "Password sign-in is disabled. Use Google sign-in.",
   # user email
   email_section            = "Email for password recovery",
   email_label              = "Email",

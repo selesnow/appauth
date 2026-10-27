@@ -5,14 +5,14 @@ test_that("на пустой базе создаются все таблицы �
 
   res <- aa_init_db(con)
 
-  expect_identical(res$applied, 1:8)
-  expect_identical(res$version, 8L)
+  expect_identical(res$applied, 1:9)
+  expect_identical(res$version, 9L)
   expect_false(res$legacy)
   expect_identical(
     table_names(con),
-    c("appauth_migrations", "auth_sessions", "login_attempts", "password_resets", "totp_recovery", "users")
+    c("appauth_migrations", "auth_sessions", "login_attempts", "oauth_states", "password_resets", "totp_recovery", "users")
   )
-  expect_identical(aa_schema_version(con), 8L)
+  expect_identical(aa_schema_version(con), 9L)
 })
 
 test_that("колонки таблиц соответствуют схеме Server Manager", {
@@ -45,11 +45,11 @@ test_that("миграции записываются в служебную та�
 
   migrations <- DBI::dbGetQuery(con, "SELECT version, name FROM appauth_migrations ORDER BY version")
 
-  expect_identical(migrations$version, 1:8)
+  expect_identical(migrations$version, 1:9)
   expect_identical(
     migrations$name,
     c("users", "users_blocked_column", "auth_sessions", "login_attempts", "users_must_change_column",
-      "users_created_and_last_login_columns", "password_resets_and_email", "totp_two_factor")
+      "users_created_and_last_login_columns", "password_resets_and_email", "totp_two_factor", "oauth_states")
   )
 })
 
@@ -65,7 +65,7 @@ test_that("повторный запуск ничего не меняет", {
   after <- lapply(c("users", "auth_sessions", "login_attempts", "appauth_migrations"), \(t) rows_of(con, t))
 
   expect_identical(res$applied, integer())
-  expect_identical(res$version, 8L)
+  expect_identical(res$version, 9L)
   expect_identical(before, after)
 })
 
@@ -79,7 +79,7 @@ test_that("Server Manager prod: старая схема достраиваетс
   res <- aa_init_db(con)
 
   expect_true(res$legacy)
-  expect_identical(res$applied, 1:8)
+  expect_identical(res$applied, 1:9)
   expect_true("blocked" %in% columns_of(con, "users"))
   expect_true("login_attempts" %in% table_names(con))
 
@@ -118,7 +118,7 @@ test_that("рекрутинг: пароли в открытом виде и root
   expect_true(res$legacy)
   expect_identical(
     table_names(con),
-    c("action_log", "appauth_migrations", "auth_sessions", "login_attempts", "password_resets", "totp_recovery", "users")
+    c("action_log", "appauth_migrations", "auth_sessions", "login_attempts", "oauth_states", "password_resets", "totp_recovery", "users")
   )
 
   users_after <- rows_of(con, "users")
@@ -216,7 +216,7 @@ test_that("aa_prepare_db подготавливает базу и не брос�
   con <- new_db()
 
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
-  expect_identical(aa_schema_version(con), 8L)
+  expect_identical(aa_schema_version(con), 9L)
 
   expect_message(aa_prepare_db(new_db(), aa_settings()), "применены миграции схемы")
 })

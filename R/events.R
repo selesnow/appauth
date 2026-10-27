@@ -57,8 +57,8 @@ aa_emit <- function(on_event, event, user = NULL, session_id = NULL, value = NUL
 #' aa_events()$event
 aa_events <- function() {
   catalog <- list(
-    c("login_success",        "Успешный вход (по паролю или по cookie автовхода)",              "cookie, если вход по автовходу"),
-    c("login_failed",         "Неверный логин или пароль",                                     ""),
+    c("login_success",        "Успешный вход (по паролю, через Google или по cookie автовхода)", "cookie (автовход) или google (вход через Google)"),
+    c("login_failed",         "Неверный логин или пароль",                                     "password_disabled, если вход по паролю отключён"),
     c("login_locked",         "Попытка входа в логин, заблокированный после неудачных попыток", "секунд до конца блокировки"),
     c("login_blocked_user",   "Попытка входа пользователя, заблокированного администратором",   ""),
     c("login_throttled",      "Отказ из-за общего лимита неудачных попыток в минуту",          ""),
@@ -84,6 +84,7 @@ aa_events <- function() {
     c("totp_failed",          "Неверный код при подтверждении входа или выключении 2FA",        ""),
     c("totp_reset",           "Администратор сбросил 2FA пользователя",                         "логин пользователя"),
     c("recovery_code_used",   "Вход подтверждён резервным кодом",                               ""),
+    c("google_login_failed",  "Неудачный вход через Google (пользователю показывается общий текст)", "причина: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; через пробел email, если известен"),
     c("weak_password_set",    "Принят слабый пароль (режим password_policy = \"warn\")",        "логин и причина: password_common, password_equals_login, password_repeated")
   )
 

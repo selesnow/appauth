@@ -81,6 +81,12 @@
 
 .aa-login-card .form-group { margin-bottom: 20px; }
 
+/* Shiny задаёт полям ширину 300px, а карточка шире: поля и кнопка должны быть одной ширины */
+.aa-login-card .shiny-input-container:not(.shiny-input-container-inline) {
+  width: 100%;
+  max-width: 100%;
+}
+
 .aa-login-card label {
   color: var(--aa-muted);
   font-weight: 500;
@@ -117,6 +123,37 @@
 }
 
 .aa-login-card .aa-login-button:hover { background-color: var(--aa-primary-hover) !important; }
+
+/* Вход через Google: кнопка с рамкой, чтобы не спорить с основной */
+.aa-login-card .aa-google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: transparent !important;
+  border: 1px solid var(--aa-input-border) !important;
+  color: var(--aa-text) !important;
+}
+
+.aa-login-card .aa-google-button:hover { background-color: var(--aa-input-bg) !important; }
+
+.aa-google-button svg { width: 18px; height: 18px; flex: none; }
+
+.aa-login-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 5px;
+  color: var(--aa-muted);
+  font-size: 0.85em;
+}
+
+.aa-login-or::before,
+.aa-login-or::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--aa-input-border);
+}
 
 .aa-login-message {
   display: block;
