@@ -7,7 +7,8 @@
 aa_schema_version(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
+(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
 }
 \value{
 Целое число: номер последней применённой миграции или \code{0}, если

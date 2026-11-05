@@ -125,7 +125,7 @@ test_that("подключение: 2FA включается только пос�
   expect_match(setup$uri, "^otpauth://totp/appauth:ivan\\?secret=")
   expect_false(aa_totp_enabled(con, "ivan"))
 
-  stored <- DBI::dbGetQuery(con, "SELECT totp_secret FROM users WHERE login = 'ivan'")$totp_secret
+  stored <- tquery(con, "SELECT totp_secret FROM users WHERE login = 'ivan'")$totp_secret
   expect_false(grepl(setup$secret, stored, fixed = TRUE))
 
   err <- tryCatch(aa_totp_enable(con, "ivan", "000000", settings), appauth_error_user = identity)
@@ -140,7 +140,7 @@ test_that("подключение: 2FA включается только пос�
   expect_identical(aa_recovery_codes_left(con, "ivan"), 10L)
 
   # в базе только хеши резервных кодов
-  hashes <- DBI::dbGetQuery(con, "SELECT code_hash FROM totp_recovery")$code_hash
+  hashes <- tquery(con, "SELECT code_hash FROM totp_recovery")$code_hash
   expect_false(any(gsub("-", "", codes) %in% hashes))
 })
 
@@ -208,7 +208,7 @@ test_that("окно totp_window настраивается", {
   raw_user(con, "ivan")
   strict <- totp_settings(totp_window = 0)
   totp <- enable_totp(con, "ivan", strict)
-  DBI::dbExecute(con, "UPDATE users SET totp_last_step = 0")
+  texec(con, "UPDATE users SET totp_last_step = 0")
 
   expect_false(aa_verify_second_factor(con, "ivan", now_code(totp$secret, 1), strict)$ok)
   expect_false(aa_verify_second_factor(con, "ivan", now_code(totp$secret, -1), strict)$ok)
@@ -268,7 +268,7 @@ test_that("выключение стирает секрет и резервны�
   expect_true(aa_totp_disable(con, "ivan"))
   expect_false(aa_totp_enabled(con, "ivan"))
   expect_identical(aa_recovery_codes_left(con, "ivan"), 0L)
-  expect_true(is.na(DBI::dbGetQuery(con, "SELECT totp_secret FROM users WHERE login = 'ivan'")$totp_secret))
+  expect_true(is.na(tquery(con, "SELECT totp_secret FROM users WHERE login = 'ivan'")$totp_secret))
   expect_false(aa_verify_second_factor(con, "ivan", now_code(totp$secret, 1), settings)$ok)
 
   expect_false(aa_totp_disable(con, "ivan"))
@@ -290,6 +290,7 @@ test_that("удаление пользователя удаляет его ре�
 })
 
 test_that("миграция 8 достраивает старую базу, у пользователей 2FA выключена", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_server_manager_prod(con)
   before <- rows_of(con, "users")
@@ -306,9 +307,10 @@ test_that("миграция 8 достраивает старую базу, у �
 })
 
 test_that("до достройки схемы 2FA считается выключенной и не ломает вход", {
+  skip_if_not_sqlite()
   con <- new_db()
-  DBI::dbExecute(con, "CREATE TABLE users (id INTEGER PRIMARY KEY, login TEXT UNIQUE, password TEXT, role TEXT)")
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('ivan', 'x', 'user')")
+  texec(con, "CREATE TABLE users (id INTEGER PRIMARY KEY, login TEXT UNIQUE, password TEXT, role TEXT)")
+  texec(con, "INSERT INTO users (login, password, role) VALUES ('ivan', 'x', 'user')")
 
   expect_false(aa_totp_enabled(con, "ivan"))
   expect_false(aa_verify_second_factor(con, "ivan", "123456", totp_settings())$ok)
@@ -332,7 +334,7 @@ test_that("после верного пароля показывается фо�
     expect_false(grepl("login_btn", form_html(output), fixed = TRUE))
     # успешная попытка не записана: она обнулила бы счётчик неудач
     expect_equal(count_attempts(con), 0)
-    expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM auth_sessions")$n, 0)
+    expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions")$n, 0)
 
     session$setInputs(totp_code = now_code(totp$secret, 1), totp_btn = 1)
 
@@ -471,9 +473,9 @@ test_that("обязательная смена пароля идёт после 
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
   settings <- totp_settings()
-  DBI::dbExecute(con, "UPDATE users SET must_change = 0")
+  texec(con, "UPDATE users SET must_change = 0")
   totp <- enable_totp(con, "ann", settings)
-  DBI::dbExecute(con, "UPDATE users SET must_change = 1")
+  texec(con, "UPDATE users SET must_change = 1")
 
   run_auth(con, settings = settings, {
     session$setInputs(login = "ann", password = "secret123", login_btn = 1)

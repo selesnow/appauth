@@ -79,7 +79,7 @@ aa_copy_button <- function(text, settings) {
 #' пароля. События: `totp_enabled`, `totp_disabled`, `totp_failed`.
 #'
 #' @param id Идентификатор модуля, такой же, как в [aa_totp_ui()].
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param auth Объект авторизации, результат [aa_auth_server()].
 #' @param settings Настройки, результат [aa_settings()] с `totp_enabled = TRUE`.
 #' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
@@ -96,7 +96,7 @@ aa_copy_button <- function(text, settings) {
 #' })
 #' }
 aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns

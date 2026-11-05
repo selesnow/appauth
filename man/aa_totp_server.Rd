@@ -9,7 +9,7 @@ aa_totp_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
 \arguments{
 \item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_totp_ui]{aa_totp_ui()}}.}
 
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{auth}{Объект авторизации, результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 

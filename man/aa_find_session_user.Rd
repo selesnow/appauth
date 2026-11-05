@@ -7,7 +7,7 @@
 aa_find_session_user(conn, token)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{token}{Токен из cookie.}
 }

@@ -7,7 +7,8 @@
 aa_cleanup(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
+(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
 }

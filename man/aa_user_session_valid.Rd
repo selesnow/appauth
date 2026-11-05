@@ -7,7 +7,7 @@
 aa_user_session_valid(conn, login, role, token = NULL)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{login}{Логин пользователя.}
 

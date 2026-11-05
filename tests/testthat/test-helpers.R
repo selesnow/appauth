@@ -14,9 +14,9 @@ test_that("сторож не трогает действующую сессию"
 
 test_that("сторож завершает сессию заблокированного, удалённого и с изменённой ролью", {
   for (case in list(
-    list(reason = "blocked", change = function(con) DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")),
-    list(reason = "deleted", change = function(con) DBI::dbExecute(con, "DELETE FROM users WHERE login = 'ivan'")),
-    list(reason = "role_changed", change = function(con) DBI::dbExecute(con, "UPDATE users SET role = 'viewer' WHERE login = 'ivan'"))
+    list(reason = "blocked", change = function(con) texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")),
+    list(reason = "deleted", change = function(con) texec(con, "DELETE FROM users WHERE login = 'ivan'")),
+    list(reason = "role_changed", change = function(con) texec(con, "UPDATE users SET role = 'viewer' WHERE login = 'ivan'"))
   )) {
     con <- users_db()
     raw_user(con, "ivan", "user")
@@ -54,7 +54,7 @@ test_that("сторож ждёт интервал из настроек", {
 
   with_guard(con, auth, settings = aa_settings(session_check_seconds = 120), {
     session$flushReact()
-    DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")
+    texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")
     session$elapse(60000)
     expect_length(auth$calls$logout, 0)
     session$elapse(70000)
@@ -69,7 +69,7 @@ test_that("сторож при сбое базы сессию не закрыв�
 
   with_guard(con, auth, {
     session$flushReact()
-    DBI::dbExecute(con, "DROP TABLE users")
+    texec(con, "DROP TABLE users")
     session$elapse(35000)
   })
 

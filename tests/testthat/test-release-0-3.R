@@ -24,10 +24,11 @@ test_that("первый администратор тоже получает cre
 })
 
 test_that("миграция достраивает колонки в существующей базе, данные сохраняются", {
+  skip_if_not_sqlite()
   con <- new_db()
-  DBI::dbExecute(con, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE NOT NULL,
+  texec(con, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL, role TEXT NOT NULL, blocked INTEGER NOT NULL DEFAULT 0)")
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('old', 'x', 'user')")
+  texec(con, "INSERT INTO users (login, password, role) VALUES ('old', 'x', 'user')")
 
   # до миграции чтение работает, даты неизвестны
   before <- aa_list_users(con)
@@ -97,7 +98,7 @@ test_that("обзор пользователей: даты для показа �
   con <- users_db()
   raw_user(con, "legacy")
   aa_create_user(con, "fresh", "secret123", "user")
-  DBI::dbExecute(con, "UPDATE users SET last_login_at = '2026-03-04 10:20:30' WHERE login = 'fresh'")
+  texec(con, "UPDATE users SET last_login_at = '2026-03-04 10:20:30' WHERE login = 'fresh'")
 
   ov <- aa_users_overview(con)
 

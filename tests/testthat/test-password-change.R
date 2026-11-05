@@ -1,5 +1,5 @@
 must_change_of <- function(con, login) {
-  DBI::dbGetQuery(con, "SELECT must_change FROM users WHERE login = ?", params = list(login))$must_change
+  tquery(con, "SELECT must_change FROM users WHERE login = ?", params = list(login))$must_change
 }
 
 test_that("создание с must_change и вход возвращают признак", {
@@ -41,7 +41,7 @@ test_that("токен пользователя, обязанного смени�
   con <- users_db()
   raw_user(con, "ann")
   token <- aa_issue_token(con, "ann")
-  DBI::dbExecute(con, "UPDATE users SET must_change = 1 WHERE login = 'ann'")
+  texec(con, "UPDATE users SET must_change = 1 WHERE login = 'ann'")
 
   expect_null(aa_find_session_user(con, token))
 })
@@ -50,10 +50,10 @@ test_that("смена своего пароля: успех, проверка н
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
   raw_keep <- NULL
-  DBI::dbExecute(con, "UPDATE users SET must_change = 0")
+  texec(con, "UPDATE users SET must_change = 0")
   keep <- aa_issue_token(con, "ann")
   other <- aa_issue_token(con, "ann")
-  DBI::dbExecute(con, "UPDATE users SET must_change = 1")
+  texec(con, "UPDATE users SET must_change = 1")
 
   expect_true(aa_change_own_password(con, "ann", "secret123", "brand-new-1", keep_token = keep))
 
@@ -79,7 +79,7 @@ test_that("смена своего пароля: неверный текущий
   expect_equal(err("ghost", "secret123", "brand-new-1")$reason, "password_wrong")
   expect_equal(err("ann", "", "brand-new-1")$reason, "password_wrong")
 
-  DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'ann'")
+  texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ann'")
   expect_equal(err("ann", "secret123", "brand-new-1")$reason, "password_wrong")
 
   expect_equal(stored_password(con, "ann"), hash_before)
@@ -133,7 +133,7 @@ test_that("истёкший токен сессии тоже недействи�
   con <- users_db()
   raw_user(con, "ann", "user")
   token <- aa_issue_token(con, "ann")
-  DBI::dbExecute(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')")
+  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')")
 
   expect_equal(aa_user_session_valid(con, "ann", "user", token)$reason, "token_revoked")
 })

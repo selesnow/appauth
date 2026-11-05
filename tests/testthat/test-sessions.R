@@ -14,9 +14,7 @@ test_that("токен выдаётся, в базе только sha256-хеш, 
   expect_equal(nchar(row$token_hash), 64)
   expect_equal(row$revoked, 0)
 
-  days <- DBI::dbGetQuery(
-    con, "SELECT julianday(expires_at) - julianday('now') AS d FROM auth_sessions"
-  )$d
+  days <- token_days_left(con)
   expect_equal(days, 30, tolerance = 0.01)
 })
 
@@ -32,9 +30,7 @@ test_that("срок токена берётся из настроек", {
   raw_user(con, "ivan")
 
   aa_issue_token(con, "ivan", aa_settings(session_days = 1))
-  days <- DBI::dbGetQuery(
-    con, "SELECT julianday(expires_at) - julianday('now') AS d FROM auth_sessions"
-  )$d
+  days <- token_days_left(con)
   expect_equal(days, 1, tolerance = 0.01)
 })
 
@@ -88,10 +84,10 @@ test_that("истёкший и отозванный токены не работ
   raw_user(con, "ivan")
   token <- aa_issue_token(con, "ivan")
 
-  DBI::dbExecute(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')")
+  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')")
   expect_null(aa_find_session_user(con, token))
 
-  DBI::dbExecute(con, "UPDATE auth_sessions SET expires_at = datetime('now', '+1 days')")
+  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '+1 days')")
   expect_false(is.null(aa_find_session_user(con, token)))
 
   expect_equal(aa_revoke_token(con, token), 1)
@@ -167,10 +163,11 @@ test_that("токен другого регистра логина не подх
 })
 
 test_that("старые токены Server Manager (sha256 как текст) продолжают работать", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_server_manager_prod(con)
   aa_init_db(con)
-  DBI::dbExecute(con, "UPDATE auth_sessions SET token_hash = ? WHERE token_hash = 'tok1'",
+  texec(con, "UPDATE auth_sessions SET token_hash = ? WHERE token_hash = 'tok1'",
                  params = list(as.character(openssl::sha256("raw-cookie"))))
 
   expect_equal(aa_find_session_user(con, "raw-cookie")$login, "alsey")
@@ -224,7 +221,7 @@ test_that("понижение роли вступает в силу и для п
 test_that("проверка живой сессии при сбое базы не выбрасывает пользователя", {
   con <- users_db()
   raw_user(con, "ivan", "user")
-  DBI::dbExecute(con, "DROP TABLE users")
+  texec(con, "DROP TABLE users")
 
   res <- aa_user_session_valid(con, "ivan", "user")
 
@@ -262,7 +259,7 @@ test_that("aa_active_autologins считает только действующи
   aa_revoke_token(con, t1)
   expect_identical(aa_active_autologins(con, "ivan"), 1L)
 
-  DBI::dbExecute(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds') WHERE token_hash = ?", params = list(aa_token_hash(t2)))
+  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds') WHERE token_hash = ?", params = list(aa_token_hash(t2)))
   expect_identical(aa_active_autologins(con, "ivan"), 0L)
   expect_identical(aa_active_autologins(con, "olga"), 1L)
 })
@@ -276,7 +273,7 @@ test_that("aa_active_autologins: логин с другим регистром, 
   expect_identical(aa_active_autologins(con, NA_character_), 0L)
   expect_identical(aa_active_autologins(con, ""), 0L)
 
-  DBI::dbExecute(con, "DROP TABLE auth_sessions")
+  texec(con, "DROP TABLE auth_sessions")
   expect_identical(aa_active_autologins(con, "ivan"), 0L)
   expect_identical(nrow(aa_active_autologins(con)), 0L)
 })

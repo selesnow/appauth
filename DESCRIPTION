@@ -1,10 +1,11 @@
 Package: appauth
 Title: Безопасная авторизация и управление пользователями для Shiny приложений
-Version: 0.7.1
+Version: 0.8.0
 Authors@R:
     person("Alexey", "Seleznev", , "selesnow@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0410-7385"))
-Description: Внутренний пакет для Shiny приложений, на SQLite: вход по логину и
+Description: Внутренний пакет для Shiny приложений. Работает с SQLite (по
+    умолчанию), DuckDB, MySQL / MariaDB и PostgreSQL: вход по логину и
     паролю с хранением паролей только в виде хешей, автовход по cookie, защита
     от подбора пароля, блокировка и удаление пользователей с защитой от потери
     последнего администратора, восстановление пароля по email (одноразовая
@@ -30,9 +31,12 @@ Imports:
     shiny,
     sodium
 Suggests:
+    duckdb,
     knitr,
     qrcode,
+    RMariaDB,
     rmarkdown,
+    RPostgres,
     testthat (>= 3.0.0),
     withr,
     yaml

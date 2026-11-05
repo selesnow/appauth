@@ -15,6 +15,8 @@ knitr::opts_chunk$set(eval = FALSE)
 
 # Временная база
 
+Тесты ниже идут на SQLite в памяти. Если приложение работает на MySQL, PostgreSQL или DuckDB, проверяйте на такой же базе: подключитесь к пустой тестовой схеме (таблицы в ней можно удалять), а запросы пишите без функций, специфичных для SQLite. Пример запуска всего набора тестов самого пакета на нужной базе есть в `dev/run-tests-db.R` его исходников.
+
 Для функций пакета хватает базы в памяти:
 
 ```{r}
@@ -67,14 +69,16 @@ test_that("права берутся из матрицы", {
 
 Ошибки правил имеют класс `appauth_error_user` и поле `reason`; текст ошибки на языке настроек.
 
-Время для защиты входа проще задавать SQL-запросом (время хранится в UTC):
+Время для защиты входа проще задавать записью с нужным временем. Время хранится текстом по UTC (`ГГГГ-ММ-ДД ЧЧ:ММ:СС`), поэтому его удобно считать в R: так запрос одинаков для всех баз (в SQL-функциях вроде `datetime('now')` нет нужды, они есть только в SQLite):
 
 ```{r}
+three_minutes_ago <- format(Sys.time() - 180, "%Y-%m-%d %H:%M:%S", tz = "UTC")
+
 DBI::dbExecute(
   con,
   "INSERT INTO login_attempts (login, success, attempted_at)
-   VALUES (?, 0, datetime('now', '-3 minutes'))",
-  params = list("ivan")
+   VALUES (?, 0, ?)",
+  params = list("ivan", three_minutes_ago)
 )
 aa_login_lock_remaining(con, "ivan", aa_settings(max_failed_logins = 1))
 ```

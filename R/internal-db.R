@@ -6,7 +6,7 @@
 #' Токены остаются в таблице с признаком `revoked = 1` и перестают работать.
 #' Нужно при сбросе пароля и блокировке пользователя.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин пользователя.
 #' @param keep_hash Хеш токена, который оставить действующим (токен текущей
 #'   сессии при смене своего пароля), либо `NULL`.
@@ -15,13 +15,13 @@
 #' @noRd
 aa_revoke_user_tokens <- function(conn, login, keep_hash = NULL) {
   if (is.null(keep_hash)) {
-    DBI::dbExecute(
+    aa_execute(
       conn,
       "UPDATE auth_sessions SET revoked = 1 WHERE user_login = ?",
       params = list(login)
     )
   } else {
-    DBI::dbExecute(
+    aa_execute(
       conn,
       "UPDATE auth_sessions SET revoked = 1 WHERE user_login = ? AND token_hash <> ?",
       params = list(login, keep_hash)
@@ -39,7 +39,7 @@ aa_revoke_user_tokens <- function(conn, login, keep_hash = NULL) {
 #' @returns Число удалённых токенов.
 #' @noRd
 aa_delete_user_tokens <- function(conn, login) {
-  DBI::dbExecute(
+  aa_execute(
     conn,
     "DELETE FROM auth_sessions WHERE user_login = ?",
     params = list(login)
@@ -48,7 +48,7 @@ aa_delete_user_tokens <- function(conn, login) {
 
 #' Число активных (не заблокированных) администраторов
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param settings Настройки, результат [aa_settings()].
 #' @param excluding Логин, которого не учитывать (например, того, кого блокируют
 #'   или удаляют), либо `NULL`.
@@ -57,13 +57,13 @@ aa_delete_user_tokens <- function(conn, login) {
 #' @noRd
 aa_active_admin_count <- function(conn, settings, excluding = NULL) {
   if (is.null(excluding)) {
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT COUNT(*) AS n FROM users WHERE role = ? AND blocked = 0",
       params = list(settings$admin_role)
     )$n
   } else {
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT COUNT(*) AS n FROM users WHERE role = ? AND blocked = 0 AND login <> ?",
       params = list(settings$admin_role, excluding)

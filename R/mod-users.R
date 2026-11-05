@@ -43,7 +43,7 @@ aa_users_ui <- function(id) {
 #'   с логином открытой карточки. Здесь регистрируются обработчики блока.
 #'
 #' @param id Идентификатор модуля, такой же, как в [aa_users_ui()].
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param auth Объект авторизации, результат [aa_auth_server()].
 #' @param settings Настройки, результат [aa_settings()].
 #' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
@@ -64,7 +64,7 @@ aa_users_ui <- function(id) {
 #' }
 aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL,
                             extra_card_ui = NULL, extra_card_server = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
     ns <- session$ns

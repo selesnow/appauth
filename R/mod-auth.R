@@ -71,7 +71,7 @@ aa_auth_ui <- function(id) {
 #' принадлежит приложению: закрывайте его при завершении сессии.
 #'
 #' @param id Идентификатор модуля, такой же, как в [aa_auth_ui()].
-#' @param conn Подключение к базе SQLite со схемой [aa_init_db()].
+#' @param conn Подключение к базе данных со схемой [aa_init_db()].
 #' @param settings Настройки, результат [aa_settings()].
 #' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
 #' @param title Заголовок формы входа. По умолчанию текст `login_title`.
@@ -110,7 +110,7 @@ aa_auth_ui <- function(id) {
 #' }
 aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
                            title = NULL, logo = NULL, cookie_name = "appauth_token") {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
     user <- shiny::reactiveVal(NULL)

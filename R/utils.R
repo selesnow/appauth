@@ -1,36 +1,3 @@
-#' Проверка подключения к базе данных
-#'
-#' Пакет работает только с SQLite, поэтому подключение должно быть создано через
-#' `DBI::dbConnect(RSQLite::SQLite(), ...)` и быть открытым.
-#'
-#' @param conn Подключение к базе данных.
-#' @param call Окружение для сообщения об ошибке.
-#'
-#' @returns Подключение (невидимо), либо ошибка класса `appauth_error_connection`.
-#' @noRd
-aa_check_sqlite <- function(conn, call = rlang::caller_env()) {
-  if (!inherits(conn, "SQLiteConnection")) {
-    rlang::abort(
-      paste0(
-        "Пакет appauth работает только с базами SQLite: передайте подключение, ",
-        "созданное через `DBI::dbConnect(RSQLite::SQLite(), ...)`."
-      ),
-      class = "appauth_error_connection",
-      call = call
-    )
-  }
-
-  if (!DBI::dbIsValid(conn)) {
-    rlang::abort(
-      "Подключение к базе данных закрыто, откройте его заново.",
-      class = "appauth_error_connection",
-      call = call
-    )
-  }
-
-  invisible(conn)
-}
-
 #' Проверка числового параметра настроек
 #'
 #' @param x Значение.

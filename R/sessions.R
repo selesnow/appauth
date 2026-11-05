@@ -20,7 +20,7 @@ aa_token_hash <- function(token) {
 #' Токен не выдаётся (возвращается `NULL`), если автовход выключен в настройках,
 #' пользователя нет или он заблокирован.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин пользователя.
 #' @param settings Настройки, результат [aa_settings()].
 #'
@@ -43,13 +43,13 @@ aa_issue_token <- function(conn, login, settings = aa_settings()) {
   }
 
   token <- openssl::base64_encode(openssl::rand_bytes(32))
-  ttl <- sprintf("+%d seconds", as.integer(round(settings$session_days * 86400)))
+  ttl <- as.integer(round(settings$session_days * 86400))
 
-  DBI::dbExecute(
+  aa_execute(
     conn,
-    "INSERT INTO auth_sessions (user_login, token_hash, expires_at)
-     VALUES (?, ?, datetime('now', ?))",
-    params = list(user$login, aa_token_hash(token), ttl)
+    "INSERT INTO auth_sessions (user_login, token_hash, created_at, expires_at)
+     VALUES (?, ?, ?, ?)",
+    params = list(user$login, aa_token_hash(token), aa_utc(), aa_utc(ttl))
   )
 
   token
@@ -77,17 +77,17 @@ aa_find_session_user <- function(conn, token) {
     return(NULL)
   }
 
-  res <- DBI::dbGetQuery(
+  res <- aa_query(
     conn,
     "SELECT u.login, u.role
      FROM auth_sessions s
      JOIN users u ON u.login = s.user_login
      WHERE s.token_hash = ?
        AND s.revoked = 0
-       AND s.expires_at > datetime('now')
+       AND s.expires_at > ?
        AND u.blocked = 0
        AND u.must_change = 0",
-    params = list(aa_token_hash(token))
+    params = list(aa_token_hash(token), aa_utc())
   )
 
   if (nrow(res) != 1) {
@@ -115,7 +115,7 @@ aa_revoke_token <- function(conn, token) {
     return(invisible(0L))
   }
 
-  invisible(DBI::dbExecute(
+  invisible(aa_execute(
     conn,
     "UPDATE auth_sessions SET revoked = 1 WHERE token_hash = ?",
     params = list(aa_token_hash(token))
@@ -124,17 +124,17 @@ aa_revoke_token <- function(conn, token) {
 
 #' Активен ли токен автовхода
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param token Токен из cookie.
 #'
 #' @returns `TRUE`, если токен существует, не отозван и не истёк.
 #' @noRd
 aa_token_active <- function(conn, token) {
-  n <- DBI::dbGetQuery(
+  n <- aa_query(
     conn,
     "SELECT COUNT(*) AS n FROM auth_sessions
-     WHERE token_hash = ? AND revoked = 0 AND expires_at > datetime('now')",
-    params = list(aa_token_hash(token))
+     WHERE token_hash = ? AND revoked = 0 AND expires_at > ?",
+    params = list(aa_token_hash(token), aa_utc())
   )$n
 
   n > 0
@@ -147,7 +147,7 @@ aa_token_active <- function(conn, token) {
 #' Это не число открытых вкладок: приложение их не отслеживает. Если таблицы
 #' токенов нет или к ней не удалось обратиться, считается, что токенов нет.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин пользователя или `NULL`.
 #'
 #' @returns Для заданного `login` целое число (0, если токенов нет). При `login = NULL`
@@ -165,14 +165,15 @@ aa_token_active <- function(conn, token) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_active_autologins <- function(conn, login = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   counts <- tryCatch(
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT user_login AS login, COUNT(*) AS n FROM auth_sessions
-       WHERE revoked = 0 AND expires_at > datetime('now')
-       GROUP BY user_login"
+       WHERE revoked = 0 AND expires_at > ?
+       GROUP BY user_login",
+      params = list(aa_utc())
     ),
     error = function(e) data.frame(login = character(), n = integer(), stringsAsFactors = FALSE)
   )

@@ -7,7 +7,7 @@
 aa_active_autologins(conn, login = NULL)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{login}{Логин пользователя или \code{NULL}.}
 }

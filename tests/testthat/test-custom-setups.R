@@ -113,7 +113,7 @@ test_that("огромный логин и пароль не роняют вхо�
     expect_false(session$returned$logged_in())
   })
 
-  stored <- DBI::dbGetQuery(con, "SELECT MAX(LENGTH(login)) AS n FROM login_attempts")$n
+  stored <- tquery(con, "SELECT MAX(LENGTH(login)) AS n FROM login_attempts")$n
   expect_lte(stored, aa_settings()$login_max)
 })
 

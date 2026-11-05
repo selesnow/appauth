@@ -55,7 +55,7 @@ aa_login_key <- function(login, settings) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_record_attempt <- function(conn, login, success, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
   aa_check_flag(success, "success")
 
   key <- aa_login_key(login, settings)
@@ -64,10 +64,10 @@ aa_record_attempt <- function(conn, login, success, settings = aa_settings()) {
     return(invisible(FALSE))
   }
 
-  DBI::dbExecute(
+  aa_execute(
     conn,
-    "INSERT INTO login_attempts (login, success) VALUES (?, ?)",
-    params = list(key, as.integer(success))
+    "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, ?)",
+    params = list(key, as.integer(success), aa_utc())
   )
 
   invisible(TRUE)
@@ -97,7 +97,7 @@ aa_record_attempt <- function(conn, login, success, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   key <- aa_login_key(login, settings)
 
@@ -108,26 +108,26 @@ aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
   window_seconds <- as.integer(settings$lockout_minutes * 60)
 
   # неудачи после последнего успешного входа (по номеру записи) и внутри окна
-  r <- DBI::dbGetQuery(
+  r <- aa_query(
     conn,
     "SELECT COUNT(*) AS n,
-            MAX(strftime('%s', attempted_at)) AS last_fail,
-            CAST(strftime('%s', 'now') AS INTEGER) AS now_ts
+            MAX(attempted_at) AS last_fail
      FROM login_attempts
      WHERE login = ?
        AND success = 0
-       AND attempted_at > datetime('now', ?)
+       AND attempted_at > ?
        AND id > COALESCE(
              (SELECT MAX(id) FROM login_attempts WHERE login = ? AND success = 1),
              0)",
-    params = list(key, sprintf("-%d seconds", window_seconds), key)
+    params = list(key, aa_utc(-window_seconds), key)
   )
 
   if (r$n < settings$max_failed_logins) {
     return(0L)
   }
 
-  remaining <- as.integer(r$last_fail) + window_seconds - r$now_ts
+  last_fail <- as.POSIXct(r$last_fail, tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
+  remaining <- as.numeric(last_fail) + window_seconds - floor(as.numeric(Sys.time()))
 
   max(0L, as.integer(remaining))
 }
@@ -151,12 +151,13 @@ aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_global_throttled <- function(conn, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
-  n <- DBI::dbGetQuery(
+  n <- aa_query(
     conn,
     "SELECT COUNT(*) AS n FROM login_attempts
-     WHERE success = 0 AND attempted_at > datetime('now', '-60 seconds')"
+     WHERE success = 0 AND attempted_at > ?",
+    params = list(aa_utc(-60))
   )$n
 
   n >= settings$max_failed_logins_per_minute
@@ -183,7 +184,7 @@ aa_global_throttled <- function(conn, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   key <- aa_login_key(login, settings)
 
@@ -191,7 +192,7 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
     return(invisible(0L))
   }
 
-  invisible(DBI::dbExecute(
+  invisible(aa_execute(
     conn,
     "DELETE FROM login_attempts WHERE login = ? AND success = 0",
     params = list(key)
@@ -227,7 +228,7 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_login_gate <- function(conn, login, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   allowed <- list(allowed = TRUE, reason = NA_character_, seconds = 0L, message = NA_character_)
 
@@ -285,7 +286,7 @@ aa_login_gate <- function(conn, login, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_users_overview <- function(conn, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   users <- aa_list_users(conn)
 
@@ -302,7 +303,7 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
 
   # email и 2FA: в старой схеме колонок может не быть, тогда считаем, что не указаны
   flags <- tryCatch(
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT login,
               CASE WHEN email IS NULL OR email = '' THEN 0 ELSE 1 END AS has_email,

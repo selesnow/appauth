@@ -324,6 +324,23 @@ settings <- aa_settings(
 
 `password_login = FALSE` скрывает форму пароля и ссылку «Забыли пароль?», а попытки входа по паролю отклоняются на сервере. Прежде чем отключать пароль, проверьте, что хотя бы у одного администратора указан email и вход через Google у него работает: иначе после отключения войти будет нечем.
 
+# Другая база данных
+
+По умолчанию приложение открывает файл SQLite. Для DuckDB, MySQL / MariaDB или PostgreSQL передайте в `aa_session_connection()` функцию, которая открывает подключение (`db_path` тогда не нужен); подключение закроется вместе с сессией:
+
+```r
+conn <- aa_session_connection(
+  prepare = TRUE, settings = settings,
+  connect = function() DBI::dbConnect(
+    RPostgres::Postgres(),
+    host = "db.example.com", dbname = "app", user = "app",
+    password = Sys.getenv("APP_DB_PASSWORD")
+  )
+)
+```
+
+Остальной код приложения (`aa_auth_server()`, `aa_users_server()`, `aa_can()`) не меняется. Драйвер ставится отдельно: `RMariaDB`, `RPostgres` или `duckdb`. Другие базы (в том числе BigQuery) отклоняются ошибкой `appauth_error_connection`. Если подключение открывает само приложение, передайте его в функции пакета как есть: пакет определяет базу по классу подключения.
+
 # Тексты
 
 Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.

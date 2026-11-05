@@ -7,7 +7,7 @@
 aa_issue_token(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{login}{Логин пользователя.}
 

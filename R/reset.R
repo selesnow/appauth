@@ -40,7 +40,7 @@ aa_email_is_valid <- function(email) {
 
 #' Найти проблему в email пользователя
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param email Нормализованный адрес (не пустой).
 #' @param login Логин, которому адрес принадлежит (его собственный адрес не
 #'   считается занятым), либо `NULL`.
@@ -52,7 +52,7 @@ aa_email_problem <- function(conn, email, login = NULL) {
     return(list(reason = "email_invalid", args = list()))
   }
 
-  owner <- DBI::dbGetQuery(
+  owner <- aa_query(
     conn, "SELECT login FROM users WHERE email = ?", params = list(email)
   )$login
 
@@ -81,14 +81,14 @@ aa_email_problem <- function(conn, email, login = NULL) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_get_email <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login)) {
     return(NA_character_)
   }
 
   email <- tryCatch(
-    DBI::dbGetQuery(conn, "SELECT email FROM users WHERE login = ?", params = list(login))$email,
+    aa_query(conn, "SELECT email FROM users WHERE login = ?", params = list(login))$email,
     error = function(e) character()
   )
 
@@ -120,7 +120,7 @@ aa_get_email <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_set_email <- function(conn, login, email, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (is.null(aa_get_user(conn, login))) {
     aa_abort_user(settings, "user_not_found")
@@ -129,7 +129,7 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   email <- aa_normalize_email(email)
 
   if (!nzchar(email)) {
-    DBI::dbExecute(conn, "UPDATE users SET email = NULL WHERE login = ?", params = list(login))
+    aa_execute(conn, "UPDATE users SET email = NULL WHERE login = ?", params = list(login))
     return(invisible(FALSE))
   }
 
@@ -137,10 +137,10 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
   tryCatch(
-    DBI::dbExecute(conn, "UPDATE users SET email = ? WHERE login = ?", params = list(email, login)),
+    aa_execute(conn, "UPDATE users SET email = ? WHERE login = ?", params = list(email, login)),
     error = function(e) {
       # при одновременной записи сработает ограничение уникальности адреса
-      if (grepl("UNIQUE", conditionMessage(e), fixed = TRUE)) {
+      if (aa_is_unique_violation(e)) {
         aa_abort_user(settings, "email_exists")
       }
 
@@ -155,14 +155,14 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
 #'
 #' Таблицы может не быть (схема не достроена), это не должно мешать вызывающему.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин пользователя.
 #'
 #' @returns Число погашенных токенов (невидимо).
 #' @noRd
 aa_invalidate_resets <- function(conn, login) {
   n <- tryCatch(
-    DBI::dbExecute(
+    aa_execute(
       conn,
       "UPDATE password_resets SET used = 1 WHERE user_login = ? AND used = 0",
       params = list(login)
@@ -181,7 +181,7 @@ aa_invalidate_resets <- function(conn, login) {
 #' @noRd
 aa_delete_user_resets <- function(conn, login) {
   n <- tryCatch(
-    DBI::dbExecute(conn, "DELETE FROM password_resets WHERE user_login = ?", params = list(login)),
+    aa_execute(conn, "DELETE FROM password_resets WHERE user_login = ?", params = list(login)),
     error = function(e) 0L
   )
 
@@ -242,7 +242,7 @@ aa_reset_link <- function(settings, token) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_request_password_reset <- function(conn, identifier, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   result <- function(reason, login = NA_character_) {
     invisible(list(sent = identical(reason, "sent"), reason = reason, login = login))
@@ -258,10 +258,10 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
   }
 
   # логин сравнивается точно, адрес без учёта регистра; оба запроса выполняются всегда
-  by_login <- DBI::dbGetQuery(
+  by_login <- aa_query(
     conn, "SELECT login, blocked, email FROM users WHERE login = ?", params = list(identifier)
   )
-  by_email <- DBI::dbGetQuery(
+  by_email <- aa_query(
     conn, "SELECT login, blocked, email FROM users WHERE email = ?",
     params = list(aa_normalize_email(identifier))
   )
@@ -282,15 +282,16 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
     return(result("no_email", login))
   }
 
-  per_user <- DBI::dbGetQuery(
+  per_user <- aa_query(
     conn,
     "SELECT COUNT(*) AS n FROM password_resets
-     WHERE user_login = ? AND created_at > datetime('now', '-1 hours')",
-    params = list(login)
+     WHERE user_login = ? AND created_at > ?",
+    params = list(login, aa_utc(-3600))
   )$n
-  overall <- DBI::dbGetQuery(
+  overall <- aa_query(
     conn,
-    "SELECT COUNT(*) AS n FROM password_resets WHERE created_at > datetime('now', '-1 minutes')"
+    "SELECT COUNT(*) AS n FROM password_resets WHERE created_at > ?",
+    params = list(aa_utc(-60))
   )$n
 
   if (per_user >= settings$reset_max_per_hour || overall >= settings$reset_max_per_minute) {
@@ -298,15 +299,15 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
   }
 
   token <- paste(as.character(openssl::rand_bytes(32)), collapse = "")
-  ttl <- sprintf("+%d seconds", as.integer(round(settings$reset_ttl_minutes * 60)))
+  ttl <- as.integer(round(settings$reset_ttl_minutes * 60))
 
   aa_invalidate_resets(conn, login)
 
-  DBI::dbExecute(
+  aa_execute(
     conn,
-    "INSERT INTO password_resets (user_login, token_hash, expires_at)
-     VALUES (?, ?, datetime('now', ?))",
-    params = list(login, aa_token_hash(token), ttl)
+    "INSERT INTO password_resets (user_login, token_hash, created_at, expires_at)
+     VALUES (?, ?, ?, ?)",
+    params = list(login, aa_token_hash(token), aa_utc(), aa_utc(ttl))
   )
 
   sent <- tryCatch(
@@ -348,22 +349,22 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_reset_token_login <- function(conn, token) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(token)) {
     return(NULL)
   }
 
-  res <- DBI::dbGetQuery(
+  res <- aa_query(
     conn,
     "SELECT r.user_login AS login
      FROM password_resets r
      JOIN users u ON u.login = r.user_login
      WHERE r.token_hash = ?
        AND r.used = 0
-       AND r.expires_at > datetime('now')
+       AND r.expires_at > ?
        AND u.blocked = 0",
-    params = list(aa_token_hash(token))
+    params = list(aa_token_hash(token), aa_utc())
   )
 
   if (nrow(res) != 1) NULL else res$login[1]
@@ -400,7 +401,7 @@ aa_reset_token_login <- function(conn, token) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_reset_password_with_token <- function(conn, token, password, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   login <- aa_reset_token_login(conn, token)
 
@@ -412,11 +413,11 @@ aa_reset_password_with_token <- function(conn, token, password, settings = aa_se
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
   # токен занимает тот, кто успел первым: из двух одновременных запросов сработает один
-  claimed <- DBI::dbExecute(
+  claimed <- aa_execute(
     conn,
     "UPDATE password_resets SET used = 1
-     WHERE token_hash = ? AND used = 0 AND expires_at > datetime('now')",
-    params = list(aa_token_hash(token))
+     WHERE token_hash = ? AND used = 0 AND expires_at > ?",
+    params = list(aa_token_hash(token), aa_utc())
   )
 
   if (claimed != 1) {

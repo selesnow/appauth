@@ -124,9 +124,9 @@ test_that("занятый логин отклоняется: точное сов
 test_that("существующие пары логинов, различающиеся регистром, сохраняются и работают как разные пользователи", {
   con <- users_db()
 
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
+  texec(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
                  params = list("kiruka", aa_hash_password("password-one")))
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
+  texec(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
                  params = list("Kiruka", aa_hash_password("password-two")))
 
   expect_identical(aa_list_users(con)$login, c("kiruka", "Kiruka"))
@@ -236,7 +236,7 @@ test_that("aa_authenticate: SQL-инъекции не работают", {
 test_that("aa_authenticate: заблокированный пользователь с верным паролем возвращается с blocked = 1, с неверным NULL", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
-  DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'worker'")
+  texec(con, "UPDATE users SET blocked = 1 WHERE login = 'worker'")
 
   res <- aa_authenticate(con, "worker", "worker-password")
 
@@ -283,8 +283,8 @@ test_that("aa_authenticate работает и без колонки blocked (с
   con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
   withr::defer(DBI::dbDisconnect(con))
 
-  DBI::dbExecute(con, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL)")
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
+  texec(con, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE NOT NULL, password TEXT NOT NULL, role TEXT NOT NULL)")
+  texec(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
                  params = list("old", aa_hash_password("old-password")))
 
   res <- aa_authenticate(con, "old", "old-password")
@@ -473,16 +473,16 @@ test_that("aa_delete_user удаляет пользователя, его ток
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user"); raw_user(con, "other", "user")
   raw_token(con, "worker", "t1"); raw_token(con, "worker", "t2", revoked = 1); raw_token(con, "other", "t3")
-  DBI::dbExecute(con, "INSERT INTO login_attempts (login, success) VALUES ('worker', 0), ('worker', 0), ('other', 0)")
+  texec(con, "INSERT INTO login_attempts (login, success) VALUES ('worker', 0), ('worker', 0), ('other', 0)")
 
   expect_identical(aa_delete_user(con, "worker", acting_login = "boss"), 1L)
 
   expect_null(aa_get_user(con, "worker"))
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'worker'")$n, 0L)
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'worker'")$n, 0L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'worker'")$n, 0L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'worker'")$n, 0L)
   # данные других пользователей не затронуты
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'other'")$n, 1L)
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'other'")$n, 1L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'other'")$n, 1L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'other'")$n, 1L)
   expect_identical(count_users(con), 2L)
 })
 
@@ -521,7 +521,7 @@ test_that("aa_delete_user: неизвестный и пустой пользов
 test_that("удаление работает, даже если таблицы попыток входа нет", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user")
-  DBI::dbExecute(con, "DROP TABLE login_attempts")
+  texec(con, "DROP TABLE login_attempts")
 
   expect_identical(aa_delete_user(con, "worker", acting_login = "boss"), 1L)
   expect_null(aa_get_user(con, "worker"))

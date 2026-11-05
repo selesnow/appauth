@@ -77,8 +77,8 @@ run_users <- function(con, expr, auth = fake_auth(), settings = aa_settings(), l
   invisible(log)
 }
 
-role_of <- function(con, login) DBI::dbGetQuery(con, "SELECT role FROM users WHERE login = ?", params = list(login))$role
-blocked_of <- function(con, login) DBI::dbGetQuery(con, "SELECT blocked FROM users WHERE login = ?", params = list(login))$blocked
+role_of <- function(con, login) aa_query(con, "SELECT role FROM users WHERE login = ?", params = list(login))$role
+blocked_of <- function(con, login) aa_query(con, "SELECT blocked FROM users WHERE login = ?", params = list(login))$blocked
 
 fake_auth_obj <- function(login = "ivan", role = "user") {
   state <- shiny::reactiveVal(if (is.null(login)) NULL else list(login = login, role = role))

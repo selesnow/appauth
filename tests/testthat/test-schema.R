@@ -31,11 +31,11 @@ test_that("у нового пользователя blocked по умолчан�
   con <- new_db()
   aa_init_db(con)
 
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'user')")
+  texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'user')")
 
-  expect_identical(DBI::dbGetQuery(con, "SELECT blocked FROM users")$blocked, 0L)
+  expect_identical(tquery(con, "SELECT blocked FROM users")$blocked, 0L)
   expect_error(
-    DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('a', 'y', 'user')")
+    texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'y', 'user')")
   )
 })
 
@@ -43,7 +43,7 @@ test_that("миграции записываются в служебную та�
   con <- new_db()
   aa_init_db(con)
 
-  migrations <- DBI::dbGetQuery(con, "SELECT version, name FROM appauth_migrations ORDER BY version")
+  migrations <- tquery(con, "SELECT version, name FROM appauth_migrations ORDER BY version")
 
   expect_identical(migrations$version, 1:9)
   expect_identical(
@@ -57,7 +57,7 @@ test_that("повторный запуск ничего не меняет", {
   con <- new_db()
   aa_init_db(con)
 
-  DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'admin')")
+  texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'admin')")
   before <- lapply(c("users", "auth_sessions", "login_attempts", "appauth_migrations"), \(t) rows_of(con, t))
 
   res <- aa_init_db(con)
@@ -70,6 +70,7 @@ test_that("повторный запуск ничего не меняет", {
 })
 
 test_that("Server Manager prod: старая схема достраивается, данные не меняются", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_server_manager_prod(con)
 
@@ -90,6 +91,7 @@ test_that("Server Manager prod: старая схема достраиваетс
 })
 
 test_that("старая схема dev без колонки id тоже достраивается", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_server_manager_dev_old(con)
 
@@ -107,6 +109,7 @@ test_that("старая схема dev без колонки id тоже дос�
 })
 
 test_that("рекрутинг: пароли в открытом виде и root/root остаются как есть, прикладные таблицы не затронуты", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_recruitment(con)
 
@@ -128,6 +131,7 @@ test_that("рекрутинг: пароли в открытом виде и root
 })
 
 test_that("повторный запуск на старых схемах тоже ничего не меняет", {
+  skip_if_not_sqlite()
   for (fixture in list(fixture_server_manager_prod, fixture_server_manager_dev_old, fixture_recruitment)) {
     con <- new_db()
     fixture(con)
@@ -146,6 +150,9 @@ test_that("повторный запуск на старых схемах тож
 
 test_that("при ошибке в миграции изменения откатываются одной транзакцией", {
   con <- new_db()
+  # в MySQL каждая команда DDL завершает транзакцию неявно, откатить создание таблиц нельзя
+  # (миграции идемпотентны, поэтому повторный запуск достроит схему)
+  testthat::skip_if(aa_dialect(con) == "mysql", "DDL в MySQL не откатывается")
 
   testthat::local_mocked_bindings(
     aa_migrations = function() {
@@ -160,7 +167,7 @@ test_that("при ошибке в миграции изменения откат
   expect_identical(table_names(con), character())
 })
 
-test_that("aa_init_db и aa_schema_version отклоняют не SQLite и закрытые подключения", {
+test_that("aa_init_db и aa_schema_version отклоняют неподдерживаемые базы и закрытые подключения", {
   expect_error(aa_init_db(list()), class = "appauth_error_connection")
   expect_error(aa_schema_version("not a connection"), class = "appauth_error_connection")
 
@@ -174,11 +181,11 @@ test_that("aa_cleanup удаляет только устаревшие попы�
   con <- new_db()
   aa_init_db(con)
 
-  DBI::dbExecute(con, "
+  texec(con, "
     INSERT INTO login_attempts (login, success, attempted_at) VALUES
       ('old',  0, datetime('now', '-25 hours')),
       ('new',  0, datetime('now', '-1 hours'))")
-  DBI::dbExecute(con, "
+  texec(con, "
     INSERT INTO auth_sessions (user_login, token_hash, created_at, expires_at, revoked) VALUES
       ('u', 'expired_long',  datetime('now', '-90 days'), datetime('now', '-60 days'), 0),
       ('u', 'revoked_long',  datetime('now', '-50 days'), datetime('now', '+10 days'), 1),
@@ -190,9 +197,9 @@ test_that("aa_cleanup удаляет только устаревшие попы�
 
   expect_identical(res$login_attempts, 1L)
   expect_identical(res$auth_sessions, 2L)
-  expect_identical(DBI::dbGetQuery(con, "SELECT login FROM login_attempts")$login, "new")
+  expect_identical(tquery(con, "SELECT login FROM login_attempts")$login, "new")
   expect_setequal(
-    DBI::dbGetQuery(con, "SELECT token_hash FROM auth_sessions")$token_hash,
+    tquery(con, "SELECT token_hash FROM auth_sessions")$token_hash,
     c("revoked_new", "expired_new", "active")
   )
 })
@@ -201,7 +208,7 @@ test_that("aa_cleanup учитывает сроки хранения из нас
   con <- new_db()
   aa_init_db(con)
 
-  DBI::dbExecute(con, "
+  texec(con, "
     INSERT INTO login_attempts (login, success, attempted_at) VALUES
       ('a', 0, datetime('now', '-3 hours')),
       ('b', 0, datetime('now', '-30 minutes'))")
@@ -209,7 +216,7 @@ test_that("aa_cleanup учитывает сроки хранения из нас
   res <- aa_cleanup(con, aa_settings(attempts_retention_hours = 2))
 
   expect_identical(res$login_attempts, 1L)
-  expect_identical(DBI::dbGetQuery(con, "SELECT login FROM login_attempts")$login, "b")
+  expect_identical(tquery(con, "SELECT login FROM login_attempts")$login, "b")
 })
 
 test_that("aa_prepare_db подготавливает базу и не бросает ошибок", {

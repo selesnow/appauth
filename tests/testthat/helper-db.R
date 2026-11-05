@@ -1,12 +1,89 @@
-# Помощники тестов: временные базы SQLite и фикстуры "старых" схем.
+# Помощники тестов: временные базы и фикстуры "старых" схем.
+#
+# Тесты идут на той базе, которую задаёт переменная окружения APPAUTH_TEST_DB:
+# sqlite (по умолчанию), duckdb, mysql или postgres. Для mysql и postgres
+# нужны переменные APPAUTH_TEST_MYSQL_* / APPAUTH_TEST_PG_* (HOST, PORT, USER,
+# PASSWORD, DBNAME); без них такие тесты пропускаются. Каждый тест получает
+# пустую базу: в серверных базах перед тестом и после него удаляются все таблицы
+# тестовой схемы, поэтому DBNAME должен указывать на отдельную тестовую схему.
 
-# Новая пустая база в памяти, закрывается автоматически в конце теста.
+test_backend <- function() tolower(Sys.getenv("APPAUTH_TEST_DB", "sqlite"))
+
+# Тест использует SQL или фикстуры, специфичные для SQLite.
+skip_if_not_sqlite <- function() {
+  testthat::skip_if(test_backend() != "sqlite", "тест только для SQLite")
+}
+
+# Переменная окружения серверной базы или пропуск теста.
+test_env <- function(prefix, name) {
+  value <- Sys.getenv(paste0("APPAUTH_TEST_", prefix, "_", name), "")
+  testthat::skip_if(!nzchar(value) && name %in% c("HOST", "USER", "DBNAME"),
+                    paste0("не задана APPAUTH_TEST_", prefix, "_", name))
+  value
+}
+
+# Удалить все таблицы тестовой серверной базы.
+drop_all_tables <- function(con) {
+  dialect <- aa_dialect(con)
+
+  if (dialect == "mysql") {
+    DBI::dbExecute(con, "SET FOREIGN_KEY_CHECKS = 0")
+    for (tbl in DBI::dbListTables(con)) {
+      DBI::dbExecute(con, paste0("DROP TABLE IF EXISTS `", tbl, "`"))
+    }
+    DBI::dbExecute(con, "SET FOREIGN_KEY_CHECKS = 1")
+  } else if (dialect == "postgres") {
+    DBI::dbExecute(con, "DROP SCHEMA IF EXISTS public CASCADE")
+    DBI::dbExecute(con, "CREATE SCHEMA public")
+  }
+
+  invisible(NULL)
+}
+
+# Новая пустая база, закрывается автоматически в конце теста.
 new_db <- function(env = parent.frame()) {
-  testthat::skip_if_not_installed("RSQLite")
+  backend <- test_backend()
 
-  con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+  con <- switch(
+    backend,
+    sqlite = {
+      testthat::skip_if_not_installed("RSQLite")
+      DBI::dbConnect(RSQLite::SQLite(), ":memory:")
+    },
+    duckdb = {
+      testthat::skip_if_not_installed("duckdb")
+      DBI::dbConnect(duckdb::duckdb(shared_home = FALSE), ":memory:")
+    },
+    mysql = {
+      testthat::skip_if_not_installed("RMariaDB")
+      DBI::dbConnect(
+        RMariaDB::MariaDB(),
+        host = test_env("MYSQL", "HOST"), port = as.integer(test_env("MYSQL", "PORT")),
+        user = test_env("MYSQL", "USER"), password = test_env("MYSQL", "PASSWORD"),
+        dbname = test_env("MYSQL", "DBNAME")
+      )
+    },
+    postgres = {
+      testthat::skip_if_not_installed("RPostgres")
+      DBI::dbConnect(
+        RPostgres::Postgres(),
+        host = test_env("PG", "HOST"), port = as.integer(test_env("PG", "PORT")),
+        user = test_env("PG", "USER"), password = test_env("PG", "PASSWORD"),
+        dbname = test_env("PG", "DBNAME")
+      )
+    },
+    stop("Неизвестная база для тестов: ", backend)
+  )
+
+  drop_all_tables(con)
+
   # тест может закрыть подключение сам, поэтому проверяем перед закрытием
-  withr::defer(if (DBI::dbIsValid(con)) DBI::dbDisconnect(con), envir = env)
+  withr::defer({
+    if (DBI::dbIsValid(con)) {
+      drop_all_tables(con)
+      if (backend == "duckdb") DBI::dbDisconnect(con, shutdown = TRUE) else DBI::dbDisconnect(con)
+    }
+  }, envir = env)
 
   con
 }
@@ -18,25 +95,66 @@ users_db <- function(env = parent.frame()) {
   con
 }
 
-# Названия таблиц без служебной sqlite_sequence.
+# SQL тестов: datetime('now', '-1 hours') заменяется на UTC-литерал, плейсхолдеры
+# приводятся к виду базы. Так одни и те же запросы идут на всех базах.
+sqlt <- function(sql) {
+  pattern <- "datetime[(]'now'((?:,\\s*'[^']*')*)[)]"
+  hits <- gregexpr(pattern, sql, perl = TRUE)
+
+  regmatches(sql, hits) <- lapply(regmatches(sql, hits), function(found) {
+    vapply(found, function(x) {
+      mods <- regmatches(x, gregexpr("'[^']*'", x))[[1]][-1]
+      seconds <- sum(vapply(gsub("'", "", mods), function(m) {
+        parts <- strsplit(m, " ")[[1]]
+        unit <- c(second = 1, seconds = 1, minutes = 60, hours = 3600, days = 86400)[[parts[2]]]
+        as.numeric(parts[1]) * unit
+      }, numeric(1)))
+      paste0("'", aa_utc(seconds), "'")
+    }, character(1), USE.NAMES = FALSE)
+  })
+
+  sql
+}
+
+texec <- function(con, sql, params = NULL) aa_execute(con, sqlt(sql), params)
+# Результат запроса: целые значения приводятся к integer, как их отдаёт SQLite
+# (DuckDB возвращает COUNT(*) числом double).
+tquery <- function(con, sql, params = NULL) {
+  res <- aa_query(con, sqlt(sql), params)
+
+  for (i in seq_along(res)) {
+    x <- res[[i]]
+    if (is.double(x) && all(is.na(x) | (x == round(x) & abs(x) < .Machine$integer.max))) {
+      res[[i]] <- as.integer(x)
+    }
+  }
+
+  res
+}
+
+# Названия таблиц без служебных.
 table_names <- function(con) {
   setdiff(sort(DBI::dbListTables(con)), "sqlite_sequence")
 }
 
 # Названия колонок таблицы.
 columns_of <- function(con, table) {
-  DBI::dbGetQuery(con, sprintf("SELECT name FROM pragma_table_info('%s')", table))$name
+  aa_table_columns(con, table)
 }
 
 # Содержимое таблицы, упорядоченное для сравнения.
-rows_of <- function(con, table, order_by = "rowid") {
-  DBI::dbGetQuery(con, sprintf("SELECT * FROM %s ORDER BY %s", table, order_by))
+rows_of <- function(con, table, order_by = NULL) {
+  if (is.null(order_by)) {
+    order_by <- if (aa_dialect(con) == "sqlite") "rowid" else if ("id" %in% columns_of(con, table)) "id" else "1"
+  }
+
+  tquery(con, sprintf("SELECT * FROM %s ORDER BY %s", table, order_by))
 }
 
 # Создаёт пользователя без проверок и без медленного хеширования
 # (для тестов, где важна только структура данных, а не пароль).
 raw_user <- function(con, login, role = "user", blocked = 0, password = "x") {
-  DBI::dbExecute(
+  aa_execute(
     con, "INSERT INTO users (login, password, role, blocked) VALUES (?, ?, ?, ?)",
     params = list(login, password, role, blocked)
   )
@@ -44,41 +162,44 @@ raw_user <- function(con, login, role = "user", blocked = 0, password = "x") {
 
 # Токен автовхода пользователя, действует 30 дней.
 raw_token <- function(con, login, hash, revoked = 0) {
-  DBI::dbExecute(
+  aa_execute(
     con,
-    "INSERT INTO auth_sessions (user_login, token_hash, expires_at, revoked)
-     VALUES (?, ?, datetime('now', '+30 days'), ?)",
-    params = list(login, hash, revoked)
+    "INSERT INTO auth_sessions (user_login, token_hash, created_at, expires_at, revoked)
+     VALUES (?, ?, ?, ?, ?)",
+    params = list(login, hash, aa_utc(), aa_utc(30 * 86400), revoked)
   )
 }
 
-revoked_of <- function(con, hash) {
-  DBI::dbGetQuery(con, "SELECT revoked FROM auth_sessions WHERE token_hash = ?", params = list(hash))$revoked
+# Сколько дней осталось у выданного токена автовхода.
+token_days_left <- function(con) {
+  expires <- aa_query(con, "SELECT expires_at FROM auth_sessions")$expires_at
+  parsed <- as.POSIXct(expires, tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
+  as.numeric(difftime(parsed, Sys.time(), units = "days"))
 }
 
-count_users <- function(con) DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM users")$n
+revoked_of <- function(con, hash) {
+  aa_query(con, "SELECT revoked FROM auth_sessions WHERE token_hash = ?", params = list(hash))$revoked
+}
+
+count_users <- function(con) tquery(con, "SELECT COUNT(*) AS n FROM users")$n
 
 stored_password <- function(con, login) {
-  DBI::dbGetQuery(con, "SELECT password FROM users WHERE login = ?", params = list(login))$password
+  aa_query(con, "SELECT password FROM users WHERE login = ?", params = list(login))$password
 }
 
 # Попытка входа с заданным временем (UTC): минуты или секунды назад.
 add_attempt <- function(con, login, success, minutes_ago = 0, seconds_ago = NULL) {
-  offset <- if (!is.null(seconds_ago)) {
-    sprintf("-%d seconds", as.integer(seconds_ago))
-  } else {
-    sprintf("-%d minutes", as.integer(minutes_ago))
-  }
+  ago <- if (!is.null(seconds_ago)) as.integer(seconds_ago) else as.integer(minutes_ago) * 60L
 
-  DBI::dbExecute(
+  aa_execute(
     con,
-    "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, datetime('now', ?))",
-    params = list(login, as.integer(success), offset)
+    "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, ?)",
+    params = list(login, as.integer(success), aa_utc(-ago))
   )
 }
 
 count_attempts <- function(con) {
-  DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts")$n
+  tquery(con, "SELECT COUNT(*) AS n FROM login_attempts")$n
 }
 
 # Фикстура: Server Manager на проде до релиза с защитой входа.

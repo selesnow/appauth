@@ -15,7 +15,7 @@ aa_session_guard(
 \arguments{
 \item{auth}{Результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{conn}{Подключение к базе SQLite.}
+\item{conn}{Подключение к базе данных.}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
 

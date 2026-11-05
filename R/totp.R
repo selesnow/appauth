@@ -199,7 +199,7 @@ aa_totp_unseal <- function(sealed, settings) {
 
 #' Данные 2FA пользователя из базы
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин.
 #'
 #' @returns Таблица из одной строки (`totp_secret`, `totp_enabled`,
@@ -211,7 +211,7 @@ aa_totp_row <- function(conn, login) {
   }
 
   row <- tryCatch(
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT totp_secret, totp_enabled, totp_last_step FROM users WHERE login = ?",
       params = list(login)
@@ -239,7 +239,7 @@ aa_totp_row <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_totp_enabled <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   row <- aa_totp_row(conn, login)
 
@@ -271,7 +271,7 @@ aa_totp_enabled <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_totp_setup <- function(conn, login, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   row <- aa_totp_row(conn, login)
 
@@ -285,7 +285,7 @@ aa_totp_setup <- function(conn, login, settings = aa_settings()) {
 
   secret <- aa_totp_secret()
 
-  DBI::dbExecute(
+  aa_execute(
     conn,
     "UPDATE users SET totp_secret = ?, totp_enabled = 0, totp_last_step = 0 WHERE login = ?",
     params = list(aa_totp_seal(secret, settings), login)
@@ -345,7 +345,7 @@ aa_recovery_hash <- function(code) {
 
 #' Создать набор резервных кодов
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин.
 #' @param n Сколько кодов.
 #'
@@ -356,13 +356,13 @@ aa_new_recovery_codes <- function(conn, login, n = 10) {
     paste(as.character(openssl::rand_bytes(5)), collapse = "")
   }, character(1))
 
-  DBI::dbExecute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login))
+  aa_execute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login))
 
   for (code in raw_codes) {
-    DBI::dbExecute(
+    aa_execute(
       conn,
-      "INSERT INTO totp_recovery (user_login, code_hash) VALUES (?, ?)",
-      params = list(login, aa_token_hash(code))
+      "INSERT INTO totp_recovery (user_login, code_hash, created_at) VALUES (?, ?, ?)",
+      params = list(login, aa_token_hash(code), aa_utc())
     )
   }
 
@@ -394,7 +394,7 @@ aa_new_recovery_codes <- function(conn, login, n = 10) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_totp_enable <- function(conn, login, code, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   row <- aa_totp_row(conn, login)
 
@@ -414,7 +414,7 @@ aa_totp_enable <- function(conn, login, code, settings = aa_settings()) {
   }
 
   DBI::dbWithTransaction(conn, {
-    DBI::dbExecute(
+    aa_execute(
       conn,
       "UPDATE users SET totp_enabled = 1, totp_last_step = ? WHERE login = ?",
       params = list(step, login)
@@ -446,19 +446,19 @@ aa_totp_enable <- function(conn, login, code, settings = aa_settings()) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_totp_disable <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login)) {
     return(invisible(FALSE))
   }
 
-  n <- DBI::dbExecute(
+  n <- aa_execute(
     conn,
     "UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_last_step = 0
      WHERE login = ? AND (totp_secret IS NOT NULL OR totp_enabled = 1)",
     params = list(login)
   )
-  DBI::dbExecute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login))
+  aa_execute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login))
 
   invisible(n > 0)
 }
@@ -478,14 +478,14 @@ aa_totp_disable <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_recovery_codes_left <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login)) {
     return(0L)
   }
 
   as.integer(tryCatch(
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT COUNT(*) AS n FROM totp_recovery WHERE user_login = ? AND used = 0",
       params = list(login)
@@ -519,7 +519,7 @@ aa_recovery_codes_left <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_verify_second_factor <- function(conn, login, code, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   failed <- list(ok = FALSE, method = NA_character_)
   row <- aa_totp_row(conn, login)
@@ -532,7 +532,7 @@ aa_verify_second_factor <- function(conn, login, code, settings = aa_settings())
 
   if (!is.na(hash)) {
     # резервный код занимается атомарным запросом: из двух одновременных сработает один
-    used <- DBI::dbExecute(
+    used <- aa_execute(
       conn,
       "UPDATE totp_recovery SET used = 1 WHERE user_login = ? AND code_hash = ? AND used = 0",
       params = list(login, hash)
@@ -554,7 +554,7 @@ aa_verify_second_factor <- function(conn, login, code, settings = aa_settings())
   }
 
   # шаг запоминается атомарно: тот же код во втором запросе уже не пройдёт
-  claimed <- DBI::dbExecute(
+  claimed <- aa_execute(
     conn,
     "UPDATE users SET totp_last_step = ? WHERE login = ? AND totp_last_step < ?",
     params = list(step, login, step)

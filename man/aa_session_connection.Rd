@@ -2,17 +2,18 @@
 % Please edit documentation in R/helpers.R
 \name{aa_session_connection}
 \alias{aa_session_connection}
-\title{Подключение к SQLite, которое закрывается вместе с сессией}
+\title{Подключение к базе, которое закрывается вместе с сессией}
 \usage{
 aa_session_connection(
-  db_path,
+  db_path = NULL,
   session = shiny::getDefaultReactiveDomain(),
   prepare = FALSE,
-  settings = aa_settings()
+  settings = aa_settings(),
+  connect = NULL
 )
 }
 \arguments{
-\item{db_path}{Путь к файлу базы SQLite.}
+\item{db_path}{Путь к файлу базы SQLite. Не нужен, если задан \code{connect}.}
 
 \item{session}{Сессия Shiny. По умолчанию текущая, поэтому функцию нужно
 вызывать внутри \code{server}.}
@@ -21,19 +22,38 @@ aa_session_connection(
 подключения.}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}, нужны для \code{prepare}.}
+
+\item{connect}{Функция без аргументов, возвращающая подключение к базе (SQLite,
+DuckDB, MySQL / MariaDB или PostgreSQL), либо \code{NULL} для файла SQLite.}
 }
 \value{
-Подключение к базе (\code{SQLiteConnection}).
+Подключение к базе.
 }
 \description{
 Открывает подключение к базе и сразу регистрирует его закрытие при завершении
 сессии Shiny. Без этого подключение остаётся открытым до остановки процесса R
-и держит файл базы: на Windows такой файл нельзя переименовать или удалить.
+и держит файл базы (SQLite, DuckDB): на Windows такой файл нельзя переименовать
+или удалить, а у серверных баз (MySQL, PostgreSQL) остаются лишние соединения.
+}
+\details{
+По умолчанию открывается файл SQLite. Для другой базы передайте \code{connect}:
+функцию без аргументов, которая возвращает подключение DBI.
 }
 \examples{
 \dontrun{
 server <- function(input, output, session) {
+  # SQLite (по умолчанию)
   conn <- aa_session_connection("app.db", prepare = TRUE)
+
+  # MySQL / MariaDB
+  conn <- aa_session_connection(
+    prepare = TRUE,
+    connect = function() DBI::dbConnect(
+      RMariaDB::MariaDB(), host = "db.example.com", dbname = "app",
+      user = "app", password = Sys.getenv("APP_DB_PASSWORD")
+    )
+  )
+
   auth <- aa_auth_server("auth", conn)
 }
 }

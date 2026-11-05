@@ -18,6 +18,9 @@
 
 #' Список миграций схемы
 #'
+#' Таблицы и колонки одинаковы во всех базах, различаются только типы и
+#' автоинкремент (см. dialect.R). В SQLite схема совпадает с прежней.
+#'
 #' @returns Список миграций, у каждой `version`, `name` и функция `up(conn)`.
 #' @noRd
 aa_migrations <- function() {
@@ -26,24 +29,43 @@ aa_migrations <- function() {
       version = 1L,
       name    = "users",
       up      = function(conn) {
-        DBI::dbExecute(conn, "
+        t <- aa_col_types(conn)
+
+        # DuckDB не позволяет менять таблицу, на которую уже есть индекс (а на users он
+        # появится в миграции 7), поэтому там все поздние колонки создаются сразу;
+        # миграции 2, 5, 6, 7 и 8 проверяют наличие колонок и ничего не добавят
+        later <- if (identical(aa_dialect(conn), "duckdb")) {
+          paste0(",
+            blocked        INTEGER NOT NULL DEFAULT 0,
+            must_change    INTEGER NOT NULL DEFAULT 0,
+            created_at     ", t$ts, ",
+            last_login_at  ", t$ts, ",
+            email          ", t$key, ",
+            totp_secret    ", t$text, ",
+            totp_enabled   INTEGER NOT NULL DEFAULT 0,
+            totp_last_step INTEGER NOT NULL DEFAULT 0")
+        } else {
+          ""
+        }
+
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS users (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            login    TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role     TEXT NOT NULL
+            ", aa_pk_column(conn, "users"), ",
+            login    ", t$key, " UNIQUE NOT NULL,
+            password ", t$text, " NOT NULL,
+            role     ", t$key, " NOT NULL", later, "
           )
-        ")
+        "))
       }
     ),
     list(
       version = 2L,
       name    = "users_blocked_column",
       up      = function(conn) {
-        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+        cols <- aa_table_columns(conn, "users")
 
         if (!"blocked" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0")
+          aa_execute(conn, "ALTER TABLE users ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0")
         }
       }
     ),
@@ -51,49 +73,47 @@ aa_migrations <- function() {
       version = 3L,
       name    = "auth_sessions",
       up      = function(conn) {
-        DBI::dbExecute(conn, "
+        t <- aa_col_types(conn)
+
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS auth_sessions (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_login TEXT NOT NULL,
-            token_hash TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            expires_at DATETIME NOT NULL,
+            ", aa_pk_column(conn, "auth_sessions"), ",
+            user_login ", t$key, " NOT NULL,
+            token_hash ", t$key, " NOT NULL,
+            created_at ", t$ts_now, ",
+            expires_at ", t$ts, " NOT NULL,
             revoked    INTEGER DEFAULT 0
           )
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_auth_sessions_token ON auth_sessions (token_hash)
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions (user_login)
-        ")
+        "))
+        aa_create_index(conn, "idx_auth_sessions_token", "auth_sessions", "token_hash")
+        aa_create_index(conn, "idx_auth_sessions_user", "auth_sessions", "user_login")
       }
     ),
     list(
       version = 4L,
       name    = "login_attempts",
       up      = function(conn) {
-        DBI::dbExecute(conn, "
+        t <- aa_col_types(conn)
+
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS login_attempts (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            login        TEXT NOT NULL,
+            ", aa_pk_column(conn, "login_attempts"), ",
+            login        ", t$key, " NOT NULL,
             success      INTEGER NOT NULL,
-            attempted_at TEXT NOT NULL DEFAULT (datetime('now'))
+            attempted_at ", t$ts_now, " NOT NULL
           )
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_login_attempts_login ON login_attempts (login, attempted_at)
-        ")
+        "))
+        aa_create_index(conn, "idx_login_attempts_login", "login_attempts", "login, attempted_at")
       }
     ),
     list(
       version = 5L,
       name    = "users_must_change_column",
       up      = function(conn) {
-        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+        cols <- aa_table_columns(conn, "users")
 
         if (!"must_change" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0")
+          aa_execute(conn, "ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0")
         }
       }
     ),
@@ -101,16 +121,17 @@ aa_migrations <- function() {
       version = 6L,
       name    = "users_created_and_last_login_columns",
       up      = function(conn) {
-        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+        cols <- aa_table_columns(conn, "users")
+        t <- aa_col_types(conn)
 
         # SQLite не разрешает DEFAULT CURRENT_TIMESTAMP в ALTER TABLE, поэтому колонки
         # допускают NULL: у уже существующих пользователей даты неизвестны
         if (!"created_at" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN created_at TEXT")
+          aa_execute(conn, paste("ALTER TABLE users ADD COLUMN created_at", t$ts))
         }
 
         if (!"last_login_at" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN last_login_at TEXT")
+          aa_execute(conn, paste("ALTER TABLE users ADD COLUMN last_login_at", t$ts))
         }
       }
     ),
@@ -118,90 +139,85 @@ aa_migrations <- function() {
       version = 7L,
       name    = "password_resets_and_email",
       up      = function(conn) {
-        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+        cols <- aa_table_columns(conn, "users")
+        t <- aa_col_types(conn)
 
         # email хранится в нижнем регистре и допускает NULL: у существующих
         # пользователей адреса нет; уникальность действует только для заданных адресов
+        # (во всех поддерживаемых базах несколько NULL в уникальном индексе допустимы)
         if (!"email" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN email TEXT")
+          aa_execute(conn, paste("ALTER TABLE users ADD COLUMN email", t$key))
         }
 
-        DBI::dbExecute(conn, "
-          CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email) WHERE email IS NOT NULL
-        ")
+        aa_create_index(conn, "idx_users_email", "users", "email", unique = TRUE)
 
-        DBI::dbExecute(conn, "
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS password_resets (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_login TEXT NOT NULL,
-            token_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            expires_at TEXT NOT NULL,
+            ", aa_pk_column(conn, "password_resets"), ",
+            user_login ", t$key, " NOT NULL,
+            token_hash ", t$key, " NOT NULL,
+            created_at ", t$ts_now, " NOT NULL,
+            expires_at ", t$ts, " NOT NULL,
             used       INTEGER NOT NULL DEFAULT 0
           )
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets (token_hash)
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets (user_login, created_at)
-        ")
+        "))
+        aa_create_index(conn, "idx_password_resets_token", "password_resets", "token_hash")
+        aa_create_index(conn, "idx_password_resets_user", "password_resets", "user_login, created_at")
       }
     ),
     list(
       version = 8L,
       name    = "totp_two_factor",
       up      = function(conn) {
-        cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+        cols <- aa_table_columns(conn, "users")
+        t <- aa_col_types(conn)
 
         # секрет хранится зашифрованным (см. aa_totp_seal), у существующих пользователей
         # двухфакторная аутентификация выключена
         if (!"totp_secret" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_secret TEXT")
+          aa_execute(conn, paste("ALTER TABLE users ADD COLUMN totp_secret", t$text))
         }
 
         if (!"totp_enabled" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
+          aa_execute(conn, "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0")
         }
 
         if (!"totp_last_step" %in% cols) {
-          DBI::dbExecute(conn, "ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0")
+          aa_execute(conn, "ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0")
         }
 
-        DBI::dbExecute(conn, "
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS totp_recovery (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_login TEXT NOT NULL,
-            code_hash  TEXT NOT NULL,
+            ", aa_pk_column(conn, "totp_recovery"), ",
+            user_login ", t$key, " NOT NULL,
+            code_hash  ", t$key, " NOT NULL,
             used       INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at ", t$ts_now, " NOT NULL
           )
-        ")
-        DBI::dbExecute(conn, "
-          CREATE INDEX IF NOT EXISTS idx_totp_recovery_user ON totp_recovery (user_login, code_hash)
-        ")
+        "))
+        aa_create_index(conn, "idx_totp_recovery_user", "totp_recovery", "user_login, code_hash")
       }
     ),
     list(
       version = 9L,
       name    = "oauth_states",
       up      = function(conn) {
+        t <- aa_col_types(conn)
+
         # вход через Google: state хранится только в виде sha256, запись живёт минуты и
         # используется один раз; nonce и PKCE-проверка нужны при возврате от Google
-        DBI::dbExecute(conn, "
+        aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS oauth_states (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            state_hash    TEXT NOT NULL,
-            nonce         TEXT NOT NULL,
-            code_verifier TEXT NOT NULL,
-            created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-            expires_at    TEXT NOT NULL,
+            ", aa_pk_column(conn, "oauth_states"), ",
+            state_hash    ", t$key, " NOT NULL,
+            nonce         ", t$key, " NOT NULL,
+            code_verifier ", t$key, " NOT NULL,
+            created_at    ", t$ts_now, " NOT NULL,
+            expires_at    ", t$ts, " NOT NULL,
             used          INTEGER NOT NULL DEFAULT 0
           )
-        ")
-        DBI::dbExecute(conn, "
-          CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_states_hash ON oauth_states (state_hash)
-        ")
+        "))
+        aa_create_index(conn, "idx_oauth_states_hash", "oauth_states", "state_hash", unique = TRUE)
       }
     )
   )
@@ -221,7 +237,8 @@ aa_migrations <- function() {
 #' работающих базах. Для запуска, который не должен останавливать приложение
 #' при ошибке, используйте [aa_prepare_db()].
 #'
-#' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
+#' @param conn Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
+#'   (`DBI::dbConnect()` с драйвером RSQLite, duckdb, RMariaDB или RPostgres).
 #'
 #' @returns Список (невидимо): `applied` (версии миграций, применённые в этом
 #'   вызове), `version` (текущая версия схемы) и `legacy` (`TRUE`, если таблица
@@ -236,33 +253,37 @@ aa_migrations <- function() {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_init_db <- function(conn) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   legacy <- DBI::dbExistsTable(conn, "users") &&
     !DBI::dbExistsTable(conn, "appauth_migrations")
 
   applied <- integer()
+  t <- aa_col_types(conn)
 
   DBI::dbWithTransaction(conn, {
-    DBI::dbExecute(conn, "
+    release <- aa_migration_lock(conn)
+    on.exit(release(), add = TRUE)
+
+    aa_execute(conn, paste0("
       CREATE TABLE IF NOT EXISTS appauth_migrations (
         version    INTEGER PRIMARY KEY,
-        name       TEXT NOT NULL,
-        applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        name       ", t$key, " NOT NULL,
+        applied_at ", t$ts_now, " NOT NULL
       )
-    ")
+    "))
 
-    done <- DBI::dbGetQuery(conn, "SELECT version FROM appauth_migrations")$version
+    done <- aa_query(conn, "SELECT version FROM appauth_migrations")$version
 
     for (migration in aa_migrations()) {
       if (migration$version %in% done) next
 
       migration$up(conn)
 
-      DBI::dbExecute(
+      aa_execute(
         conn,
-        "INSERT OR IGNORE INTO appauth_migrations (version, name) VALUES (?, ?)",
-        params = list(migration$version, migration$name)
+        aa_insert_ignore_sql(conn, "appauth_migrations", c("version", "name", "applied_at")),
+        params = list(migration$version, migration$name, aa_utc())
       )
 
       applied <- c(applied, migration$version)
@@ -293,13 +314,13 @@ aa_init_db <- function(conn) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_schema_version <- function(conn) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!DBI::dbExistsTable(conn, "appauth_migrations")) {
     return(0L)
   }
 
-  version <- DBI::dbGetQuery(conn, "SELECT MAX(version) AS v FROM appauth_migrations")$v
+  version <- aa_query(conn, "SELECT MAX(version) AS v FROM appauth_migrations")$v
 
   if (is.na(version)) 0L else as.integer(version)
 }
@@ -329,37 +350,39 @@ aa_schema_version <- function(conn) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_cleanup <- function(conn, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
-  attempts_age <- sprintf("-%d hours", as.integer(settings$attempts_retention_hours))
-  token_age    <- sprintf("-%d days", as.integer(settings$token_retention_days))
+  attempts_cutoff <- aa_utc(-3600 * as.integer(settings$attempts_retention_hours))
+  token_cutoff    <- aa_utc(-86400 * as.integer(settings$token_retention_days))
+  day_cutoff      <- aa_utc(-86400)
 
-  attempts <- DBI::dbExecute(
+  attempts <- aa_execute(
     conn,
-    "DELETE FROM login_attempts WHERE attempted_at < datetime('now', ?)",
-    params = list(attempts_age)
+    "DELETE FROM login_attempts WHERE attempted_at < ?",
+    params = list(attempts_cutoff)
   )
 
-  sessions <- DBI::dbExecute(
+  sessions <- aa_execute(
     conn,
     "DELETE FROM auth_sessions
-     WHERE expires_at < datetime('now', ?)
-        OR (revoked = 1 AND created_at < datetime('now', ?))",
-    params = list(token_age, token_age)
+     WHERE expires_at < ?
+        OR (revoked = 1 AND created_at < ?)",
+    params = list(token_cutoff, token_cutoff)
   )
 
   # таблицы восстановления пароля может не быть, если схема не достроена
   resets <- tryCatch(
-    DBI::dbExecute(
+    aa_execute(
       conn,
-      "DELETE FROM password_resets WHERE expires_at < datetime('now', '-1 days')
-         OR (used = 1 AND created_at < datetime('now', '-1 days'))"
+      "DELETE FROM password_resets WHERE expires_at < ?
+         OR (used = 1 AND created_at < ?)",
+      params = list(day_cutoff, day_cutoff)
     ),
     error = function(e) 0L
   )
 
   oauth <- tryCatch(
-    DBI::dbExecute(conn, "DELETE FROM oauth_states WHERE expires_at < datetime('now', '-1 days')"),
+    aa_execute(conn, "DELETE FROM oauth_states WHERE expires_at < ?", params = list(day_cutoff)),
     error = function(e) 0L
   )
 

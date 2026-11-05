@@ -17,7 +17,7 @@ has_sqlite <- requireNamespace("RSQLite", quietly = TRUE)
 # Что понадобится
 
 * Пакет уже установлен в общую библиотеку сервера, отдельной установки нет: `library(appauth)`.
-* Файл базы SQLite для приложения. Пакет сам создаст в нём свои таблицы (`users`, `auth_sessions`, `login_attempts`, `appauth_migrations`), остальные таблицы приложения он не трогает.
+* База данных для приложения: файл SQLite (по умолчанию) либо DuckDB, MySQL / MariaDB или PostgreSQL (см. виньетку `deployment`, раздел «Другие базы данных»). Пакет сам создаст в ней свои таблицы (`users`, `auth_sessions`, `login_attempts`, `appauth_migrations` и другие), остальные таблицы приложения он не трогает.
 * Решение, как приложение определяет права: матрица «право -> роли» (как в Server Manager) или что-то своё. Об этом ниже и в виньетке `extension-points`.
 
 # Основные понятия

@@ -30,7 +30,7 @@ test_that("aa_record_attempt записывает точный логин и р�
   expect_true(aa_record_attempt(con, "Alsey", FALSE))
   expect_true(aa_record_attempt(con, "Alsey", TRUE))
 
-  rows <- DBI::dbGetQuery(con, "SELECT login, success FROM login_attempts ORDER BY id")
+  rows <- tquery(con, "SELECT login, success FROM login_attempts ORDER BY id")
 
   expect_identical(rows$login, c("Alsey", "Alsey"))
   expect_identical(rows$success, c(0L, 1L))
@@ -203,7 +203,7 @@ test_that("aa_clear_attempts снимает блокировку, успешны
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
   for (i in 1:5) aa_record_attempt(con, "ida", FALSE)
   aa_record_attempt(con, "alsey", TRUE)   # успех идёт ПОСЛЕ неудач: счётчик и так обнулился бы
-  DBI::dbExecute(con, "DELETE FROM login_attempts WHERE login = 'alsey' AND success = 1")
+  texec(con, "DELETE FROM login_attempts WHERE login = 'alsey' AND success = 1")
 
   expect_gt(aa_login_lock_remaining(con, "alsey"), 0)
 
@@ -223,8 +223,8 @@ test_that("aa_clear_attempts сохраняет успешные попытки 
 
   aa_clear_attempts(con, "alsey")
 
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'alsey'")$n, 1L)
-  expect_identical(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'Alsey'")$n, 3L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'alsey'")$n, 1L)
+  expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'Alsey'")$n, 3L)
   expect_equal(aa_clear_attempts(con, ""), 0)
   expect_equal(aa_clear_attempts(con, NA_character_), 0)
 })
@@ -322,7 +322,7 @@ test_that("при общем лимите вход закрыт для всех 
 
 test_that("шлюз не запирает вход, если таблицы попыток нет (fail-open) и пишет причину в лог", {
   con <- users_db()
-  DBI::dbExecute(con, "DROP TABLE login_attempts")
+  texec(con, "DROP TABLE login_attempts")
 
   expect_message(gate <- aa_login_gate(con, "alsey"), "проверка блокировки входа недоступна")
 
@@ -373,7 +373,7 @@ test_that("обзор пользователей на английском и с
 test_that("обзор пользователей не падает, если таблицы попыток нет", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user", blocked = 1)
-  DBI::dbExecute(con, "DROP TABLE login_attempts")
+  texec(con, "DROP TABLE login_attempts")
 
   ov <- aa_users_overview(con)
 
@@ -420,6 +420,7 @@ test_that("aa_users_overview: email, 2FA и автовходы по пользо
 })
 
 test_that("aa_users_overview: пустая таблица и старая схема без email и 2FA", {
+  skip_if_not_sqlite()
   con <- users_db()
   empty <- aa_users_overview(con)
   expect_identical(nrow(empty), 0L)

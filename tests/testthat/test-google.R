@@ -70,7 +70,7 @@ g_fake_exchange <- function(con, env = parent.frame(), ...) {
 
   testthat::local_mocked_bindings(
     aa_google_exchange_code = function(settings, code, verifier) {
-      nonce <- DBI::dbGetQuery(
+      nonce <- aa_query(
         con, "SELECT nonce FROM oauth_states WHERE code_verifier = ?", params = list(verifier)
       )$nonce
       do.call(g_token, c(list(nonce = nonce), extra))
@@ -171,7 +171,7 @@ test_that("старт входа: адрес Google с PKCE, state в базе �
   expect_match(started$url, "redirect_uri=https%3A%2F%2Fapps.example.com%2F", fixed = TRUE)
   expect_false(grepl("s3cret-value", started$url, fixed = TRUE))
 
-  row <- DBI::dbGetQuery(con, "SELECT * FROM oauth_states")
+  row <- tquery(con, "SELECT * FROM oauth_states")
   expect_equal(nrow(row), 1)
   expect_false(identical(row$state_hash, started$state))
   expect_identical(row$state_hash, aa_token_hash(started$state))
@@ -203,7 +203,7 @@ test_that("state принимается один раз, просроченны�
   expect_null(aa_google_take_state(con, started$state))
 
   expired <- aa_google_start(con, g_settings())
-  DBI::dbExecute(con, "UPDATE oauth_states SET expires_at = datetime('now', '-1 minutes') WHERE state_hash = ?",
+  texec(con, "UPDATE oauth_states SET expires_at = datetime('now', '-1 minutes') WHERE state_hash = ?",
                  params = list(aa_token_hash(expired$state)))
   expect_null(aa_google_take_state(con, expired$state))
 
@@ -216,13 +216,13 @@ test_that("очистка удаляет старые параметры вхо�
   con <- g_db()
   fresh <- aa_google_start(con, g_settings())
   old <- aa_google_start(con, g_settings())
-  DBI::dbExecute(con, "UPDATE oauth_states SET expires_at = datetime('now', '-3 days') WHERE state_hash = ?",
+  texec(con, "UPDATE oauth_states SET expires_at = datetime('now', '-3 days') WHERE state_hash = ?",
                  params = list(aa_token_hash(old$state)))
 
   res <- aa_cleanup(con, g_settings())
 
   expect_equal(res$oauth_states, 1)
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
   expect_false(is.null(aa_google_take_state(con, fresh$state)))
 })
 
@@ -367,11 +367,11 @@ test_that("вход не создаёт пользователей", {
   g_fake_jwks()
   con <- g_db()
   g_fake_exchange(con, email = "stranger@example.com")
-  before <- DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM users")$n
+  before <- tquery(con, "SELECT COUNT(*) AS n FROM users")$n
 
   aa_google_complete(con, g_settings(), "c", aa_google_start(con, g_settings())$state)
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM users")$n, before)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM users")$n, before)
 })
 
 test_that("ошибки обмена, пустой код и выключенный Google дают отказ без исключения", {
@@ -427,7 +427,7 @@ test_that("форма: при отключённом пароле только �
 
 test_that("отключённый пароль: попытка входа по паролю отклоняется на сервере", {
   con <- auth_db()
-  DBI::dbExecute(con, "UPDATE users SET email = 'alsey@example.com' WHERE login = 'alsey'")
+  texec(con, "UPDATE users SET email = 'alsey@example.com' WHERE login = 'alsey'")
 
   log <- run_auth(con, {
     session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
@@ -450,14 +450,14 @@ test_that("кнопка Google создаёт параметры входа и �
     expect_false(session$returned$logged_in())
   }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
 })
 
 test_that("возврат от Google: вход выполнен, роль из базы, токен автовхода выдан, 2FA не спрашивается", {
   g_fake_jwks()
   con <- g_db()
   settings <- g_settings(totp_enabled = TRUE, totp_key = strrep("k", 20))
-  DBI::dbExecute(con, "UPDATE users SET totp_enabled = 1, totp_secret = 'x' WHERE login = 'ann'")
+  texec(con, "UPDATE users SET totp_enabled = 1, totp_secret = 'x' WHERE login = 'ann'")
   g_fake_exchange(con)
   started <- aa_google_start(con, settings)
   g_url(paste0("?code=abc&state=", started$state))
@@ -601,7 +601,7 @@ test_that("кнопка на адресе возврата начинает вх
     session$setInputs(google_btn = 1)
   }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
   expect_length(calls$calls, 1)
   expect_match(calls$calls[[1]]$url, "^https://accounts.google.com/")
 })
@@ -616,7 +616,7 @@ test_that("кнопка на другом адресе (по IP) перевод�
     expect_false(session$returned$logged_in())
   }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
   expect_length(calls$calls, 1)
   expect_identical(calls$calls[[1]]$url, "https://apps.example.com/?google=1")
   expect_identical(calls$calls[[1]]$origin, "https://apps.example.com")
@@ -629,7 +629,7 @@ test_that("другой порт или схема тоже считаются �
 
   run_auth(con, { session$setInputs(google_btn = 1) }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
   expect_match(calls$calls[[1]]$url, "google=1", fixed = TRUE)
 })
 
@@ -644,7 +644,7 @@ test_that("?google=1 запускает вход сразу и не перево
     expect_false(session$returned$logged_in())
   }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
   expect_length(calls$calls, 1)
   expect_match(calls$calls[[1]]$url, "^https://accounts.google.com/")
 })
@@ -657,7 +657,7 @@ test_that("?google=1 на адресе возврата тоже запуска�
 
   run_auth(con, { session$flushReact() }, settings = g_settings())
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 1)
   expect_length(calls$calls, 1)
 })
 
@@ -668,7 +668,7 @@ test_that("без включённого Google параметр google=1 нич
 
   run_auth(con, { session$flushReact() })
 
-  expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
+  expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM oauth_states")$n, 0)
   expect_length(calls$calls, 0)
 })
 

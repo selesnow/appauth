@@ -383,7 +383,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
   }
 
   # ключ строки это login (он уникален), колонки id в старых базах может не быть
-  users <- DBI::dbGetQuery(conn, "SELECT login, password FROM users")
+  users <- aa_query(conn, "SELECT login, password FROM users")
   is_hash <- aa_is_password_hash(users$password)
   to_migrate <- users[!is_hash, , drop = FALSE]
 
@@ -433,7 +433,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
           rlang::abort(paste0("Хеш не прошёл проверку для ", login, "."))
         }
 
-        DBI::dbExecute(
+        aa_execute(
           conn,
           "UPDATE users SET password = ? WHERE login = ?",
           params = list(new_hash, login)
@@ -510,7 +510,7 @@ aa_common_passwords <- function() {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!(is.character(common) && !anyNA(common))) {
     rlang::abort(
@@ -519,7 +519,7 @@ aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
     )
   }
 
-  users <- DBI::dbGetQuery(conn, "SELECT login, role, password FROM users ORDER BY rowid")
+  users <- aa_query(conn, paste0("SELECT login, role, password FROM users ORDER BY ", aa_users_order(conn)))
 
   found <- list()
   add <- function(i, reason) {

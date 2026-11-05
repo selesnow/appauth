@@ -37,7 +37,7 @@ with_url <- function(search, env = parent.frame()) {
 }
 
 reset_tokens_of <- function(con, login) {
-  DBI::dbGetQuery(con, "SELECT * FROM password_resets WHERE user_login = ? ORDER BY id", params = list(login))
+  tquery(con, "SELECT * FROM password_resets WHERE user_login = ? ORDER BY id", params = list(login))
 }
 
 # --- email пользователей ------------------------------------------------------
@@ -213,7 +213,7 @@ test_that("лимиты: на пользователя в час и общий �
   expect_length(box$sent, 2)
 
   # запросы старше часа в лимит не входят
-  DBI::dbExecute(con, "UPDATE password_resets SET created_at = datetime('now', '-2 hours')")
+  texec(con, "UPDATE password_resets SET created_at = datetime('now', '-2 hours')")
   expect_true(aa_request_password_reset(con, "ann", settings)$sent)
 
   # общий лимит по всем пользователям
@@ -265,13 +265,13 @@ test_that("после смены по ссылке отзываются сесс
   settings <- reset_settings(box)
 
   session_token <- aa_issue_token(con, "ann")
-  DBI::dbExecute(con, "UPDATE users SET must_change = 1 WHERE login = 'ann'")
+  texec(con, "UPDATE users SET must_change = 1 WHERE login = 'ann'")
   for (i in 1:5) aa_record_attempt(con, "ann", FALSE, settings)
   expect_gt(aa_login_lock_remaining(con, "ann", settings), 0)
 
   aa_request_password_reset(con, "ann", settings)
   # вторая ссылка гасит первую, поэтому имитируем две живые ссылки вручную
-  DBI::dbExecute(
+  texec(
     con, "INSERT INTO password_resets (user_login, token_hash, expires_at) VALUES ('ann', 'other', datetime('now', '+1 hours'))"
   )
 
@@ -294,7 +294,7 @@ test_that("неверный, просроченный и чужой токен �
     expect_error(aa_reset_password_with_token(con, bad, "brand-new-pass", settings), class = "appauth_error_user")
   }
 
-  DBI::dbExecute(con, "UPDATE password_resets SET expires_at = datetime('now', '-1 minutes')")
+  texec(con, "UPDATE password_resets SET expires_at = datetime('now', '-1 minutes')")
   expect_null(aa_reset_token_login(con, token))
   err <- tryCatch(aa_reset_password_with_token(con, token, "brand-new-pass", settings), appauth_error_user = identity)
   expect_identical(err$reason, "reset_link_invalid")
@@ -347,7 +347,7 @@ test_that("сброс пароля администратором и смена 
 
 test_that("aa_cleanup удаляет старые токены восстановления и оставляет свежие", {
   con <- reset_db()
-  DBI::dbExecute(con, "
+  texec(con, "
     INSERT INTO password_resets (user_login, token_hash, created_at, expires_at, used) VALUES
       ('ann', 'old_expired', datetime('now', '-3 days'), datetime('now', '-3 days', '+1 hours'), 0),
       ('ann', 'old_used',    datetime('now', '-3 days'), datetime('now', '+1 hours'),            1),
@@ -361,6 +361,7 @@ test_that("aa_cleanup удаляет старые токены восстано�
 })
 
 test_that("миграция 7 достраивает старую базу и не трогает пользователей", {
+  skip_if_not_sqlite()
   con <- new_db()
   fixture_server_manager_prod(con)
   before <- rows_of(con, "users")
@@ -381,8 +382,8 @@ test_that("на уровне базы адрес уникален, но у мн�
   con <- reset_db()
   raw_user(con, "carl")
 
-  expect_error(DBI::dbExecute(con, "UPDATE users SET email = 'ann@example.com' WHERE login = 'bob'"), "UNIQUE")
-  expect_no_error(DBI::dbExecute(con, "UPDATE users SET email = NULL"))
+  expect_error(texec(con, "UPDATE users SET email = 'ann@example.com' WHERE login = 'bob'"), "UNIQUE|Duplicate|duplicate")
+  expect_no_error(texec(con, "UPDATE users SET email = NULL"))
 })
 
 # --- модуль входа ----------------------------------------------------------------

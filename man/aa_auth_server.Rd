@@ -17,7 +17,7 @@ aa_auth_server(
 \arguments{
 \item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_auth_ui]{aa_auth_ui()}}.}
 
-\item{conn}{Подключение к базе SQLite со схемой \code{\link[=aa_init_db]{aa_init_db()}}.}
+\item{conn}{Подключение к базе данных со схемой \code{\link[=aa_init_db]{aa_init_db()}}.}
 
 \item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
 

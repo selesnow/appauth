@@ -157,6 +157,7 @@ test_that("правила логина берутся из настроек", {
 
 # файловая база с фикстурой, путь удаляется в конце теста
 file_db <- function(fixture, env = parent.frame()) {
+  skip_if_not_sqlite()
   testthat::skip_if_not_installed("RSQLite")
 
   path <- withr::local_tempfile(fileext = ".db", .local_envir = env)
@@ -170,7 +171,7 @@ file_db <- function(fixture, env = parent.frame()) {
 read_users <- function(path) {
   con <- DBI::dbConnect(RSQLite::SQLite(), path)
   on.exit(DBI::dbDisconnect(con))
-  DBI::dbGetQuery(con, "SELECT login, password, role FROM users ORDER BY rowid")
+  tquery(con, "SELECT login, password, role FROM users ORDER BY rowid")
 }
 
 test_that("рекрутинг: пароли в открытом виде переносятся в хеши, вход по старым паролям работает", {
@@ -268,7 +269,7 @@ test_that("таблица users без колонки id тоже перенос
 
 test_that("спецсимволы в пароле и логине не ломают перенос (параметры, а не склейка SQL)", {
   db <- file_db(function(con) {
-    DBI::dbExecute(con, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)")
+    texec(con, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)")
     DBI::dbExecute(
       con, "INSERT INTO users VALUES (?, ?, 'user')",
       params = list("o'neil\"; DROP TABLE users;--", "p'a\"ss;--%d")
@@ -285,7 +286,7 @@ test_that("спецсимволы в пароле и логине не лома�
 test_that("при пустом пароле у одного пользователя вся миграция откатывается", {
   db <- file_db(function(con) {
     fixture_recruitment(con)
-    DBI::dbExecute(con, "INSERT INTO users (login, password, role) VALUES ('empty', '', 'user')")
+    texec(con, "INSERT INTO users (login, password, role) VALUES ('empty', '', 'user')")
   })
   before <- read_users(db)
 
@@ -314,13 +315,13 @@ test_that("резервную копию можно сохранить по св
 })
 
 test_that("база без пользователей и без таблицы users обрабатывается", {
-  db <- file_db(function(con) DBI::dbExecute(con, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)"))
+  db <- file_db(function(con) texec(con, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)"))
   res <- aa_migrate_plaintext_passwords(db)
 
   expect_identical(res$migrated, character())
   expect_identical(res$skipped, character())
 
-  db2 <- file_db(function(con) DBI::dbExecute(con, "CREATE TABLE other (x INTEGER)"))
+  db2 <- file_db(function(con) texec(con, "CREATE TABLE other (x INTEGER)"))
   expect_error(aa_migrate_plaintext_passwords(db2), "нет таблицы `users`", class = "appauth_error_migration")
 })
 
@@ -339,7 +340,7 @@ test_that("некорректные аргументы миграции откл
 # ---- слабые учётные записи ------------------------------------------------------
 
 add_user <- function(con, login, password, role = "user", hash = TRUE) {
-  DBI::dbExecute(
+  aa_execute(
     con, "INSERT INTO users (login, password, role) VALUES (?, ?, ?)",
     params = list(login, if (hash) aa_hash_password(password) else password, role)
   )

@@ -7,7 +7,8 @@
 aa_init_db(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
+(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
 }
 \value{
 Список (невидимо): \code{applied} (версии миграций, применённые в этом

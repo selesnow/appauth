@@ -68,7 +68,7 @@ aa_google_flag <- function(x) {
 #' Создаёт одноразовые `state`, `nonce` и PKCE-проверку, сохраняет их в базе и
 #' возвращает адрес страницы согласия Google.
 #'
-#' @param conn Подключение к базе SQLite со схемой [aa_init_db()].
+#' @param conn Подключение к базе данных со схемой [aa_init_db()].
 #' @param settings Настройки, результат [aa_settings()], с `google_enabled = TRUE`.
 #'
 #' @returns Список: `url` (куда отправить браузер) и `state` (его нужно положить в
@@ -80,9 +80,10 @@ aa_google_start <- function(conn, settings) {
   }
 
   # защита от засорения таблицы: общий лимит запусков в минуту
-  recent <- DBI::dbGetQuery(
+  recent <- aa_query(
     conn,
-    "SELECT COUNT(*) AS n FROM oauth_states WHERE created_at > datetime('now', '-1 minutes')"
+    "SELECT COUNT(*) AS n FROM oauth_states WHERE created_at > ?",
+    params = list(aa_utc(-60))
   )$n
 
   if (recent >= 60) {
@@ -94,11 +95,11 @@ aa_google_start <- function(conn, settings) {
   verifier <- aa_b64url_encode(openssl::rand_bytes(32))
   challenge <- aa_b64url_encode(unclass(openssl::sha256(charToRaw(verifier))))
 
-  DBI::dbExecute(
+  aa_execute(
     conn,
-    "INSERT INTO oauth_states (state_hash, nonce, code_verifier, expires_at)
-     VALUES (?, ?, ?, datetime('now', '+600 seconds'))",
-    params = list(aa_token_hash(state), nonce, verifier)
+    "INSERT INTO oauth_states (state_hash, nonce, code_verifier, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?)",
+    params = list(aa_token_hash(state), nonce, verifier, aa_utc(), aa_utc(600))
   )
 
   query <- list(
@@ -131,7 +132,7 @@ aa_google_start <- function(conn, settings) {
 #' Гасит запись атомарным запросом: одним и тем же `state` воспользоваться второй раз
 #' нельзя, просроченный `state` не принимается.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param state Значение `state` из адреса.
 #'
 #' @returns Список `nonce` и `code_verifier` или `NULL`.
@@ -143,18 +144,18 @@ aa_google_take_state <- function(conn, state) {
 
   hash <- aa_token_hash(state)
 
-  claimed <- DBI::dbExecute(
+  claimed <- aa_execute(
     conn,
     "UPDATE oauth_states SET used = 1
-     WHERE state_hash = ? AND used = 0 AND expires_at > datetime('now')",
-    params = list(hash)
+     WHERE state_hash = ? AND used = 0 AND expires_at > ?",
+    params = list(hash, aa_utc())
   )
 
   if (claimed != 1) {
     return(NULL)
   }
 
-  row <- DBI::dbGetQuery(
+  row <- aa_query(
     conn,
     "SELECT nonce, code_verifier FROM oauth_states WHERE state_hash = ?",
     params = list(hash)
@@ -338,7 +339,7 @@ aa_google_verify_id_token <- function(id_token, settings, nonce, now = Sys.time(
 #' пользователя по email. Сверка `state` с cookie браузера делается в модуле
 #' [aa_auth_server()], до вызова этой функции.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param settings Настройки, результат [aa_settings()].
 #' @param code,state Параметры из адреса возврата.
 #'
@@ -389,7 +390,7 @@ aa_google_complete <- function(conn, settings, code, state) {
     return(fail(verified$reason, verified$email))
   }
 
-  user <- DBI::dbGetQuery(
+  user <- aa_query(
     conn,
     "SELECT login, role, blocked FROM users WHERE email = ?",
     params = list(verified$email)

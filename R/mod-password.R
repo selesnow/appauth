@@ -24,7 +24,7 @@ aa_password_ui <- function(id) {
 #' работать. О смене модуль сообщает хуку `on_event` событием `password_changed`.
 #'
 #' @param id Идентификатор модуля, такой же, как в [aa_password_ui()].
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param auth Объект авторизации, результат [aa_auth_server()].
 #' @param settings Настройки, результат [aa_settings()].
 #' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
@@ -40,7 +40,7 @@ aa_password_ui <- function(id) {
 #' aa_password_server("password", conn, auth, on_event = log_event)
 #' }
 aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
     changed <- shiny::reactiveVal(0)

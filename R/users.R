@@ -38,12 +38,12 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
 #' Даты создания и последнего входа появились в схеме позже остальных колонок:
 #' если их в таблице ещё нет (схема не достроена), вместо них отдаётся `NULL`.
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #'
 #' @returns Строка со списком колонок для `SELECT`.
 #' @noRd
 aa_user_columns <- function(conn) {
-  cols <- DBI::dbGetQuery(conn, "SELECT name FROM pragma_table_info('users')")$name
+  cols <- aa_table_columns(conn, "users")
 
   paste0(
     "login, role, blocked, ",
@@ -54,7 +54,7 @@ aa_user_columns <- function(conn) {
 
 #' Запомнить время успешного входа по паролю
 #'
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param login Логин.
 #'
 #' @returns Невидимо `TRUE`, если дата записана. Ошибка не прерывает вход.
@@ -62,10 +62,10 @@ aa_user_columns <- function(conn) {
 aa_touch_last_login <- function(conn, login) {
   ok <- tryCatch(
     {
-      DBI::dbExecute(
+      aa_execute(
         conn,
-        "UPDATE users SET last_login_at = datetime('now') WHERE login = ?",
-        params = list(login)
+        "UPDATE users SET last_login_at = ? WHERE login = ?",
+        params = list(aa_utc(), login)
       )
       TRUE
     },
@@ -103,13 +103,13 @@ aa_touch_last_login <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_get_user <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login)) {
     return(NULL)
   }
 
-  user <- DBI::dbGetQuery(
+  user <- aa_query(
     conn,
     paste0("SELECT ", aa_user_columns(conn), " FROM users WHERE login = ?"),
     params = list(login)
@@ -136,9 +136,9 @@ aa_get_user <- function(conn, login) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_list_users <- function(conn) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
-  DBI::dbGetQuery(conn, paste0("SELECT ", aa_user_columns(conn), " FROM users ORDER BY rowid"))
+  aa_query(conn, paste0("SELECT ", aa_user_columns(conn), " FROM users ORDER BY ", aa_users_order(conn)))
 }
 
 #' Есть ли в базе хотя бы один пользователь
@@ -159,9 +159,9 @@ aa_list_users <- function(conn) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_users_exist <- function(conn) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
-  DBI::dbGetQuery(conn, "SELECT COUNT(*) AS n FROM users")$n > 0
+  aa_query(conn, "SELECT COUNT(*) AS n FROM users")$n > 0
 }
 
 #' Найти проблему в данных нового пользователя
@@ -184,7 +184,7 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
     return(list(reason = "invalid_role", args = list()))
   }
 
-  existing <- DBI::dbGetQuery(conn, "SELECT login FROM users")$login
+  existing <- aa_query(conn, "SELECT login FROM users")$login
 
   if (login %in% existing) {
     return(list(reason = "user_exists", args = list()))
@@ -221,7 +221,7 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_validate_new_user <- function(conn, login, password, role, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   aa_problem_text(settings, aa_new_user_problem(conn, login, password, role, settings))
 }
@@ -262,7 +262,7 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #' }
 aa_create_user <- function(conn, login, password, role, settings = aa_settings(),
                            must_change = FALSE, email = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   problem <- aa_new_user_problem(conn, login, password, role, settings)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
@@ -274,14 +274,14 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
   }
 
   tryCatch(
-    DBI::dbExecute(
+    aa_execute(
       conn,
-      "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
-      params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)))
+      "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, ?)",
+      params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)), aa_utc())
     ),
     error = function(e) {
       # при одновременном создании сработает ограничение уникальности логина
-      if (grepl("UNIQUE", conditionMessage(e), fixed = TRUE)) {
+      if (aa_is_unique_violation(e)) {
         aa_abort_user(settings, "user_exists")
       }
 
@@ -320,18 +320,24 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_create_first_admin <- function(conn, login, password, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   problem <- aa_login_problem(login, settings)
   if (is.null(problem)) problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
-  n <- DBI::dbExecute(
+  # типы параметров в списке SELECT PostgreSQL выводит только из явного приведения
+  p <- aa_text_param(conn)
+
+  n <- aa_execute(
     conn,
-    "INSERT INTO users (login, password, role, created_at)
-     SELECT ?, ?, ?, datetime('now')
-     WHERE NOT EXISTS (SELECT 1 FROM users)",
-    params = list(login, aa_hash_password(password), settings$admin_role)
+    paste0(
+      "INSERT INTO users (login, password, role, created_at)
+       SELECT ", p, ", ", p, ", ", p, ", ", p, "
+       FROM (SELECT 1 AS one) AS only_row
+       WHERE NOT EXISTS (SELECT 1 FROM users)"
+    ),
+    params = list(login, aa_hash_password(password), settings$admin_role, aa_utc())
   )
 
   n == 1
@@ -367,7 +373,7 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_authenticate <- function(conn, login, password) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login) || !aa_is_string(password)) {
     return(NULL)
@@ -376,13 +382,13 @@ aa_authenticate <- function(conn, login, password) {
   # колонки blocked и must_change появляются миграциями; если их по какой-то
   # причине нет, вход продолжает работать по паролю
   user <- tryCatch(
-    DBI::dbGetQuery(
+    aa_query(
       conn,
       "SELECT login, role, password, blocked, must_change FROM users WHERE login = ?",
       params = list(login)
     ),
     error = function(e) {
-      u <- DBI::dbGetQuery(
+      u <- aa_query(
         conn,
         "SELECT login, role, password FROM users WHERE login = ?",
         params = list(login)
@@ -435,7 +441,7 @@ aa_authenticate <- function(conn, login, password) {
 #' }
 aa_set_password <- function(conn, login, password, settings = aa_settings(),
                             must_change = FALSE, keep_token = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
@@ -444,7 +450,7 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
     return(invisible(0L))
   }
 
-  n <- DBI::dbExecute(
+  n <- aa_execute(
     conn,
     "UPDATE users SET password = ?, must_change = ? WHERE login = ?",
     params = list(aa_hash_password(password), as.integer(isTRUE(must_change)), login)
@@ -482,7 +488,7 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_check_can_change_role <- function(conn, login, role, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   aa_problem_text(settings, aa_role_change_problem(conn, login, role, settings))
 }
@@ -543,16 +549,17 @@ aa_role_change_problem <- function(conn, login, role, settings) {
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_set_role <- function(conn, login, role, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   problem <- aa_role_change_problem(conn, login, role, settings)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
-  n <- DBI::dbExecute(
+  n <- aa_execute(
     conn,
     "UPDATE users SET role = ? WHERE login = ?",
     params = list(role, login)
   )
+  n <- aa_rows_matched(conn, n, login)
 
   invisible(n)
 }
@@ -609,7 +616,7 @@ aa_user_removal_problem <- function(conn, login, acting_login, settings, action)
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_check_can_block <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "block"))
 }
@@ -632,7 +639,7 @@ aa_check_can_block <- function(conn, login, acting_login = NULL, settings = aa_s
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_check_can_delete <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "delete"))
 }
@@ -667,7 +674,7 @@ aa_check_can_delete <- function(conn, login, acting_login = NULL, settings = aa_
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
   aa_check_flag(blocked, "blocked")
 
   if (blocked) {
@@ -679,11 +686,12 @@ aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, set
     return(invisible(0L))
   }
 
-  n <- DBI::dbExecute(
+  n <- aa_execute(
     conn,
     "UPDATE users SET blocked = ? WHERE login = ?",
     params = list(as.integer(blocked), login)
   )
+  n <- aa_rows_matched(conn, n, login)
 
   if (n > 0 && blocked) {
     aa_revoke_user_tokens(conn, login)
@@ -719,18 +727,18 @@ aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, set
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   problem <- aa_user_removal_problem(conn, login, acting_login, settings, "delete")
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
-  n <- DBI::dbExecute(conn, "DELETE FROM users WHERE login = ?", params = list(login))
+  n <- aa_execute(conn, "DELETE FROM users WHERE login = ?", params = list(login))
 
   if (n > 0) {
     aa_delete_user_tokens(conn, login)
     aa_delete_user_resets(conn, login)
     tryCatch(
-      DBI::dbExecute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login)),
+      aa_execute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login)),
       error = function(e) NULL
     )
     # таблицы попыток входа может не быть, это не должно мешать удалению
@@ -769,7 +777,7 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
 #' }
 aa_change_own_password <- function(conn, login, old_password, new_password,
                                    settings = aa_settings(), keep_token = NULL) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   current <- aa_authenticate(conn, login, old_password)
 
@@ -812,7 +820,7 @@ aa_change_own_password <- function(conn, login, old_password, new_password,
 #'   DBI::dbDisconnect(conn)
 #' }
 aa_revoke_sessions <- function(conn, login) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   if (!aa_is_string(login)) {
     return(invisible(0L))

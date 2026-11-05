@@ -1,3 +1,5 @@
+skip_if_not_sqlite()
+
 # Сквозные проверки двух пример-приложений (inst/examples) через testServer:
 # каждое приложение запускается целиком, с настоящими модулями и базой SQLite.
 
@@ -31,7 +33,7 @@ db_do <- function(db, fn) {
 
 db_active_tokens <- function(db, login) {
   db_do(db, function(con) {
-    DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = ? AND revoked = 0", params = list(login))$n
+    tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = ? AND revoked = 0", params = list(login))$n
   })
 }
 
@@ -60,7 +62,7 @@ test_that("minimal-app: первый запуск создаёт админис�
 
   db_do(ex$db, function(con) {
     expect_equal(aa_get_user(con, "boss")$role, "admin")
-    expect_true(aa_is_password_hash(DBI::dbGetQuery(con, "SELECT password FROM users")$password))
+    expect_true(aa_is_password_hash(tquery(con, "SELECT password FROM users")$password))
   })
 })
 
@@ -209,7 +211,7 @@ test_that("custom-permissions-app: права редактора берутся 
     session$setInputs(`users-permissions` = "export", `users-save_permissions` = 1)
   })
   db_do(ex$db, function(con) {
-    expect_equal(DBI::dbGetQuery(con, "SELECT permission FROM user_permissions WHERE login = 'ann'")$permission, "export")
+    expect_equal(tquery(con, "SELECT permission FROM user_permissions WHERE login = 'ann'")$permission, "export")
   })
 
   run_app(ex, {
@@ -238,7 +240,7 @@ test_that("custom-permissions-app: сохранять права может то
   })
 
   db_do(ex$db, function(con) {
-    expect_equal(DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM user_permissions")$n, 0)
+    expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM user_permissions")$n, 0)
   })
 })
 
@@ -302,7 +304,7 @@ test_that("база рекрутинга (старая схема, открыт�
   })
 
   expect_true(all(vapply(
-    DBI::dbGetQuery(con, "SELECT password FROM users")$password, aa_is_password_hash, logical(1)
+    tquery(con, "SELECT password FROM users")$password, aa_is_password_hash, logical(1)
   )))
   expect_true("action_log" %in% DBI::dbListTables(con))
 })

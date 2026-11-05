@@ -244,7 +244,7 @@ test_that("не администратор не может выполнять д
 
 test_that("администратор, которого понизили в базе, теряет доступ несмотря на старую роль в сессии", {
   con <- users_fixture()
-  DBI::dbExecute(con, "UPDATE users SET role = 'user' WHERE login = 'alsey'")
+  texec(con, "UPDATE users SET role = 'user' WHERE login = 'alsey'")
 
   log <- run_users(con, {
     session$setInputs(open = "ivan")
@@ -257,7 +257,7 @@ test_that("администратор, которого понизили в ба
 
 test_that("администратор, которого заблокировали, теряет доступ", {
   con <- users_fixture()
-  DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'alsey'")
+  texec(con, "UPDATE users SET blocked = 1 WHERE login = 'alsey'")
 
   run_users(con, {
     session$setInputs(open = "ivan")

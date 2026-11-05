@@ -1,30 +1,57 @@
-#' Подключение к SQLite, которое закрывается вместе с сессией
+#' Подключение к базе, которое закрывается вместе с сессией
 #'
 #' Открывает подключение к базе и сразу регистрирует его закрытие при завершении
 #' сессии Shiny. Без этого подключение остаётся открытым до остановки процесса R
-#' и держит файл базы: на Windows такой файл нельзя переименовать или удалить.
+#' и держит файл базы (SQLite, DuckDB): на Windows такой файл нельзя переименовать
+#' или удалить, а у серверных баз (MySQL, PostgreSQL) остаются лишние соединения.
 #'
-#' @param db_path Путь к файлу базы SQLite.
+#' По умолчанию открывается файл SQLite. Для другой базы передайте `connect`:
+#' функцию без аргументов, которая возвращает подключение DBI.
+#'
+#' @param db_path Путь к файлу базы SQLite. Не нужен, если задан `connect`.
 #' @param session Сессия Shiny. По умолчанию текущая, поэтому функцию нужно
 #'   вызывать внутри `server`.
 #' @param prepare Подготовить схему базы ([aa_prepare_db()]) сразу после
 #'   подключения.
 #' @param settings Настройки, результат [aa_settings()], нужны для `prepare`.
+#' @param connect Функция без аргументов, возвращающая подключение к базе (SQLite,
+#'   DuckDB, MySQL / MariaDB или PostgreSQL), либо `NULL` для файла SQLite.
 #'
-#' @returns Подключение к базе (`SQLiteConnection`).
+#' @returns Подключение к базе.
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' server <- function(input, output, session) {
+#'   # SQLite (по умолчанию)
 #'   conn <- aa_session_connection("app.db", prepare = TRUE)
+#'
+#'   # MySQL / MariaDB
+#'   conn <- aa_session_connection(
+#'     prepare = TRUE,
+#'     connect = function() DBI::dbConnect(
+#'       RMariaDB::MariaDB(), host = "db.example.com", dbname = "app",
+#'       user = "app", password = Sys.getenv("APP_DB_PASSWORD")
+#'     )
+#'   )
+#'
 #'   auth <- aa_auth_server("auth", conn)
 #' }
 #' }
-aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDomain(),
-                                  prepare = FALSE, settings = aa_settings()) {
-  if (!aa_is_string(db_path)) {
-    rlang::abort("`db_path` должен быть путём к файлу базы.", class = "appauth_error_connection")
+aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultReactiveDomain(),
+                                  prepare = FALSE, settings = aa_settings(), connect = NULL) {
+  if (is.null(connect) && !aa_is_string(db_path)) {
+    rlang::abort(
+      "`db_path` должен быть путём к файлу базы (или передайте `connect`).",
+      class = "appauth_error_connection"
+    )
+  }
+
+  if (!is.null(connect) && !is.function(connect)) {
+    rlang::abort(
+      "`connect` должен быть функцией без аргументов, возвращающей подключение.",
+      class = "appauth_error_connection"
+    )
   }
 
   if (is.null(session) || !is.function(session$onSessionEnded)) {
@@ -34,11 +61,17 @@ aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDo
     )
   }
 
-  if (!requireNamespace("RSQLite", quietly = TRUE)) {
-    rlang::abort("Для работы с базой нужен пакет RSQLite.", class = "appauth_error_connection")
+  if (is.null(connect)) {
+    if (!requireNamespace("RSQLite", quietly = TRUE)) {
+      rlang::abort("Для работы с базой нужен пакет RSQLite.", class = "appauth_error_connection")
+    }
+
+    conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  } else {
+    conn <- connect()
   }
 
-  conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+  aa_check_conn(conn)
 
   session$onSessionEnded(function() {
     try(DBI::dbDisconnect(conn), silent = TRUE)
@@ -69,7 +102,7 @@ aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDo
 #' @param auth Результат [aa_auth_server()].
 #' @param cleanup_minutes Как часто чистить устаревшие записи, в минутах.
 
-#' @param conn Подключение к базе SQLite.
+#' @param conn Подключение к базе данных.
 #' @param settings Настройки, результат [aa_settings()].
 #' @param reload Перезагружать страницу после выхода, чтобы модули прежнего
 #'   пользователя исчезли. Рекомендуется `TRUE`.
@@ -84,7 +117,7 @@ aa_session_connection <- function(db_path, session = shiny::getDefaultReactiveDo
 #' }
 aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE,
                              cleanup_minutes = 60) {
-  aa_check_sqlite(conn)
+  aa_check_conn(conn)
 
   interval <- max(1, settings$session_check_seconds) * 1000
   last_cleanup <- Sys.time()
