@@ -2,32 +2,33 @@
 % Please edit documentation in R/passwords.R
 \name{aa_check_default_accounts}
 \alias{aa_check_default_accounts}
-\title{Найти учётные записи со слабыми паролями}
+\title{Find accounts with weak passwords}
 \usage{
 aa_check_default_accounts(conn, common = aa_common_passwords())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite, в которой уже есть таблица \code{users}.}
+\item{conn}{A connection to the SQLite database that already has the \code{users}
+table.}
 
-\item{common}{Список слабых паролей для проверки, по умолчанию
+\item{common}{List of weak passwords to check, by default
 \code{\link[=aa_common_passwords]{aa_common_passwords()}}.}
 }
 \value{
-Таблица с колонками \code{login}, \code{role} и \code{reason}: \code{plaintext}
-(пароль хранится в открытом виде), \code{login_as_password} (пароль совпадает с
-логином) или \code{common_password} (пароль из списка слабых). Если таких
-пользователей нет, таблица пустая.
+A table with \code{login}, \code{role} and \code{reason} columns: \code{plaintext} (the
+password is stored in plain text), \code{login_as_password} (the password equals
+the login) or \code{common_password} (a password from the weak list). If there
+are no such users, the table is empty.
 }
 \description{
-Гигиеническая проверка таблицы \code{users}: находит пользователей, у которых
-пароль хранится в открытом виде, совпадает с логином (в нижнем и верхнем
-регистре тоже) или входит в список распространённых слабых паролей. Проверка
-идёт по хешам, пароли в открытом виде функция не показывает. Проверка может
-занять несколько секунд на каждого пользователя из-за стойкого хеширования.
+A hygiene check of the \code{users} table: finds users whose password is stored in
+plain text, equals the login (lower and upper case too) or is in the list of
+common weak passwords. The check works on hashes; the function does not show
+plain-text passwords. The check can take a few seconds per user because of
+strong hashing.
 }
 \details{
-Для одного пользователя может быть несколько строк результата, например, для
-пароля \code{root} в открытом виде у логина \code{root}.
+A single user can have several result rows, for example for the plain-text
+password \code{root} of the login \code{root}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

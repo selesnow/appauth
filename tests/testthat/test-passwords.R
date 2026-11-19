@@ -1,6 +1,6 @@
-# ---- хеширование и проверка ---------------------------------------------------
+# ---- hashing and verification ---------------------------------------------------
 
-test_that("хеш начинается с $7$ и не содержит пароль", {
+test_that("the hash starts with $7$ and does not contain the password", {
   hash <- aa_hash_password("secret-password")
 
   expect_type(hash, "character")
@@ -9,7 +9,7 @@ test_that("хеш начинается с $7$ и не содержит паро�
   expect_false(grepl("secret-password", hash, fixed = TRUE))
 })
 
-test_that("два хеша одного пароля различаются (соль), оба проходят проверку", {
+test_that("two hashes of one password differ (salt), both pass verification", {
   h1 <- aa_hash_password("same-password")
   h2 <- aa_hash_password("same-password")
 
@@ -18,7 +18,7 @@ test_that("два хеша одного пароля различаются (с�
   expect_true(aa_verify_password("same-password", h2))
 })
 
-test_that("проверка пароля различает верный и неверный, учитывает регистр и пробелы", {
+test_that("verification tells right from wrong, respects case and whitespace", {
   hash <- aa_hash_password("Secret Pass")
 
   expect_true(aa_verify_password("Secret Pass", hash))
@@ -27,20 +27,20 @@ test_that("проверка пароля различает верный и не
   expect_false(aa_verify_password("wrong", hash))
 })
 
-test_that("кириллица, спецсимволы и длинные пароли работают", {
-  for (pw in c("пароль-на-русском", "p'a\"ss;--%d", strrep("a", 128), "  пробелы  ")) {
+test_that("non-ASCII, special characters and long passwords work", {
+  for (pw in c("\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441", "p'a\"ss;--%d", strrep("a", 128), "  spaces  ")) {
     hash <- aa_hash_password(pw)
     expect_true(aa_verify_password(pw, hash), info = pw)
   }
 })
 
-test_that("aa_hash_password отклоняет не строки и пустые значения", {
+test_that("aa_hash_password rejects non-strings and empty values", {
   for (bad in list("", NA_character_, NULL, 123, c("a", "b"), TRUE, list("a"))) {
     expect_error(aa_hash_password(bad), class = "appauth_error_password")
   }
 })
 
-test_that("aa_is_password_hash отличает хеши от паролей в открытом виде", {
+test_that("aa_is_password_hash tells hashes from plain-text passwords", {
   hash <- aa_hash_password("x")
 
   expect_identical(
@@ -50,20 +50,20 @@ test_that("aa_is_password_hash отличает хеши от паролей в 
   expect_identical(aa_is_password_hash(character()), logical())
 })
 
-test_that("пароль в открытом виде никогда не проходит проверку", {
+test_that("a plain-text password never passes verification", {
   expect_false(aa_verify_password("root", "root"))
   expect_false(aa_verify_password("secret", "secret"))
-  # значение, похожее на хеш, но не являющееся им, тоже не принимается
+  # a value that looks like a hash but is not one is not accepted either
   expect_false(aa_verify_password("$7$abc", "$7$abc"))
 })
 
-test_that("сам хеш в качестве пароля не подходит (pass-the-hash)", {
+test_that("the hash itself does not work as a password (pass-the-hash)", {
   hash <- aa_hash_password("secret")
 
   expect_false(aa_verify_password(hash, hash))
 })
 
-test_that("некорректные аргументы и повреждённый хеш дают FALSE без ошибок", {
+test_that("invalid arguments and a corrupted hash give FALSE without errors", {
   hash <- aa_hash_password("secret")
 
   expect_false(aa_verify_password(NULL, hash))
@@ -74,11 +74,11 @@ test_that("некорректные аргументы и повреждённы
   expect_false(aa_verify_password("secret", NULL))
   expect_false(aa_verify_password("secret", NA_character_))
   expect_false(aa_verify_password("secret", c(hash, hash)))
-  expect_false(aa_verify_password("secret", "$7$повреждённый-хеш"))
+  expect_false(aa_verify_password("secret", "$7$corrupted-hash"))
   expect_false(aa_verify_password("secret", substr(hash, 1, 20)))
 })
 
-test_that("хеш-заглушка это хеш, не меняется в течение сессии и не принимает типичные пароли", {
+test_that("the dummy hash is a hash, does not change during the session and rejects typical passwords", {
   dummy <- aa_dummy_hash()
 
   expect_true(aa_is_password_hash(dummy))
@@ -87,39 +87,39 @@ test_that("хеш-заглушка это хеш, не меняется в те�
   expect_false(aa_verify_password("", dummy))
 })
 
-# ---- правила нового пароля и логина -------------------------------------------
+# ---- rules for a new password and login -------------------------------------------
 
-test_that("пароль нужной длины подходит", {
+test_that("a password of the right length is fine", {
   expect_null(aa_validate_password("123456"))
   expect_null(aa_validate_password(strrep("a", 128)))
-  expect_null(aa_validate_password("пароль-русский"))
+  expect_null(aa_validate_password("\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441"))
 })
 
-test_that("слишком короткий и слишком длинный пароль отклоняются с понятным текстом", {
+test_that("a too short and a too long password are rejected with a clear text", {
   expect_identical(
     aa_validate_password("12345"),
-    "Пароль должен содержать минимум 6 символов"
+    aa_text(aa_settings(), "password_too_short", 6L)
   )
   expect_identical(
     aa_validate_password(strrep("a", 129)),
-    "Пароль должен содержать максимум 128 символов"
+    aa_text(aa_settings(), "password_too_long", 128L)
   )
 })
 
-test_that("длина пароля считается в символах, а не в байтах", {
-  # шесть кириллических символов это 12 байт, но 6 символов
-  expect_null(aa_validate_password("абвгде"))
-  expect_false(is.null(aa_validate_password("абвгд")))
+test_that("password length is counted in characters, not bytes", {
+  # six Cyrillic characters are 12 bytes but 6 characters
+  expect_null(aa_validate_password("\u0430\u0431\u0432\u0433\u0434\u0435"))
+  expect_false(is.null(aa_validate_password("\u0430\u0431\u0432\u0433\u0434")))
 })
 
-test_that("пустые и некорректные пароли отклоняются", {
+test_that("empty and invalid passwords are rejected", {
   for (bad in list("", NA_character_, NULL, 123, c("abcdef", "abcdef"))) {
-    expect_identical(aa_validate_password(bad), "Пароль не может быть пустым")
+    expect_identical(aa_validate_password(bad), aa_text(aa_settings(), "password_empty"))
   }
 })
 
-test_that("правила пароля берутся из настроек и тексты на языке настроек", {
-  s <- aa_settings(password_min = 10, password_max = 12, texts = aa_texts("en"))
+test_that("password rules come from the settings and texts are in the settings language", {
+  s <- aa_settings(password_min = 10, password_max = 12)
 
   expect_identical(aa_validate_password("123456789", s), "Password must be at least 10 characters long")
   expect_identical(aa_validate_password(strrep("a", 13), s), "Password must be at most 12 characters long")
@@ -127,35 +127,35 @@ test_that("правила пароля берутся из настроек и �
   expect_identical(aa_validate_password("", s), "Password cannot be empty")
 })
 
-test_that("логин проверяется", {
+test_that("the login is validated", {
   expect_null(aa_validate_login("alsey"))
   expect_null(aa_validate_login("al sey"))
   expect_null(aa_validate_login(strrep("a", 64)))
 
-  # пробелы по краям запрещены: вход сравнивает логин точно
+  # edge whitespace is forbidden: login compares the login exactly
   for (bad in c("  alsey  ", " alsey", "alsey ", "alsey\t")) {
-    expect_identical(aa_validate_login(bad), "Логин не должен начинаться или заканчиваться пробелом")
+    expect_identical(aa_validate_login(bad), aa_text(aa_settings(), "login_whitespace"))
   }
   expect_identical(aa_validate_login(" alsey", aa_settings(texts = aa_texts("en"))), "Login must not start or end with a space")
 
-  expect_identical(aa_validate_login(strrep("a", 65)), "Логин должен содержать максимум 64 символов")
+  expect_identical(aa_validate_login(strrep("a", 65)), aa_text(aa_settings(), "login_too_long", 64L))
 
   for (bad in list("", "   ", NA_character_, NULL, 5, c("a", "b"))) {
-    expect_identical(aa_validate_login(bad), "Логин не может быть пустым")
+    expect_identical(aa_validate_login(bad), aa_text(aa_settings(), "login_empty"))
   }
 })
 
-test_that("правила логина берутся из настроек", {
-  s <- aa_settings(login_max = 5, texts = aa_texts("en"))
+test_that("login rules come from the settings", {
+  s <- aa_settings(login_max = 5)
 
   expect_null(aa_validate_login("abcde", s))
   expect_identical(aa_validate_login("abcdef", s), "Login must be at most 5 characters long")
   expect_identical(aa_validate_login(" ", s), "Login cannot be empty")
 })
 
-# ---- перенос паролей из открытого вида ---------------------------------------
+# ---- migration of passwords from plain text ---------------------------------------
 
-# файловая база с фикстурой, путь удаляется в конце теста
+# file database with a fixture, the path is removed at the end of the test
 file_db <- function(fixture, env = parent.frame()) {
   skip_if_not_sqlite()
   testthat::skip_if_not_installed("RSQLite")
@@ -174,8 +174,8 @@ read_users <- function(path) {
   tquery(con, "SELECT login, password, role FROM users ORDER BY rowid")
 }
 
-test_that("рекрутинг: пароли в открытом виде переносятся в хеши, вход по старым паролям работает", {
-  db <- file_db(fixture_recruitment)
+test_that("legacy app: plain-text passwords are migrated to hashes, login with old passwords works", {
+  db <- file_db(fixture_legacy_plain)
   before <- read_users(db)
 
   res <- suppressMessages(aa_migrate_plaintext_passwords(db))
@@ -193,8 +193,8 @@ test_that("рекрутинг: пароли в открытом виде пер�
   }
 })
 
-test_that("перед изменениями создаётся резервная копия со старыми паролями", {
-  db <- file_db(fixture_recruitment)
+test_that("a backup copy with the old passwords is created before changes", {
+  db <- file_db(fixture_legacy_plain)
   before <- read_users(db)
 
   res <- suppressMessages(aa_migrate_plaintext_passwords(db))
@@ -205,15 +205,15 @@ test_that("перед изменениями создаётся резервна
   expect_identical(read_users(res$backup), before)
 })
 
-test_that("после переноса выводится напоминание удалить резервную копию", {
-  db <- file_db(fixture_recruitment)
+test_that("after the migration a reminder to delete the backup is shown", {
+  db <- file_db(fixture_legacy_plain)
 
-  expect_message(res <- aa_migrate_plaintext_passwords(db), "Удалите её после проверки")
+  expect_message(res <- aa_migrate_plaintext_passwords(db), "Delete it after checking")
   unlink(res$backup)
 })
 
-test_that("повторный запуск ничего не меняет и не создаёт лишних копий", {
-  db <- file_db(fixture_recruitment)
+test_that("a repeated run changes nothing and creates no extra copies", {
+  db <- file_db(fixture_legacy_plain)
   first <- suppressMessages(aa_migrate_plaintext_passwords(db))
   on.exit(unlink(first$backup), add = TRUE)
 
@@ -229,8 +229,8 @@ test_that("повторный запуск ничего не меняет и н�
   expect_identical(list.files(dirname(db), pattern = basename(db), full.names = TRUE), files_before)
 })
 
-test_that("dry_run показывает, что будет перенесено, и ничего не меняет", {
-  db <- file_db(fixture_recruitment)
+test_that("dry_run shows what would be migrated and changes nothing", {
+  db <- file_db(fixture_legacy_plain)
   before <- read_users(db)
 
   res <- aa_migrate_plaintext_passwords(db, dry_run = TRUE)
@@ -242,9 +242,9 @@ test_that("dry_run показывает, что будет перенесено,
   expect_identical(list.files(dirname(db), pattern = paste0(basename(db), ".bak"), full.names = TRUE), character())
 })
 
-test_that("уже хешированные пароли пропускаются и не меняются", {
+test_that("already hashed passwords are skipped and unchanged", {
   db <- file_db(function(con) {
-    fixture_server_manager_dev_old(con)   # alsey: хеш, tester: открытый пароль
+    fixture_legacy_old(con)   # alsey: hash, tester: plain-text password
   })
   before <- read_users(db)
 
@@ -257,8 +257,8 @@ test_that("уже хешированные пароли пропускаются
   expect_true(aa_verify_password("tester", after$password[after$login == "tester"]))
 })
 
-test_that("таблица users без колонки id тоже переносится", {
-  db <- file_db(fixture_server_manager_dev_old)
+test_that("a users table without an id column is migrated too", {
+  db <- file_db(fixture_legacy_old)
 
   expect_false("id" %in% names(read_users(db)))
 
@@ -267,7 +267,7 @@ test_that("таблица users без колонки id тоже перенос
   expect_identical(res$migrated, "tester")
 })
 
-test_that("спецсимволы в пароле и логине не ломают перенос (параметры, а не склейка SQL)", {
+test_that("special characters in password and login do not break the migration (parameters, not SQL concatenation)", {
   db <- file_db(function(con) {
     texec(con, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)")
     DBI::dbExecute(
@@ -283,23 +283,23 @@ test_that("спецсимволы в пароле и логине не лома�
   expect_true(aa_verify_password("p'a\"ss;--%d", after$password))
 })
 
-test_that("при пустом пароле у одного пользователя вся миграция откатывается", {
+test_that("an empty password for one user rolls back the whole migration", {
   db <- file_db(function(con) {
-    fixture_recruitment(con)
+    fixture_legacy_plain(con)
     texec(con, "INSERT INTO users (login, password, role) VALUES ('empty', '', 'user')")
   })
   before <- read_users(db)
 
   expect_error(
     suppressMessages(aa_migrate_plaintext_passwords(db, backup = FALSE)),
-    "Миграция отменена, изменения не применены",
+    "Migration cancelled, no changes were applied",
     class = "appauth_error_migration"
   )
   expect_identical(read_users(db), before)
 })
 
-test_that("резервную копию можно сохранить по своему пути или отключить", {
-  db <- file_db(fixture_recruitment)
+test_that("the backup can be saved to a custom path or disabled", {
+  db <- file_db(fixture_legacy_plain)
   copy <- withr::local_tempfile(fileext = ".bak")
 
   res <- suppressMessages(aa_migrate_plaintext_passwords(db, backup = copy))
@@ -307,14 +307,14 @@ test_that("резервную копию можно сохранить по св
   expect_identical(res$backup, copy)
   expect_true(file.exists(copy))
 
-  db2 <- file_db(fixture_recruitment)
+  db2 <- file_db(fixture_legacy_plain)
   res2 <- aa_migrate_plaintext_passwords(db2, backup = FALSE)
 
   expect_true(is.na(res2$backup))
   expect_identical(list.files(dirname(db2), pattern = paste0(basename(db2), ".bak"), full.names = TRUE), character())
 })
 
-test_that("база без пользователей и без таблицы users обрабатывается", {
+test_that("a database with no users and with no users table is handled", {
   db <- file_db(function(con) texec(con, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)"))
   res <- aa_migrate_plaintext_passwords(db)
 
@@ -322,22 +322,22 @@ test_that("база без пользователей и без таблицы u
   expect_identical(res$skipped, character())
 
   db2 <- file_db(function(con) texec(con, "CREATE TABLE other (x INTEGER)"))
-  expect_error(aa_migrate_plaintext_passwords(db2), "нет таблицы `users`", class = "appauth_error_migration")
+  expect_error(aa_migrate_plaintext_passwords(db2), "no `users` table", class = "appauth_error_migration")
 })
 
-test_that("некорректные аргументы миграции отклоняются", {
-  expect_error(aa_migrate_plaintext_passwords("нет-такого-файла.db"), "не найден", class = "appauth_error_migration")
+test_that("invalid migration arguments are rejected", {
+  expect_error(aa_migrate_plaintext_passwords("no-such-file.db"), "not found", class = "appauth_error_migration")
   expect_error(aa_migrate_plaintext_passwords(NA_character_), class = "appauth_error_migration")
   expect_error(aa_migrate_plaintext_passwords(c("a", "b")), class = "appauth_error_migration")
 
-  db <- file_db(fixture_recruitment)
+  db <- file_db(fixture_legacy_plain)
 
   expect_error(aa_migrate_plaintext_passwords(db, backup = NA), class = "appauth_error_migration")
   expect_error(aa_migrate_plaintext_passwords(db, backup = 5), class = "appauth_error_migration")
   expect_error(aa_migrate_plaintext_passwords(db, dry_run = "yes"), class = "appauth_error_settings")
 })
 
-# ---- слабые учётные записи ------------------------------------------------------
+# ---- weak accounts ------------------------------------------------------
 
 add_user <- function(con, login, password, role = "user", hash = TRUE) {
   aa_execute(
@@ -346,7 +346,7 @@ add_user <- function(con, login, password, role = "user", hash = TRUE) {
   )
 }
 
-test_that("находятся пароль = логин и распространённые пароли, сильные пароли не трогаются", {
+test_that("password = login and common passwords are found, strong passwords are left alone", {
   con <- new_db()
   aa_init_db(con)
 
@@ -367,7 +367,7 @@ test_that("находятся пароль = логин и распростра�
   expect_false("alsey" %in% res$login)
 })
 
-test_that("пароли в открытом виде находятся, root/root даёт две причины", {
+test_that("plain-text passwords are found, root/root gives two reasons", {
   con <- new_db()
   aa_init_db(con)
 
@@ -380,8 +380,8 @@ test_that("пароли в открытом виде находятся, root/ro
   expect_identical(res$reason[res$login == "hr_one"], "plaintext")
 })
 
-test_that("рекрутинг после миграции: слабые пароли остаются слабыми и находятся", {
-  db <- file_db(fixture_recruitment)
+test_that("legacy app after migration: weak passwords stay weak and are found", {
+  db <- file_db(fixture_legacy_plain)
   suppressMessages(aa_migrate_plaintext_passwords(db, backup = FALSE))
 
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
@@ -393,7 +393,7 @@ test_that("рекрутинг после миграции: слабые паро
   expect_identical(res$reason, "login_as_password")
 })
 
-test_that("если слабых паролей нет, результат пустая таблица нужной формы", {
+test_that("if there are no weak passwords, the result is an empty table of the right shape", {
   con <- new_db()
   aa_init_db(con)
   add_user(con, "alsey", "very-strong-pass-92!", "admin")
@@ -408,7 +408,7 @@ test_that("если слабых паролей нет, результат пу�
   expect_identical(nrow(aa_check_default_accounts(empty)), 0L)
 })
 
-test_that("список слабых паролей можно заменить", {
+test_that("the list of weak passwords can be replaced", {
   con <- new_db()
   aa_init_db(con)
   add_user(con, "u1", "company2026")
@@ -417,7 +417,7 @@ test_that("список слабых паролей можно заменить"
   expect_identical(aa_check_default_accounts(con, common = "company2026")$reason, "common_password")
 })
 
-test_that("aa_check_default_accounts проверяет аргументы", {
+test_that("aa_check_default_accounts validates its arguments", {
   expect_error(aa_check_default_accounts(list()), class = "appauth_error_connection")
 
   con <- new_db()
@@ -427,7 +427,7 @@ test_that("aa_check_default_accounts проверяет аргументы", {
   expect_error(aa_check_default_accounts(con, common = c("a", NA)), class = "appauth_error_password")
 })
 
-test_that("aa_common_passwords возвращает вектор строк с очевидными паролями", {
+test_that("aa_common_passwords returns a character vector with obvious passwords", {
   common <- aa_common_passwords()
 
   expect_type(common, "character")

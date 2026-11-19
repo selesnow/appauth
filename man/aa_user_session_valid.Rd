@@ -2,36 +2,38 @@
 % Please edit documentation in R/sessions.R
 \name{aa_user_session_valid}
 \alias{aa_user_session_valid}
-\title{Проверить, что открытая сессия всё ещё действует}
+\title{Check that an open session is still valid}
 \usage{
 aa_user_session_valid(conn, login, role, token = NULL)
 }
 \arguments{
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{login}{Логин пользователя.}
+\item{login}{User login.}
 
-\item{role}{Роль, с которой пользователь вошёл.}
+\item{role}{The role the user logged in with.}
 
-\item{token}{Токен автовхода этой сессии (\code{auth$token()}) или \code{NULL}, если
-у сессии токена нет (например, автовход выключен): тогда токен не проверяется.}
+\item{token}{Autologin token of this session (\code{auth$token()}) or \code{NULL} if
+the session has no token (for example, autologin is disabled): then the
+token is not checked.}
 }
 \value{
-Список: \code{valid} (логическое), \code{reason} (\code{"ok"}, \code{"deleted"},
-\code{"blocked"}, \code{"role_changed"}, \code{"token_revoked"}, \code{"check_failed"}) и \code{role}
-(актуальная роль из базы или \code{NULL}).
+A list: \code{valid} (logical), \code{reason} (\code{"ok"}, \code{"deleted"},
+\code{"blocked"}, \code{"role_changed"}, \code{"token_revoked"}, \code{"check_failed"}) and
+\code{role} (the current role from the database or \code{NULL}).
 }
 \description{
-Вызывается периодически (интервал \code{session_check_seconds}), чтобы блокировка,
-удаление, понижение роли и завершение сессий вступали в силу у уже вошедшего
-пользователя, а не только при следующем входе. Сессия недействительна, если
-пользователь удалён, заблокирован, его роль в базе отличается от роли в
-сессии или токен этой сессии отозван (сброс пароля, «завершить все сессии»).
+Called periodically (every \code{session_check_seconds}) so that blocking,
+deletion, role demotion and session termination take effect for a user who
+is already logged in, not only at the next login. A session is invalid if
+the user was deleted or blocked, the role in the database differs from the
+role in the session, or the token of this session was revoked (password
+reset, "end all sessions").
 }
 \details{
-Если базу прочитать не удалось, сессия считается действующей
-(\code{reason = "check_failed"}), чтобы сбой базы не выбросил всех пользователей;
-доступ при этом не расширяется, так как пароль не проверяется.
+If the database cannot be read, the session is considered valid
+(\code{reason = "check_failed"}) so that a database failure does not kick out all
+users; access is not widened, because no password is checked.
 }
 \examples{
 \dontrun{

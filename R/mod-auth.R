@@ -1,12 +1,12 @@
-#' Модуль входа: интерфейс
+#' Sign-in module: UI
 #'
-#' Форма входа (или создания первого администратора, если пользователей ещё
-#' нет). Когда пользователь вошёл, модуль ничего не показывает. Стили подключаются
-#' через [aa_app_head()].
+#' The sign-in form (or the creation of the first administrator if there are
+#' no users yet). When the user is signed in, the module shows nothing. Styles are attached
+#' through [aa_app_head()].
 #'
-#' @param id Идентификатор модуля.
+#' @param id Module id.
 #'
-#' @returns Элемент интерфейса Shiny.
+#' @returns A Shiny UI element.
 #' @seealso [aa_auth_server()]
 #' @export
 #'
@@ -16,84 +16,84 @@ aa_auth_ui <- function(id) {
   shiny::uiOutput(shiny::NS(id, "form"))
 }
 
-#' Модуль входа: сервер
+#' Sign-in module: server
 #'
-#' Вход по логину и паролю с защитой от подбора ([aa_login_gate()]), создание
-#' первого администратора на пустой базе, автовход по cookie (если включён в
-#' настройках) и выход. Обо всех событиях модуль сообщает хуку `on_event`
-#' (каталог в [aa_events()]), сам в логи ничего не пишет.
+#' Sign-in with login and password protected against guessing ([aa_login_gate()]), creation of the
+#' first administrator on an empty database, auto-login by cookie (if enabled in the
+#' settings) and sign-out. The module reports all events to the `on_event` hook
+#' (catalog in [aa_events()]) and writes nothing to logs itself.
 #'
-#' Если пароль пользователю задал администратор (`must_change`), после ввода
-#' верного пароля показывается форма смены пароля, и в приложение пользователь
-#' попадает только после смены.
+#' If the password was set by an administrator (`must_change`), the password change form
+#' is shown after the correct password is entered, and the user gets into the app
+#' only after the change.
 #'
-#' @section Двухфакторная аутентификация:
-#' При `totp_enabled = TRUE` в настройках ([aa_settings()]) пользователь, у которого
-#' включена 2FA ([aa_totp_server()]), после верного пароля вводит код из
-#' приложения-аутентификатора или резервный код. До этого токен автовхода не
-#' выдаётся, а успешная попытка входа не записывается: неверные коды считаются
-#' неудачными попытками входа, и логин блокируется по тем же правилам, что и при
-#' переборе пароля. Вход по cookie автовхода второй фактор не спрашивает (cookie
-#' выдан после его прохождения). Модуль сообщает события `totp_failed` и
+#' @section Two-factor authentication:
+#' With `totp_enabled = TRUE` in the settings ([aa_settings()]), a user who has
+#' 2FA enabled ([aa_totp_server()]) enters, after the correct password, a code from the
+#' authenticator app or a recovery code. Until then no auto-login token is
+#' issued and the successful login attempt is not recorded: wrong codes count as
+#' failed login attempts, and the login is locked by the same rules as for
+#' password guessing. Auto-login by cookie does not ask for the second factor (the cookie
+#' was issued after it was passed). The module reports the events `totp_failed` and
 #' `recovery_code_used`.
 #'
-#' @section Восстановление пароля по email:
-#' При `reset_enabled = TRUE` в настройках ([aa_settings()]) на форме входа
-#' появляется ссылка «Забыли пароль?». Пользователь вводит логин или email, ему
-#' уходит письмо со ссылкой `<reset_base_url>/?reset=<токен>`, а ответ на экране
-#' всегда один и тот же, независимо от того, найден ли пользователь. Модуль сам
-#' читает параметр `reset` из адресной строки, убирает его из адреса и показывает
-#' форму нового пароля, если ссылка рабочая. После смены пароля пользователь входит
-#' как обычно: автоматически его не пускают. Модуль сообщает события
-#' `password_reset_requested`, `password_reset_done` и `password_reset_failed`.
-#' Логика без интерфейса: [aa_request_password_reset()] и
+#' @section Password recovery by email:
+#' With `reset_enabled = TRUE` in the settings ([aa_settings()]), a "Forgot password?"
+#' link appears on the sign-in form. The user enters a login or email and is
+#' sent an email with a link `<reset_base_url>/?reset=<token>`, and the on-screen answer is
+#' always the same, whether or not the user was found. The module itself
+#' reads the `reset` parameter from the address bar, removes it from the address and shows
+#' the new password form if the link works. After the password is changed the user signs in
+#' as usual: they are not signed in automatically. The module reports the events
+#' `password_reset_requested`, `password_reset_done` and `password_reset_failed`.
+#' Logic without UI: [aa_request_password_reset()] and
 #' [aa_reset_password_with_token()].
 #'
-#' @section Вход через Google:
-#' При `google_enabled = TRUE` в настройках ([aa_settings()]) на форме входа появляется
-#' кнопка «Войти через Google». Пользователь подтверждает вход у Google и возвращается
-#' на `google_redirect_uri`; пакет проверяет подпись и содержимое токена Google, домен
-#' организации (`google_domains`) и находит пользователя **по email среди уже созданных**:
-#' новых пользователей вход не создаёт, роль берётся из базы, заблокированный
-#' пользователь не входит. Двухфакторный код приложения при этом не спрашивается
-#' (подтверждение делает Google). `state` из адреса сверяется с коротким cookie
-#' браузера, начавшего вход, поэтому чужую ссылку возврата подсунуть нельзя. При
-#' `password_login = FALSE` форма пароля скрыта, а попытки входа по паролю отклоняются
-#' на сервере. Модуль сообщает `login_success` со значением `google` и
-#' `google_login_failed` (причина и email в `value`); пользователю при отказе
-#' показывается общий текст. Если страница открыта не на адресе
-#' `google_redirect_uri` (например, приложение открыто по IP, а возврат настроен на
-#' домен), кнопка переводит пользователя на адрес возврата, и вход начинается там сам
-#' (параметр `?google=1`): `state` лежит в cookie адреса сайта, а cookie по IP и по домену
-#' разные. Вход по паролю и автовход по cookie на каждом адресе работают независимо.
+#' @section Sign-in with Google:
+#' With `google_enabled = TRUE` in the settings ([aa_settings()]), a "Sign in with Google"
+#' button appears on the sign-in form. The user confirms the sign-in with Google and returns
+#' to `google_redirect_uri`; the package checks the signature and contents of the Google token, the organization
+#' domain (`google_domains`) and finds the user **by email among already created ones**:
+#' sign-in does not create new users, the role is taken from the database, a blocked
+#' user does not get in. The two-factor code is not asked for in this case
+#' (Google does the confirmation). `state` from the address is compared with a short cookie
+#' of the browser that started the sign-in, so someone else's return link cannot be slipped in. With
+#' `password_login = FALSE` the password form is hidden and password sign-in attempts are rejected
+#' on the server. The module reports `login_success` with the value `google` and
+#' `google_login_failed` (reason and email in `value`); on refusal the user
+#' sees a generic text. If the page is opened not at the
+#' `google_redirect_uri` address (for example, the app is opened by IP while the return is configured for a
+#' domain), the button sends the user to the return address and sign-in starts there on its own
+#' (parameter `?google=1`): `state` is stored in the cookie of the site address, and cookies for an IP and for a domain
+#' are different. Password sign-in and cookie auto-login work independently at each address.
 #'
-#' Роль и логин берутся из базы, а не из введённой строки. Подключение `conn`
-#' принадлежит приложению: закрывайте его при завершении сессии.
+#' The role and login are taken from the database, not from the entered string. The `conn`
+#' connection belongs to the app: close it when the session ends.
 #'
-#' @param id Идентификатор модуля, такой же, как в [aa_auth_ui()].
-#' @param conn Подключение к базе данных со схемой [aa_init_db()].
-#' @param settings Настройки, результат [aa_settings()].
-#' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
-#' @param title Заголовок формы входа. По умолчанию текст `login_title`.
-#' @param logo Адрес картинки над заголовком (например `"logo.png"` из папки
-#'   `www`) или `NULL`.
-#' @param cookie_name Имя cookie автовхода. Cookie не изолируются по порту,
-#'   поэтому приложениям на одном хосте нужны разные имена.
+#' @param id Module id, the same as in [aa_auth_ui()].
+#' @param conn Database connection with the [aa_init_db()] schema.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param title Sign-in form title. Defaults to the `login_title` text.
+#' @param logo Address of an image above the title (for example `"logo.png"` from the
+#'   `www` folder) or `NULL`.
+#' @param cookie_name Auto-login cookie name. Cookies are not isolated by port,
+#'   so apps on the same host need different names.
 #'
-#' @returns Список: `user` (реактивное значение, список `login` и `role` либо
-#'   `NULL`), `logged_in` (реактивное логическое), `role` (реактивная роль либо
-#'   `NULL`), функция `token()` (токен автовхода этой сессии или `NULL`, нужен
-#'   [aa_session_guard()]), функция `logout(reason = NULL, reload = FALSE)` и
-#'   функция `logout_all(reload = TRUE)`. Без `reason`
-#'   это обычный выход (событие `logout`), с `reason` (`"blocked"`, `"deleted"`,
-#'   `"role_changed"`, `"token_revoked"`) принудительный (`session_forced_logout`). При
-#'   `reload = TRUE` страница перезагружается, чтобы модули прежнего пользователя
-#'   исчезли.
+#' @returns A list: `user` (reactive value, a list with `login` and `role` or
+#'   `NULL`), `logged_in` (reactive logical), `role` (reactive role or
+#'   `NULL`), a `token()` function (the auto-login token of this session or `NULL`, needed by
+#'   [aa_session_guard()]), a `logout(reason = NULL, reload = FALSE)` function and
+#'   a `logout_all(reload = TRUE)` function. Without `reason`
+#'   this is an ordinary sign-out (event `logout`); with `reason` (`"blocked"`, `"deleted"`,
+#'   `"role_changed"`, `"token_revoked"`) it is forced (`session_forced_logout`). With
+#'   `reload = TRUE` the page is reloaded so that the modules of the previous user
+#'   disappear.
 #'
-#'   `logout_all()` это «выйти на всех устройствах»: отзывает все токены
-#'   пользователя (событие `sessions_revoked`) и сразу выходит; открытые сессии на
-#'   других устройствах закроет [aa_session_guard()] при ближайшей проверке. Перед
-#'   вызовом покажите пользователю окно подтверждения: кнопка выбросит его везде.
+#'   `logout_all()` is "sign out on all devices": it revokes all tokens of the
+#'   user (event `sessions_revoked`) and signs out immediately; open sessions on
+#'   other devices are closed by [aa_session_guard()] at the next check. Show the user a
+#'   confirmation dialog before calling it: the button kicks them out everywhere.
 #' @seealso [aa_auth_ui()]
 #' @export
 #'
@@ -116,18 +116,18 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     user <- shiny::reactiveVal(NULL)
     message_text <- shiny::reactiveVal("")
     current_token <- NULL
-    # вошёл с паролем, который задал администратор: пока не сменит, в приложение не пускаем
+    # signed in with a password set by an administrator: not let into the app until it is changed
     pending <- shiny::reactiveVal(NULL)
-    # пароль верен, ждём код второго фактора: list(login, role, must_change, old)
+    # the password is correct, waiting for the second factor code: list(login, role, must_change, old)
     second_factor <- shiny::reactiveVal(NULL)
-    # какая форма показана до входа: "login" или "forgot" (запрос ссылки)
+    # which form is shown before sign-in: "login" or "forgot" (link request)
     mode <- shiny::reactiveVal("login")
-    # токен из ссылки восстановления, по которому показана форма нового пароля
+    # token from the recovery link for which the new password form is shown
     reset_pending <- shiny::reactiveVal(NULL)
-    # параметры возврата от Google (code, state), пока ждём cookie браузера для сверки
+    # Google return parameters (code, state) while waiting for the browser cookie to compare
     google_callback <- shiny::reactiveVal(NULL)
     google_on <- isTRUE(settings$google_enabled)
-    # настройки собраны aa_settings(), но на всякий случай отсутствие поля не отключает пароль
+    # settings are built by aa_settings(), but just in case a missing field does not disable the password
     password_on <- !identical(settings$password_login, FALSE)
     oauth_cookie <- paste0(cookie_name, "_oauth")
 
@@ -139,7 +139,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       aa_emit(on_event, event, login, session$token, value)
     }
 
-    # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+    # with password_policy = "warn" a weak password is accepted, but we report it
     warn_weak <- function(password, login) {
       weak <- aa_password_warning(password, settings, login)
 
@@ -154,14 +154,14 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       user(list(login = login, role = role))
 
       if (issue_token) {
-        # вход по паролю (в том числе после обязательной смены пароля и создания
-        # первого администратора); вход по cookie дату не обновляет
+        # password sign-in (including after a mandatory password change and creation of the
+        # first administrator); cookie sign-in does not update the date
         aa_touch_last_login(conn, login)
 
         token <- tryCatch(
           aa_issue_token(conn, login, settings),
           error = function(e) {
-            message("appauth: не удалось выдать токен автовхода: ", conditionMessage(e))
+            message("appauth: could not issue an auto-login token: ", conditionMessage(e))
             NULL
           }
         )
@@ -176,7 +176,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       }
     }
 
-    # ссылка восстановления пароля из письма: ?reset=<токен>
+    # password recovery link from the email: ?reset=<token>
     if (isTRUE(settings$reset_enabled) && password_on) {
       shiny::observeEvent(aa_url_search(session), {
         token <- shiny::parseQueryString(aa_url_search(session))[["reset"]]
@@ -185,7 +185,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           return()
         }
 
-        # токен не должен оставаться в адресе: он попадёт в историю и закладки
+        # the token must not stay in the address: it would end up in history and bookmarks
         shiny::updateQueryString("?", mode = "replace", session = session)
 
         login <- tryCatch(aa_reset_token_login(conn, token), error = function(e) NULL)
@@ -200,7 +200,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       }, once = TRUE)
     }
 
-    # автовход по cookie
+    # auto-login by cookie
     if (isTRUE(settings$autologin)) {
       session$onFlushed(function() {
         session$sendCustomMessage(
@@ -217,7 +217,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         found <- tryCatch(aa_find_session_user(conn, input$cookie), error = function(e) NULL)
 
         if (is.null(found)) {
-          # токен устарел, отозван или принадлежит заблокированному: убираем cookie
+          # the token is expired, revoked or belongs to a blocked user: remove the cookie
           session$sendCustomMessage("appauth_clear_cookie", list(name = cookie_name))
           return()
         }
@@ -228,14 +228,14 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       })
     }
 
-    # вход через Google ------------------------------------------------------------
+    # sign-in with Google ------------------------------------------------------------
     google_fail <- function(reason, email = NULL) {
       message_text(aa_text(settings, aa_google_text_key(reason)))
       emit("google_login_failed", NULL, paste(c(reason, if (aa_is_string(email)) email), collapse = " "))
     }
 
     if (google_on) {
-      # запоминаем state в cookie этого браузера и отправляем его к Google
+      # remember state in this browser's cookie and send it to Google
       start_google <- function() {
         if (!is.null(shiny::isolate(user()))) {
           return()
@@ -244,7 +244,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         started <- tryCatch(
           aa_google_start(conn, settings),
           error = function(e) {
-            message("appauth: не удалось начать вход через Google: ", conditionMessage(e))
+            message("appauth: could not start sign-in with Google: ", conditionMessage(e))
             NULL
           }
         )
@@ -262,9 +262,9 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         aa_redirect(session, started$url, "https://accounts.google.com")
       }
 
-      # кнопка. state лежит в cookie адреса, с которого открыта страница, а Google вернёт
-      # пользователя на google_redirect_uri: со страницы на другом адресе (например, по IP) вход
-      # нужно начинать на адресе возврата, туда кнопка и переводит (вход стартует там сам)
+      # the button. state is stored in the cookie of the address the page is opened from, and Google returns
+      # the user to google_redirect_uri: from a page at another address (for example, by IP) sign-in
+      # must be started at the return address, and the button sends the user there (sign-in starts there on its own)
       shiny::observeEvent(input$google_btn, {
         if (!is.null(shiny::isolate(user()))) {
           return()
@@ -282,14 +282,14 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         start_google()
       })
 
-      # возврат от Google: ?code=...&state=... (или ?error=... при отказе пользователя)
+      # return from Google: ?code=...&state=... (or ?error=... if the user refused)
       shiny::observeEvent(aa_url_search(session), {
         query <- shiny::parseQueryString(aa_url_search(session))
         code <- query[["code"]]
         state <- query[["state"]]
 
-        # переход с кнопки на другом адресе (по IP): начинаем вход сразу, без второго клика.
-        # Здесь адрес не сверяется, иначе при неверном определении адреса был бы бесконечный переход
+      # redirect from the button at another address (by IP): start sign-in at once, without a second click.
+      # The address is not compared here, otherwise a wrong address detection would cause an endless redirect
         if (identical(query[["google"]], "1") && !aa_is_string(code) && !aa_is_string(state) &&
             is.null(shiny::isolate(user()))) {
           shiny::updateQueryString("?", mode = "replace", session = session)
@@ -302,7 +302,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           return()
         }
 
-        # код и state не должны оставаться в адресной строке
+        # code and state must not stay in the address bar
         shiny::updateQueryString("?", mode = "replace", session = session)
 
         if (!aa_is_string(code)) {
@@ -314,8 +314,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         session$sendCustomMessage("appauth_read_cookie", list(name = oauth_cookie, input = session$ns("oauth_cookie")))
       }, once = TRUE)
 
-      # cookie браузера должен совпасть со state из адреса: так вход заканчивается
-      # только в том браузере, который его начал
+      # the browser cookie must match state from the address: this way sign-in finishes
+      # only in the browser that started it
       shiny::observeEvent(input$oauth_cookie, {
         callback <- shiny::isolate(google_callback())
         shiny::req(callback)
@@ -369,9 +369,9 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       invisible(TRUE)
     }
 
-    # выход на всех устройствах: отзываются все токены пользователя (остальные
-    # сессии закроет сторож aa_session_guard() при ближайшей проверке) и сразу
-    # выходит текущая сессия
+    # sign out on all devices: all tokens of the user are revoked (the other
+    # sessions are closed by the aa_session_guard() guard at the next check) and the
+    # current session signs out at once
     logout_all <- function(reload = TRUE) {
       login <- shiny::isolate(user())$login
 
@@ -486,7 +486,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       login <- input$login
       password <- input$password
 
-      # защита на сервере: скрытая форма не заменяет проверку
+      # server-side protection: a hidden form is not a substitute for a check
       if (!password_on) {
         message_text(aa_text(settings, "password_login_disabled"))
         emit("login_failed", NULL, "password_disabled")
@@ -498,8 +498,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         return()
       }
 
-      # заблокированный логин и общий лимит: пароль не проверяем и попытку не
-      # записываем, чтобы блокировка не продлевалась
+      # blocked login and the general limit: the password is not checked and the attempt is not
+      # recorded, so that the block is not extended
       gate <- aa_login_gate(conn, login, settings)
       if (!gate$allowed) {
         message_text(gate$message)
@@ -510,16 +510,16 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       res <- aa_authenticate(conn, login, password)
 
       if (!is.null(res) && isTRUE(res$blocked[1] == 1)) {
-        # пароль верный, но учётная запись заблокирована: об этом сообщаем только
-        # тому, кто знает пароль, чтобы не раскрывать список логинов
+        # the password is correct but the account is blocked: this is reported only
+        # to someone who knows the password, so as not to reveal the list of logins
         message_text(aa_text(settings, "blocked_user"))
         emit("login_blocked_user", login)
         return()
       }
 
       if (!is.null(res) && isTRUE(settings$totp_enabled) && aa_totp_enabled(conn, res$login[1])) {
-        # пароль верен, но нужен код: успешную попытку не записываем (она обнулила бы
-        # счётчик неудач, и код можно было бы подбирать бесконечно), токен не выдаём
+        # the password is correct but a code is needed: the successful attempt is not recorded (it would reset
+        # the failure counter and the code could be guessed endlessly), no token is issued
         message_text("")
         second_factor(list(
           login = res$login[1], role = res$role[1],
@@ -532,7 +532,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         try(aa_record_attempt(conn, login, success = TRUE, settings = settings), silent = TRUE)
 
         if (isTRUE(res$must_change[1] == 1)) {
-          # пароль верный, но его задал администратор: сначала смена пароля
+          # the password is correct but it was set by an administrator: password change first
           message_text("")
           pending(list(login = res$login[1], role = res$role[1], old = password))
           return()
@@ -545,7 +545,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
       try(aa_record_attempt(conn, login, success = FALSE, settings = settings), silent = TRUE)
 
-      # эта попытка могла привести к блокировке
+      # this attempt could have led to a block
       gate <- aa_login_gate(conn, login, settings)
       if (!gate$allowed && gate$reason == "locked") {
         message_text(gate$message)
@@ -604,12 +604,12 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       res <- tryCatch(
         aa_request_password_reset(conn, input$forgot_identifier, settings),
         error = function(e) {
-          message("appauth: не удалось обработать запрос восстановления пароля: ", conditionMessage(e))
+          message("appauth: could not process the password recovery request: ", conditionMessage(e))
           list(reason = "error", login = NA_character_)
         }
       )
 
-      # в журнал уходит причина, пользователю ответ всегда один и тот же
+      # the journal gets the reason, the user always gets the same answer
       emit("password_reset_requested", if (is.na(res$login)) NULL else res$login, res$reason)
       message_text(aa_text(settings, "forgot_done", as.integer(round(settings$reset_ttl_minutes))))
     })
@@ -628,7 +628,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         appauth_error_user = function(e) {
           message_text(conditionMessage(e))
 
-          # ссылка больше не работает: слабый пароль токен не тратит, остальное да
+          # the link no longer works: a weak password does not spend the token, anything else does
           if (identical(e$reason, "reset_link_invalid")) {
             reset_pending(NULL)
             mode("login")
@@ -663,7 +663,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       checked <- tryCatch(
         aa_verify_second_factor(conn, waiting$login, input$totp_code, settings),
         error = function(e) {
-          message("appauth: не удалось проверить второй фактор: ", conditionMessage(e))
+          message("appauth: could not verify the second factor: ", conditionMessage(e))
           list(ok = FALSE, method = NA_character_)
         }
       )
@@ -674,7 +674,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
         gate <- aa_login_gate(conn, waiting$login, settings)
         if (!gate$allowed && gate$reason == "locked") {
-          # блокировка: начинать нужно с пароля (когда она закончится)
+          # block: the user has to start over with the password (when it ends)
           second_factor(NULL)
           message_text(gate$message)
           emit("login_locked", waiting$login, gate$seconds)
@@ -701,7 +701,7 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     })
 
     shiny::observeEvent(input$setup_btn, {
-      # пользователя могли создать в другой вкладке или сессии
+      # the user could have been created in another tab or session
       if (tryCatch(aa_users_exist(conn), error = function(e) FALSE)) {
         users_exist(TRUE)
         return()
@@ -747,9 +747,9 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
   })
 }
 
-#' Значок Google для кнопки входа
+#' Google icon for the sign-in button
 #'
-#' @returns Элемент интерфейса Shiny (встроенный SVG).
+#' @returns A Shiny UI element (inline SVG).
 #' @noRd
 aa_google_icon <- function() {
   shiny::HTML(paste0(
@@ -762,14 +762,14 @@ aa_google_icon <- function() {
   ))
 }
 
-#' Строка параметров адреса страницы
+#' Page address parameters string
 #'
-#' Вынесено в функцию, чтобы тесты могли подменить адрес: у mock-сессии Shiny
-#' адресная строка не настраивается.
+#' Wrapped in a function so that tests can substitute the address: the mock Shiny
+#' session does not have a configurable address bar.
 #'
-#' @param session Сессия модуля.
+#' @param session Module session.
 #'
-#' @returns Строка вида `"?reset=abc"` (может быть пустой).
+#' @returns A string like `"?reset=abc"` (may be empty).
 #' @noRd
 aa_url_search <- function(session) {
   session$clientData$url_search

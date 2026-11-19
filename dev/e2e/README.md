@@ -1,11 +1,11 @@
-# Проверка модулей в настоящем браузере
+# Checking the modules in a real browser
 
-Разовая проверка перед релизом пакета (модули `aa_auth_*`, `aa_users_*`, стили, cookie).
+A one-off check before a package release (the `aa_auth_*` and `aa_users_*` modules, styles, cookies).
 
-* `prepare_db.R` - временная база `%TEMP%\aa_e2e\e2e.db` с тестовыми пользователями;
-* `app.R` - маленькое приложение с модулями входа и пользователей;
-* `e2e.py` - сценарии Playwright (Chrome на сервере, Python), скриншоты в `%TEMP%\aa_e2e\shots`;
-* `run_e2e.ps1` - запускает всё вместе: останавливает прежнее приложение, готовит базу, поднимает приложение на порту 8765 и прогоняет сценарии.
+* `prepare_db.R` - a temporary database `%TEMP%\aa_e2e\e2e.db` with test users;
+* `app.R` - a small application with the login and users modules;
+* `e2e.py` - Playwright scenarios (Chrome, Python), screenshots in `%TEMP%\aa_e2e\shots`;
+* `run_e2e.ps1` - runs everything together: stops the previous app, prepares the database, starts the app on port 8765 and runs the scenarios.
 
-Скопируйте папку в `%TEMP%\aa_e2e` (приложение в подпапку `app`) и запустите `run_e2e.ps1`.
-После проверки остановите процесс приложения и удалите папку.
+Copy the folder to `%TEMP%\aa_e2e` (the app into the `app` subfolder), set the `AA_PKG` environment variable to the package source folder and run `run_e2e.ps1`.
+After the check, stop the app process and delete the folder.

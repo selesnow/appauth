@@ -2,28 +2,29 @@
 % Please edit documentation in R/sessions.R
 \name{aa_issue_token}
 \alias{aa_issue_token}
-\title{Выдать токен автовхода}
+\title{Issue an autologin token}
 \usage{
 aa_issue_token(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{login}{Логин пользователя.}
+\item{login}{User login.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Строка с токеном или \code{NULL}.
+A string with the token or \code{NULL}.
 }
 \description{
-Создаёт случайный токен (32 байта), записывает в базу его хеш и срок действия
-(\code{session_days} из \code{\link[=aa_settings]{aa_settings()}}). Сам токен нужно передать браузеру
-(в cookie), в базе его восстановить нельзя.
+Creates a random token (32 bytes) and stores its hash and expiry
+(\code{session_days} from \code{\link[=aa_settings]{aa_settings()}}) in the database. The token itself must
+be handed to the browser (in a cookie); it cannot be recovered from the
+database.
 }
 \details{
-Токен не выдаётся (возвращается \code{NULL}), если автовход выключен в настройках,
-пользователя нет или он заблокирован.
+No token is issued (\code{NULL} is returned) if autologin is disabled in the
+settings, the user does not exist or the user is blocked.
 }
 \examples{
 \dontrun{

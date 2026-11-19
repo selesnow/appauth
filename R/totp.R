@@ -1,24 +1,24 @@
-# Двухфакторная аутентификация: одноразовые коды TOTP (RFC 6238) и резервные коды.
+# Two-factor authentication: one-time TOTP codes (RFC 6238) and recovery codes.
 #
-# Правила, которые держат эти функции:
-#  - секрет хранится в базе только в зашифрованном виде (sodium, ключ из настройки
-#    `totp_key`), поэтому одной базы для получения кодов недостаточно;
-#  - пока пользователь не подтвердил код из приложения, 2FA не включена
-#    (`totp_enabled = 0`), а ожидающий секрет можно заменить;
-#  - один и тот же код (шаг времени) принимается один раз: `totp_last_step`
-#    защищает от повторного использования подсмотренного кода;
-#  - резервные коды одноразовые, в базе только sha256;
-#  - подбор кодов ограничивает общая защита входа: неверный код записывается как
-#    неудачная попытка входа (aa_record_attempt), а перед проверкой кода вызывается
-#    aa_login_gate().
+# Rules these functions uphold:
+#  - the secret is stored in the database only in encrypted form (sodium, key from the
+#    `totp_key` setting), so the database alone is not enough to get codes;
+#  - until the user confirms a code from the app, 2FA is not enabled
+#    (`totp_enabled = 0`), and a pending secret can be replaced;
+#  - the same code (time step) is accepted once: `totp_last_step`
+#    protects against reuse of a code that was spied on;
+#  - recovery codes are one-time, only sha256 is stored in the database;
+#  - guessing codes is limited by the general login protection: a wrong code is recorded as a
+#    failed login attempt (aa_record_attempt), and aa_login_gate() is called
+#    before the code is checked.
 
 aa_base32_alphabet <- "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
-#' Кодирование в base32 (RFC 4648, без заполнения)
+#' Base32 encoding (RFC 4648, without padding)
 #'
-#' @param x Вектор `raw`.
+#' @param x A `raw` vector.
 #'
-#' @returns Строка из символов `A-Z2-7`.
+#' @returns A string of `A-Z2-7` characters.
 #' @noRd
 aa_base32_encode <- function(x) {
   if (length(x) == 0) {
@@ -34,11 +34,11 @@ aa_base32_encode <- function(x) {
   paste(strsplit(aa_base32_alphabet, "")[[1]][idx], collapse = "")
 }
 
-#' Декодирование base32
+#' Base32 decoding
 #'
-#' @param x Строка base32 (регистр и пробелы не важны, заполнение `=` игнорируется).
+#' @param x A base32 string (case and spaces do not matter, `=` padding is ignored).
 #'
-#' @returns Вектор `raw` или `NULL`, если в строке есть недопустимые символы.
+#' @returns A `raw` vector or `NULL` if the string has invalid characters.
 #' @noRd
 aa_base32_decode <- function(x) {
   if (!aa_is_string(x)) {
@@ -63,10 +63,10 @@ aa_base32_decode <- function(x) {
   as.raw(as.vector(bytes))
 }
 
-#' Случайный секрет для приложения-аутентификатора
+#' Random secret for an authenticator app
 #'
-#' @returns Строка base32 из 32 символов (160 бит), так её вводят в приложение
-#'   вручную.
+#' @returns A base32 string of 32 characters (160 bits), the way it is entered into the app
+#'   manually.
 #' @export
 #'
 #' @examples
@@ -75,17 +75,17 @@ aa_totp_secret <- function() {
   aa_base32_encode(openssl::rand_bytes(20))
 }
 
-#' Одноразовый код TOTP для момента времени
+#' One-time TOTP code for a point in time
 #'
-#' Алгоритм RFC 6238 (HMAC-SHA1, шаг 30 секунд). Нужна в тестах и для сверки с
-#' приложением-аутентификатором.
+#' The RFC 6238 algorithm (HMAC-SHA1, 30-second step). Needed in tests and for comparing with
+#' an authenticator app.
 #'
-#' @param secret Секрет в base32.
-#' @param time Момент времени (по умолчанию сейчас).
-#' @param digits Число цифр кода.
-#' @param period Длина шага, секунд.
+#' @param secret Secret in base32.
+#' @param time Point in time (now by default).
+#' @param digits Number of digits in the code.
+#' @param period Step length, seconds.
 #'
-#' @returns Строка из `digits` цифр или `NA`, если секрет некорректен.
+#' @returns A string of `digits` digits or `NA` if the secret is invalid.
 #' @export
 #'
 #' @examples
@@ -100,16 +100,16 @@ aa_totp_code <- function(secret, time = Sys.time(), digits = 6, period = 30) {
   aa_hotp(key, floor(as.numeric(time) / period), digits)
 }
 
-#' Код HOTP по счётчику (RFC 4226)
+#' HOTP code by counter (RFC 4226)
 #'
-#' @param key Ключ (`raw`).
-#' @param counter Счётчик (целое, шаг времени).
-#' @param digits Число цифр.
+#' @param key Key (`raw`).
+#' @param counter Counter (integer, time step).
+#' @param digits Number of digits.
 #'
-#' @returns Строка из `digits` цифр.
+#' @returns A string of `digits` digits.
 #' @noRd
 aa_hotp <- function(key, counter, digits = 6) {
-  # счётчик 8 байт в порядке от старшего: старшие 4 байта нулевые до 2106 года
+  # an 8-byte counter, most significant byte first: the upper 4 bytes are zero until the year 2106
   msg <- c(raw(4), writeBin(as.integer(counter), raw(), size = 4, endian = "big"))
   hash <- as.integer(as.raw(openssl::sha1(msg, key = key)))
   offset <- bitwAnd(hash[20], 15L) + 1L
@@ -121,15 +121,15 @@ aa_hotp <- function(key, counter, digits = 6) {
   formatC(bin %% (10 ^ digits), width = digits, format = "d", flag = "0")
 }
 
-#' Ссылка otpauth для приложения-аутентификатора
+#' otpauth link for an authenticator app
 #'
-#' Из этой ссылки строится QR-код, её же понимают приложения при ручном вводе.
+#' The QR code is built from this link, and apps also understand it on manual entry.
 #'
-#' @param secret Секрет в base32.
-#' @param login Логин пользователя.
-#' @param issuer Название сервиса, которое покажет приложение.
+#' @param secret Secret in base32.
+#' @param login User login.
+#' @param issuer Service name the app will show.
 #'
-#' @returns Строка вида `otpauth://totp/...`.
+#' @returns A string like `otpauth://totp/...`.
 #' @export
 #'
 #' @examples
@@ -143,16 +143,16 @@ aa_totp_uri <- function(secret, login, issuer = "appauth") {
   )
 }
 
-#' Ключ шифрования секретов из настроек
+#' Secret encryption key from the settings
 #'
-#' @param settings Настройки, результат [aa_settings()].
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Ключ (`raw`, 32 байта).
+#' @returns A key (`raw`, 32 bytes).
 #' @noRd
 aa_totp_key <- function(settings) {
   if (!aa_is_string(settings$totp_key)) {
     rlang::abort(
-      "Для двухфакторной аутентификации нужен ключ шифрования `totp_key` в настройках.",
+      "Two-factor authentication needs the encryption key `totp_key` in the settings.",
       class = "appauth_error_settings"
     )
   }
@@ -160,12 +160,12 @@ aa_totp_key <- function(settings) {
   sodium::hash(charToRaw(settings$totp_key), size = 32)
 }
 
-#' Зашифровать секрет для хранения в базе
+#' Encrypt a secret for storing in the database
 #'
-#' @param secret Секрет base32.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param secret Base32 secret.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Строка hex: одноразовое число (24 байта) и шифртекст.
+#' @returns A hex string: a nonce (24 bytes) and the ciphertext.
 #' @noRd
 aa_totp_seal <- function(secret, settings) {
   nonce <- sodium::random(24)
@@ -174,13 +174,13 @@ aa_totp_seal <- function(secret, settings) {
   sodium::bin2hex(c(nonce, cipher))
 }
 
-#' Расшифровать секрет из базы
+#' Decrypt a secret from the database
 #'
-#' @param sealed Строка из [aa_totp_seal()].
-#' @param settings Настройки, результат [aa_settings()].
+#' @param sealed A string from [aa_totp_seal()].
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Секрет base32 или `NA`, если расшифровать не удалось (другой ключ,
-#'   повреждённые данные).
+#' @returns A base32 secret or `NA` if decryption failed (another key,
+#'   corrupted data).
 #' @noRd
 aa_totp_unseal <- function(sealed, settings) {
   if (!aa_is_string(sealed)) {
@@ -197,13 +197,13 @@ aa_totp_unseal <- function(sealed, settings) {
   )
 }
 
-#' Данные 2FA пользователя из базы
+#' User 2FA data from the database
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин.
+#' @param conn Database connection.
+#' @param login Login.
 #'
-#' @returns Таблица из одной строки (`totp_secret`, `totp_enabled`,
-#'   `totp_last_step`) или `NULL`, если пользователя нет или схема не достроена.
+#' @returns A one-row table (`totp_secret`, `totp_enabled`,
+#'   `totp_last_step`) or `NULL` if the user does not exist or the schema is not upgraded.
 #' @noRd
 aa_totp_row <- function(conn, login) {
   if (!aa_is_string(login)) {
@@ -222,12 +222,12 @@ aa_totp_row <- function(conn, login) {
   if (is.null(row) || nrow(row) != 1) NULL else row
 }
 
-#' Включена ли двухфакторная аутентификация у пользователя
+#' Whether two-factor authentication is enabled for a user
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns `TRUE` или `FALSE` (`FALSE` и для несуществующего пользователя, и
-#'   если схема не достроена до версии 8).
+#' @returns `TRUE` or `FALSE` (`FALSE` both for a nonexistent user and
+#'   if the schema is not upgraded to version 8).
 #' @export
 #'
 #' @examples
@@ -246,18 +246,18 @@ aa_totp_enabled <- function(conn, login) {
   !is.null(row) && isTRUE(as.logical(row$totp_enabled[1]))
 }
 
-#' Начать подключение двухфакторной аутентификации
+#' Start setting up two-factor authentication
 #'
-#' Создаёт новый секрет и сохраняет его в базе в зашифрованном виде, но **не
-#' включает** 2FA: она включится только после [aa_totp_enable()] с верным кодом
-#' из приложения. Повторный вызов заменяет ожидающий секрет. Если 2FA уже
-#' включена, ошибка класса `appauth_error_user`.
+#' Creates a new secret and stores it in the database in encrypted form, but **does not
+#' enable** 2FA: it is enabled only after [aa_totp_enable()] with a correct code
+#' from the app. A repeated call replaces the pending secret. If 2FA is already
+#' enabled, an error of class `appauth_error_user` is raised.
 #'
 #' @inheritParams aa_get_user
-#' @param settings Настройки, результат [aa_settings()] с `totp_enabled = TRUE`.
+#' @param settings Settings, the result of [aa_settings()] with `totp_enabled = TRUE`.
 #'
-#' @returns Список: `secret` (base32, для ручного ввода) и `uri` (ссылка
-#'   `otpauth://`, из неё строится QR-код).
+#' @returns A list: `secret` (base32, for manual entry) and `uri` (an
+#'   `otpauth://` link, the QR code is built from it).
 #' @export
 #'
 #' @examples
@@ -294,15 +294,15 @@ aa_totp_setup <- function(conn, login, settings = aa_settings()) {
   list(secret = secret, uri = aa_totp_uri(secret, login, settings$totp_issuer))
 }
 
-#' Проверить код TOTP и запомнить шаг
+#' Check a TOTP code and remember the step
 #'
-#' @param secret Секрет base32.
-#' @param code Введённый код.
-#' @param last_step Последний принятый шаг времени.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param time Момент времени.
+#' @param secret Base32 secret.
+#' @param code Entered code.
+#' @param last_step Last accepted time step.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param time Point in time.
 #'
-#' @returns Принятый шаг времени или `NA`, если код неверен или уже использован.
+#' @returns The accepted time step or `NA` if the code is wrong or already used.
 #' @noRd
 aa_totp_match_step <- function(secret, code, last_step, settings, time = Sys.time()) {
   code <- gsub("[[:space:]]", "", as.character(code))
@@ -319,7 +319,7 @@ aa_totp_match_step <- function(secret, code, last_step, settings, time = Sys.tim
   }
 
   steps <- seq(now_step - settings$totp_window, now_step + settings$totp_window)
-  # сравнение без раннего выхода: время проверки не зависит от того, какой шаг подошёл
+  # comparison without early exit: the check time does not depend on which step matched
   matched <- vapply(steps, function(s) identical(aa_hotp(key, s, 6), code), logical(1))
   last_step <- if (is.na(last_step)) 0 else as.numeric(last_step)
   steps <- steps[matched & steps > last_step]
@@ -327,11 +327,11 @@ aa_totp_match_step <- function(secret, code, last_step, settings, time = Sys.tim
   if (length(steps) == 0) NA_real_ else max(steps)
 }
 
-#' Хеш резервного кода
+#' Recovery code hash
 #'
-#' @param code Код в любом регистре, с пробелами или дефисами.
+#' @param code Code in any case, with spaces or hyphens.
 #'
-#' @returns Строка sha256 или `NA`, если формат не подходит.
+#' @returns A sha256 string or `NA` if the format does not fit.
 #' @noRd
 aa_recovery_hash <- function(code) {
   code <- tolower(gsub("[[:space:]-]", "", as.character(code)))
@@ -343,13 +343,13 @@ aa_recovery_hash <- function(code) {
   aa_token_hash(code)
 }
 
-#' Создать набор резервных кодов
+#' Create a set of recovery codes
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин.
-#' @param n Сколько кодов.
+#' @param conn Database connection.
+#' @param login Login.
+#' @param n How many codes.
 #'
-#' @returns Вектор кодов вида `abcde-12345` (показываются один раз).
+#' @returns A vector of codes like `abcde-12345` (shown once).
 #' @noRd
 aa_new_recovery_codes <- function(conn, login, n = 10) {
   raw_codes <- vapply(seq_len(n), function(i) {
@@ -369,17 +369,17 @@ aa_new_recovery_codes <- function(conn, login, n = 10) {
   paste0(substr(raw_codes, 1, 5), "-", substr(raw_codes, 6, 10))
 }
 
-#' Включить двухфакторную аутентификацию
+#' Enable two-factor authentication
 #'
-#' Проверяет код из приложения для ожидающего секрета ([aa_totp_setup()]) и
-#' включает 2FA. Создаёт 10 резервных кодов: **они возвращаются один раз**, в базе
-#' остаются только хеши. Неверный код даёт ошибку класса `appauth_error_user`
+#' Checks the app code against the pending secret ([aa_totp_setup()]) and
+#' enables 2FA. Creates 10 recovery codes: **they are returned once**, only hashes
+#' stay in the database. A wrong code raises an error of class `appauth_error_user`
 #' (`reason = "totp_wrong"`).
 #'
 #' @inheritParams aa_totp_setup
-#' @param code Код из приложения-аутентификатора.
+#' @param code Code from the authenticator app.
 #'
-#' @returns Вектор резервных кодов (невидимо).
+#' @returns A vector of recovery codes (invisibly).
 #' @export
 #'
 #' @examples
@@ -425,16 +425,16 @@ aa_totp_enable <- function(conn, login, code, settings = aa_settings()) {
   invisible(codes)
 }
 
-#' Выключить двухфакторную аутентификацию
+#' Disable two-factor authentication
 #'
-#' Стирает секрет и резервные коды пользователя. Функция **ничего не проверяет**:
-#' модуль [aa_totp_server()] перед вызовом требует пароль и код, а сброс
-#' администратором ([aa_users_server()]) разрешён только администратору.
+#' Erases the user's secret and recovery codes. The function **checks nothing**:
+#' the [aa_totp_server()] module requires a password and a code before calling it, and reset
+#' by an administrator ([aa_users_server()]) is allowed only to an administrator.
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns `TRUE`, если у пользователя что-то было сброшено, иначе `FALSE`
-#'   (невидимо).
+#' @returns `TRUE` if something was reset for the user, otherwise `FALSE`
+#'   (invisibly).
 #' @export
 #'
 #' @examples
@@ -463,11 +463,11 @@ aa_totp_disable <- function(conn, login) {
   invisible(n > 0)
 }
 
-#' Сколько резервных кодов осталось
+#' How many recovery codes are left
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns Целое число неиспользованных резервных кодов.
+#' @returns An integer: the number of unused recovery codes.
 #' @export
 #'
 #' @examples
@@ -494,19 +494,19 @@ aa_recovery_codes_left <- function(conn, login) {
   ))
 }
 
-#' Проверить второй фактор при входе
+#' Verify the second factor at sign-in
 #'
-#' Принимает код из приложения (6 цифр) или резервный код. Код из приложения
-#' принимается один раз: повтор того же кода (шага времени) отклоняется. Резервный
-#' код одноразовый. Функция **не ограничивает число попыток сама**: перед ней
-#' вызывайте [aa_login_gate()], а после неверного кода [aa_record_attempt()], как
-#' делает модуль входа.
+#' Accepts a code from the app (6 digits) or a recovery code. An app code
+#' is accepted once: a repeat of the same code (time step) is rejected. A recovery
+#' code is one-time. The function **does not limit the number of attempts itself**: call
+#' [aa_login_gate()] before it and [aa_record_attempt()] after a wrong code, as
+#' the sign-in module does.
 #'
 #' @inheritParams aa_totp_setup
-#' @param code Введённый код.
+#' @param code Entered code.
 #'
-#' @returns Список: `ok` (`TRUE` или `FALSE`) и `method` (`"totp"`, `"recovery"`
-#'   или `NA`).
+#' @returns A list: `ok` (`TRUE` or `FALSE`) and `method` (`"totp"`, `"recovery"`
+#'   or `NA`).
 #' @export
 #'
 #' @examples
@@ -531,7 +531,7 @@ aa_verify_second_factor <- function(conn, login, code, settings = aa_settings())
   hash <- aa_recovery_hash(code)
 
   if (!is.na(hash)) {
-    # резервный код занимается атомарным запросом: из двух одновременных сработает один
+    # a recovery code is claimed with an atomic query: of two simultaneous ones only one works
     used <- aa_execute(
       conn,
       "UPDATE totp_recovery SET used = 1 WHERE user_login = ? AND code_hash = ? AND used = 0",
@@ -553,7 +553,7 @@ aa_verify_second_factor <- function(conn, login, code, settings = aa_settings())
     return(failed)
   }
 
-  # шаг запоминается атомарно: тот же код во втором запросе уже не пройдёт
+  # the step is remembered atomically: the same code in a second request will not pass
   claimed <- aa_execute(
     conn,
     "UPDATE users SET totp_last_step = ? WHERE login = ? AND totp_last_step < ?",

@@ -2,7 +2,7 @@
 % Please edit documentation in R/helpers.R
 \name{aa_session_connection}
 \alias{aa_session_connection}
-\title{Подключение к базе, которое закрывается вместе с сессией}
+\title{Database connection closed together with the session}
 \usage{
 aa_session_connection(
   db_path = NULL,
@@ -13,36 +13,39 @@ aa_session_connection(
 )
 }
 \arguments{
-\item{db_path}{Путь к файлу базы SQLite. Не нужен, если задан \code{connect}.}
+\item{db_path}{Path to the SQLite database file. Not needed if \code{connect} is
+set.}
 
-\item{session}{Сессия Shiny. По умолчанию текущая, поэтому функцию нужно
-вызывать внутри \code{server}.}
+\item{session}{Shiny session. The current one by default, so the function
+must be called inside \code{server}.}
 
-\item{prepare}{Подготовить схему базы (\code{\link[=aa_prepare_db]{aa_prepare_db()}}) сразу после
-подключения.}
+\item{prepare}{Prepare the database schema (\code{\link[=aa_prepare_db]{aa_prepare_db()}}) right after
+connecting.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}, нужны для \code{prepare}.}
+\item{settings}{Settings, a result of \code{\link[=aa_settings]{aa_settings()}}, needed for \code{prepare}.}
 
-\item{connect}{Функция без аргументов, возвращающая подключение к базе (SQLite,
-DuckDB, MySQL / MariaDB или PostgreSQL), либо \code{NULL} для файла SQLite.}
+\item{connect}{A function without arguments that returns a database
+connection (SQLite, DuckDB, MySQL / MariaDB or PostgreSQL), or \code{NULL} for
+a SQLite file.}
 }
 \value{
-Подключение к базе.
+A database connection.
 }
 \description{
-Открывает подключение к базе и сразу регистрирует его закрытие при завершении
-сессии Shiny. Без этого подключение остаётся открытым до остановки процесса R
-и держит файл базы (SQLite, DuckDB): на Windows такой файл нельзя переименовать
-или удалить, а у серверных баз (MySQL, PostgreSQL) остаются лишние соединения.
+Opens a database connection and immediately registers its closing when the
+Shiny session ends. Without this the connection stays open until the R
+process stops and holds the database file (SQLite, DuckDB): on Windows such a
+file cannot be renamed or deleted, and server databases (MySQL, PostgreSQL)
+are left with extra connections.
 }
 \details{
-По умолчанию открывается файл SQLite. Для другой базы передайте \code{connect}:
-функцию без аргументов, которая возвращает подключение DBI.
+By default a SQLite file is opened. For another database pass \code{connect}: a
+function without arguments that returns a DBI connection.
 }
 \examples{
 \dontrun{
 server <- function(input, output, session) {
-  # SQLite (по умолчанию)
+  # SQLite (default)
   conn <- aa_session_connection("app.db", prepare = TRUE)
 
   # MySQL / MariaDB

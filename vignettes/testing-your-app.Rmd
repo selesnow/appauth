@@ -1,8 +1,8 @@
 ---
-title: "Тестирование приложения с appauth"
+title: "Testing your app"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Тестирование приложения с appauth}
+  %\VignetteIndexEntry{Testing your app}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,13 +11,13 @@ vignette: >
 knitr::opts_chunk$set(eval = FALSE)
 ```
 
-Авторизацию нужно тестировать вместе с приложением: пакет проверен своими автотестами, но ошибки чаще возникают на стыке, например забытая проверка права в обработчике. Здесь собраны приёмы, которые мы используем в тестах самого пакета (`tests/testthat` в его исходниках) и которые подходят для тестов приложения.
+Authorization needs to be tested together with the application: the package is covered by its own automated tests, but errors more often appear at the seams, for example a forgotten permission check in a handler. This document collects techniques used in the package's own tests (`tests/testthat` in its sources) that also suit application tests.
 
-# Временная база
+# A temporary database
 
-Тесты ниже идут на SQLite в памяти. Если приложение работает на MySQL, PostgreSQL или DuckDB, проверяйте на такой же базе: подключитесь к пустой тестовой схеме (таблицы в ней можно удалять), а запросы пишите без функций, специфичных для SQLite. Пример запуска всего набора тестов самого пакета на нужной базе есть в `dev/run-tests-db.R` его исходников.
+The tests below run on an in-memory SQLite database. If your application runs on MySQL, PostgreSQL, or DuckDB, test on the same database: connect to an empty test schema (its tables may be dropped), and write queries without SQLite-specific functions. An example of running the package's entire test suite on a chosen database is in `dev/run-tests-db.R` in its sources.
 
-Для функций пакета хватает базы в памяти:
+An in-memory database is enough for the package functions:
 
 ```{r}
 new_db <- function(env = parent.frame()) {
@@ -28,9 +28,9 @@ new_db <- function(env = parent.frame()) {
 }
 ```
 
-Если приложению нужен файл базы (как у примеров), создайте `tempfile(fileext = ".db")`, передайте путь через переменную среды или конфиг и удалите файл в `withr::defer()`.
+If the application needs a database file (as the examples do), create `tempfile(fileext = ".db")`, pass the path through an environment variable or config, and delete the file in `withr::defer()`.
 
-**Хеширование scrypt намеренно медленное** (доли секунды на пароль). В тесте заводите только тех пользователей, которые реально входят. Если пользователь нужен только как строка в таблице (проверка прав, статусов), вставьте его SQL-запросом:
+**scrypt hashing is intentionally slow** (a fraction of a second per password). In a test, create only the users who actually sign in. If a user is needed only as a table row (permission and status checks), insert them with an SQL query:
 
 ```{r}
 DBI::dbExecute(
@@ -39,14 +39,14 @@ DBI::dbExecute(
 )
 ```
 
-Такой пользователь войти не сможет (пароль не хеш), но для остальных проверок он подходит.
+Such a user cannot sign in (the password is not a hash), but is fine for other checks.
 
-# Функции без Shiny
+# Functions without Shiny
 
-Правила пользователей, права, токены и защита входа проверяются обычными `expect_*`:
+User rules, permissions, tokens, and login protection are checked with ordinary `expect_*`:
 
 ```{r}
-test_that("последнего администратора нельзя удалить", {
+test_that("the last administrator cannot be deleted", {
   con <- new_db()
   aa_create_first_admin(con, "boss", "boss-password")
   aa_create_user(con, "ann", "ann-password", "admin")
@@ -58,18 +58,18 @@ test_that("последнего администратора нельзя уда
   )
 })
 
-test_that("права берутся из матрицы", {
+test_that("permissions come from the matrix", {
   provider <- aa_permissions_from_matrix(list(Run = c("admin", "user"), Access = "admin"))
 
   expect_true(aa_can(list(login = "ivan", role = "user"), "Run", provider))
   expect_false(aa_can(list(login = "ivan", role = "user"), "Access", provider))
-  expect_false(aa_can(NULL, "Run", provider))      # закрыто по умолчанию
+  expect_false(aa_can(NULL, "Run", provider))      # closed by default
 })
 ```
 
-Ошибки правил имеют класс `appauth_error_user` и поле `reason`; текст ошибки на языке настроек.
+Rule errors have the class `appauth_error_user` and a `reason` field; the error text is in the language of the settings.
 
-Время для защиты входа проще задавать записью с нужным временем. Время хранится текстом по UTC (`ГГГГ-ММ-ДД ЧЧ:ММ:СС`), поэтому его удобно считать в R: так запрос одинаков для всех баз (в SQL-функциях вроде `datetime('now')` нет нужды, они есть только в SQLite):
+Time for login protection is easiest to set by inserting a record with the needed time. Time is stored as text in UTC (`YYYY-MM-DD HH:MM:SS`), so it is convenient to compute it in R: this way the query is the same for all databases (there is no need for SQL functions like `datetime('now')`, which exist only in SQLite):
 
 ```{r}
 three_minutes_ago <- format(Sys.time() - 180, "%Y-%m-%d %H:%M:%S", tz = "UTC")
@@ -83,9 +83,9 @@ DBI::dbExecute(
 aa_login_lock_remaining(con, "ivan", aa_settings(max_failed_logins = 1))
 ```
 
-# Модули через testServer
+# Modules via testServer
 
-Модули входа, пользователей и смены пароля проверяются через `shiny::testServer()`. Удобно завернуть вызов в помощника, потому что `expr` нужно передать как выражение:
+The sign-in, user, and password change modules are tested through `shiny::testServer()`. It is convenient to wrap the call in a helper, because `expr` must be passed as an expression:
 
 ```{r}
 run_auth <- function(con, expr, settings = aa_settings(), on_event = NULL, ...) {
@@ -96,14 +96,14 @@ run_auth <- function(con, expr, settings = aa_settings(), on_event = NULL, ...) 
   ))
 }
 
-test_that("вход по паролю", {
+test_that("password sign-in", {
   con <- new_db()
   aa_create_user(con, "ivan", "ivan-password", "user")
 
   run_auth(con, {
     session$setInputs(login = "ivan", password = "wrong", login_btn = 1)
     expect_false(session$returned$logged_in())
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, "Incorrect login or password")
 
     session$setInputs(login = "ivan", password = "ivan-password", login_btn = 2)
     expect_true(session$returned$logged_in())
@@ -112,7 +112,7 @@ test_that("вход по паролю", {
 })
 ```
 
-Для модуля пользователей вместо настоящего `auth` достаточно объекта с реактивным `user`:
+For the users module, instead of a real `auth` an object with a reactive `user` is enough:
 
 ```{r}
 fake_auth <- function(login = "boss", role = "admin") {
@@ -120,11 +120,11 @@ fake_auth <- function(login = "boss", role = "admin") {
 }
 ```
 
-Идентификаторы в тесте модуля без префикса (`login`, `login_btn`), в тесте всего приложения с префиксом модуля (`auth-login`, `users-open`).
+Identifiers in a module test have no prefix (`login`, `login_btn`); in a whole-application test they carry the module prefix (`auth-login`, `users-open`).
 
-## События
+## Events
 
-Хук собирает события в список, по нему видно, что пакет отправил:
+The hook collects events into a list, which shows what the package emitted:
 
 ```{r}
 events <- list()
@@ -133,9 +133,9 @@ hook <- function(event, user, session_id, value) {
 }
 ```
 
-## Содержимое окон
+## Dialog contents
 
-Окна открываются через `shiny::showModal()`, в testServer их не видно. Подмените функцию и получите HTML, который увидит браузер:
+Dialogs are opened through `shiny::showModal()` and are not visible in testServer. Replace the function and get the HTML the browser would see:
 
 ```{r}
 html <- NULL
@@ -145,24 +145,24 @@ testthat::local_mocked_bindings(
 )
 ```
 
-Так можно проверить, что кнопка блокировки не показывается для себя, что слот карточки выведен, что логин с HTML экранирован.
+This lets you check that the block button is not shown for oneself, that the card slot is rendered, and that a login containing HTML is escaped.
 
-## Время и сторож
+## Time and the guard
 
-В `testServer` время сессии двигается вручную:
+In `testServer` the session time is advanced manually:
 
 ```{r}
 shiny::testServer(function(input, output, session) aa_session_guard(auth, con, settings), {
   session$flushReact()
   DBI::dbExecute(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")
-  session$elapse(35000)               # прошло 35 секунд
+  session$elapse(35000)               # 35 seconds have passed
   expect_equal(logout_calls[[1]]$reason, "blocked")
 })
 ```
 
-# Тест всего приложения: загружайте `app.R` как это делает `runApp()`
+# Whole-application test: load `app.R` the way `runApp()` does
 
-`shiny::runApp(папка)` загружает `app.R` в собственное окружение, а не в глобальное. Если в тесте выполнить `eval(parse("app.R"), envir = globalenv())`, переменные, созданные в `app.R`, станут глобальными, и ошибка вида «функция из `R/` не видит переменную из `app.R`» в тесте не воспроизведётся, хотя в запущенном приложении вкладка сломана. Загружайте приложение в отдельное окружение:
+`shiny::runApp(directory)` loads `app.R` into its own environment, not the global one. If a test runs `eval(parse("app.R"), envir = globalenv())`, variables created in `app.R` become global, and an error such as "a function from `R/` does not see a variable from `app.R`" will not reproduce in the test, although in the running application the tab is broken. Load the application into a separate environment:
 
 ```{r}
 app_env <- new.env(parent = globalenv())
@@ -170,16 +170,16 @@ app_obj <- eval(parse(text = app_code), envir = app_env)
 server <- app_env$server
 ```
 
-Не полагайтесь только на такие тесты: ошибки порядка загрузки (например, файл из `R/` вызывает функцию пакета на верхнем уровне без своего `library(appauth)`, а Shiny подключает `R/` до `app.R`) проявляются только при настоящем `runApp()`. Перед релизом запустите приложение как в бою и откройте его в браузере. Если `Rscript` в вашей среде подхватывает чужой `.Rprofile` или `R_LIBS_USER` другого проекта, запускайте его с ключами `--no-init-file --no-site-file`.
+Do not rely only on such tests: load order errors (for example, a file in `R/` calls a package function at top level without its own `library(appauth)`, while Shiny sources `R/` before `app.R`) show up only with a real `runApp()`. Before a release, run the application as in production and open it in a browser. If `Rscript` in your environment picks up another project's `.Rprofile` or `R_LIBS_USER`, run it with the `--no-init-file --no-site-file` flags.
 
-Проверьте, что серверные части вкладок зарегистрированы тем, у кого есть право: после входа администратора `output$`access-users-main`` должен содержать таблицу пользователей. Тест, который не проверяет содержимое вкладок под ролью администратора, пропустит пустую вкладку.
+Check that the server parts of tabs are registered for those who have the permission: after an administrator signs in, `output$`access-users-main`` must contain the users table. A test that does not check tab contents under the administrator role will miss an empty tab.
 
-# Защита обработчиков вашего приложения
+# Protecting your application's handlers
 
-Для каждого обработчика действия напишите тест «без права обработчик не выполняется»:
+For each action handler, write a "without the permission the handler does not run" test:
 
 ```{r}
-test_that("запуск задачи без права отклоняется", {
+test_that("running a task without the permission is rejected", {
   provider <- aa_permissions_from_matrix(list(Run = "admin"))
   auth <- list(user = function() list(login = "olga", role = "viewer"))
 
@@ -190,21 +190,21 @@ test_that("запуск задачи без права отклоняется", 
 })
 ```
 
-В тесте всего приложения проверяйте, что побочный эффект не произошёл (запись не добавлена, задача не запущена), а хук получил `access_denied`.
+In a whole-application test, check that the side effect did not happen (no record added, no task started) and that the hook received `access_denied`.
 
-# Чек-лист тестов безопасности приложения
+# Security test checklist for the application
 
-* Вход: неверный пароль, несуществующий логин (сообщение то же), пустые поля.
-* Блокировка после серии неудач; верный пароль при блокировке не пускает.
-* Заблокированный администратором пользователь не входит, его токен не работает.
-* Каждый обработчик действия отказывает без права (для каждой роли без права).
-* Пользователь без права не получает серверную часть модуля.
-* SQL-инъекция в логине и пароле формы входа не даёт войти.
-* Логин с HTML и скриптами экранируется во всех таблицах и окнах приложения.
-* Токен отозванного, удалённого и заблокированного пользователя не работает.
-* Открытая сессия завершается после блокировки, удаления, смены роли, сброса пароля.
-* Подключение к базе закрывается при завершении сессии (файл базы можно переименовать после остановки сессий).
+* Sign-in: wrong password, nonexistent login (same message), empty fields.
+* Lockout after a series of failures; the correct password does not let the user in while locked.
+* A user blocked by the administrator cannot sign in, and their token does not work.
+* Every action handler refuses without the permission (for each role lacking it).
+* A user without the permission does not get the module's server part.
+* SQL injection in the login and password of the sign-in form does not let anyone in.
+* A login containing HTML and scripts is escaped in all tables and dialogs of the application.
+* The token of a revoked, deleted, or blocked user does not work.
+* An open session ends after blocking, deletion, role change, or password reset.
+* The database connection is closed when the session ends (the database file can be renamed after the sessions stop).
 
-# Проверка в настоящем браузере
+# Testing in a real browser
 
-`testServer` не проверяет JavaScript: cookie автовхода, подсветку строк, вход по Enter. Для таких проверок в исходниках пакета есть сценарии на Playwright и Chrome (`dev/e2e`): приложение поднимается на временной базе, сценарий проходит вход, блокировку, карточку и выход и сохраняет скриншоты. Их можно взять за основу для своего приложения. Запускайте такую проверку на копии базы с тестовыми пользователями, а не на рабочей базе.
+`testServer` does not test JavaScript: the auto-login cookie, row highlighting, sign-in on Enter. For such checks the package sources include Playwright and Chrome scenarios (`dev/e2e`): the application starts on a temporary database, the scenario goes through sign-in, blocking, the card, and sign-out, and saves screenshots. They can serve as a basis for your own application. Run such a check on a copy of the database with test users, not on the production database.

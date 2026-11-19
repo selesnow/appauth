@@ -2,26 +2,28 @@
 % Please edit documentation in R/users.R
 \name{aa_check_can_change_role}
 \alias{aa_check_can_change_role}
-\title{Можно ли сменить пользователю роль}
+\title{Can a user's role be changed}
 \usage{
 aa_check_can_change_role(conn, login, role, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{role}{Роль из списка \code{roles} настроек.}
+\item{role}{A role from the \code{roles} list of the settings.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{NULL}, если можно, иначе текст причины отказа (на языке настроек).
+\code{NULL} if allowed, otherwise the reason for refusal (in the
+settings language).
 }
 \description{
-Роль должна быть в списке \code{roles} настроек, а у \strong{последнего активного
-(не заблокированного) администратора} нельзя снять роль администратора,
-иначе в приложении некому будет управлять пользователями.
+The role must be in the \code{roles} list of the settings, and the administrator
+role cannot be taken from the \strong{last active (not blocked) administrator},
+otherwise nobody in the app could manage users.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

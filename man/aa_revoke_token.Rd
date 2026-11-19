@@ -2,20 +2,20 @@
 % Please edit documentation in R/sessions.R
 \name{aa_revoke_token}
 \alias{aa_revoke_token}
-\title{Отозвать токен автовхода}
+\title{Revoke an autologin token}
 \usage{
 aa_revoke_token(conn, token)
 }
 \arguments{
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{token}{Токен из cookie.}
+\item{token}{Token from the cookie.}
 }
 \value{
-Число отозванных токенов (0 или 1), невидимо.
+The number of revoked tokens (0 or 1), invisibly.
 }
 \description{
-Нужно при выходе: cookie в браузере после этого перестаёт работать.
+Needed on logout: the cookie in the browser stops working afterwards.
 }
 \examples{
 \dontrun{

@@ -2,25 +2,25 @@
 % Please edit documentation in R/schema.R
 \name{aa_prepare_db}
 \alias{aa_prepare_db}
-\title{Подготовка базы при запуске приложения}
+\title{Prepare the database on app start}
 \usage{
 aa_prepare_db(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
-(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE}, если схема подготовлена, иначе \code{FALSE} (невидимо).
+\code{TRUE} if the schema is prepared, otherwise \code{FALSE} (invisibly).
 }
 \description{
-Вызывает \code{\link[=aa_init_db]{aa_init_db()}} и \code{\link[=aa_cleanup]{aa_cleanup()}} и \strong{никогда не останавливает
-приложение}: при ошибке пишет сообщение в лог приложения и возвращает
-\code{FALSE}. Рассчитана на вызов один раз при старте приложения. Без подготовленных
-таблиц защита от перебора и блокировки работать не будут, а вход по паролю
-продолжит работать.
+Calls \code{\link[=aa_init_db]{aa_init_db()}} and \code{\link[=aa_cleanup]{aa_cleanup()}} and \strong{never stops
+the app}: on error it writes a message to the app log and returns
+\code{FALSE}. Meant to be called once at app start. Without the prepared
+tables, protection against guessing and locks will not work, while password sign-in
+will keep working.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

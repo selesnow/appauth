@@ -1,25 +1,25 @@
 # TODO appauth
 
-Список доработок пакета. Порядок соответствует приоритету. Выполненный пункт переносим в `NEWS.md` и удаляем отсюда.
+Planned improvements, in priority order. A finished item is moved to `NEWS.md` and removed from here.
 
-## 1. Cookie с `HttpOnly`
+## 1. `HttpOnly` cookie
 
-Сейчас cookie автовхода пишет JS, поэтому `HttpOnly` поставить нельзя. Компенсация: в базе только хеш токена, токен отзывается при выходе, блокировке и смене пароля. Настоящее решение: выдавать cookie с сервера, это заметная переделка.
+The auto-login cookie is currently written by JavaScript, so `HttpOnly` cannot be set. Mitigation: only the token hash is stored in the database, and the token is revoked on logout, blocking and password change. The real fix is to issue the cookie from the server, which is a significant rework.
 
-## 2. Развитие двухфакторной аутентификации (после 0.5.0)
+## 2. Two-factor authentication follow-ups (after 0.5.0)
 
-* Принудительное включение для ролей (`totp_required_roles`): при входе без 2FA сначала мастер подключения, как у обязательной смены пароля.
-* Выпуск новых резервных кодов без выключения 2FA (нужны пароль и код).
-* Другие факторы: WebAuthn и аппаратные ключи.
-* Спрашивать код при входе по cookie для чувствительных действий (повторное подтверждение).
+* Mandatory enrolment for roles (`totp_required_roles`): when logging in without 2FA, show the setup wizard first, like the forced password change.
+* Issue new recovery codes without disabling 2FA (password and code required).
+* Other factors: WebAuthn and hardware keys.
+* Ask for a code when logging in via cookie for sensitive actions (re-confirmation).
 
-## 3. Развитие восстановления пароля (после 0.4.0)
+## 3. Password recovery follow-ups (after 0.4.0)
 
-* Отправка письма в фоне, чтобы время ответа формы не выдавало существование пользователя.
-* Уведомление на почту о том, что пароль был изменён (по ссылке или администратором).
-* Подтверждение адреса email (письмо со ссылкой) перед тем, как использовать его для восстановления.
-* Личный кабинет: пользователь сам указывает и меняет свой email в модуле `aa_password_ui()`.
+* Send the email in the background, so the form response time does not reveal whether a user exists.
+* Email notification that the password was changed (via the link or by an administrator).
+* Email address confirmation (a link in an email) before it is used for recovery.
+* Self-service: users set and change their own email in the `aa_password_ui()` module.
 
-## Отложено
+## Postponed
 
-* Ограничение по IP (за nginx IP не виден).
+* IP-based restrictions (the client IP is not visible behind nginx).

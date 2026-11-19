@@ -2,28 +2,29 @@
 % Please edit documentation in R/reset.R
 \name{aa_set_email}
 \alias{aa_set_email}
-\title{Указать, сменить или удалить email пользователя}
+\title{Set, change or remove a user's email}
 \usage{
 aa_set_email(conn, login, email, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{email}{Адрес или пустое значение для удаления.}
+\item{email}{An address or an empty value to remove it.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE}, если адрес сохранён, и \code{FALSE}, если он удалён (невидимо).
+\code{TRUE} if the address was saved and \code{FALSE} if it was removed (invisibly).
 }
 \description{
-Адрес нужен для восстановления пароля (\code{\link[=aa_request_password_reset]{aa_request_password_reset()}}).
-Хранится в нижнем регистре, у двух пользователей один адрес быть не может.
-Пустое значение (\code{NULL}, \code{NA} или \code{""}) удаляет адрес. Ошибки (неверный формат,
-адрес занят, пользователя нет) имеют класс \code{appauth_error_user} и текст на
-языке настроек.
+The address is needed for password recovery (\code{\link[=aa_request_password_reset]{aa_request_password_reset()}}).
+It is stored in lower case, and two users cannot have the same address.
+An empty value (\code{NULL}, \code{NA} or \code{""}) removes the address. Errors (invalid format,
+address taken, no such user) have the class \code{appauth_error_user} and a text in the
+settings language.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

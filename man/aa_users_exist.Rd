@@ -2,19 +2,20 @@
 % Please edit documentation in R/users.R
 \name{aa_users_exist}
 \alias{aa_users_exist}
-\title{Есть ли в базе хотя бы один пользователь}
+\title{Does the database have at least one user}
 \usage{
 aa_users_exist(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 }
 \value{
-\code{TRUE} или \code{FALSE}.
+\code{TRUE} or \code{FALSE}.
 }
 \description{
-Если пользователей нет, приложению нужно показать окно создания первого
-администратора, это делает модуль входа пакета.
+If there are no users, the app needs to show the form for creating the first
+administrator; the package login module does this.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

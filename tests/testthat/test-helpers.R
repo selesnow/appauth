@@ -1,4 +1,4 @@
-test_that("сторож не трогает действующую сессию", {
+test_that("the guard leaves a valid session alone", {
   con <- users_db()
   raw_user(con, "ivan", "user")
   auth <- fake_auth_obj("ivan", "user")
@@ -12,7 +12,7 @@ test_that("сторож не трогает действующую сессию"
   expect_length(auth$calls$logout, 0)
 })
 
-test_that("сторож завершает сессию заблокированного, удалённого и с изменённой ролью", {
+test_that("the guard ends sessions of blocked, deleted and role-changed users", {
   for (case in list(
     list(reason = "blocked", change = function(con) texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")),
     list(reason = "deleted", change = function(con) texec(con, "DELETE FROM users WHERE login = 'ivan'")),
@@ -34,7 +34,7 @@ test_that("сторож завершает сессию заблокирован
   }
 })
 
-test_that("сторож по умолчанию просит перезагрузку страницы", {
+test_that("the guard asks for a page reload by default", {
   con <- users_db()
   raw_user(con, "ivan", "user", blocked = 1)
   auth <- fake_auth_obj("ivan", "user")
@@ -47,7 +47,7 @@ test_that("сторож по умолчанию просит перезагру�
   expect_true(auth$calls$logout[[1]]$reload)
 })
 
-test_that("сторож ждёт интервал из настроек", {
+test_that("the guard waits for the interval from settings", {
   con <- users_db()
   raw_user(con, "ivan", "user")
   auth <- fake_auth_obj("ivan", "user")
@@ -62,7 +62,7 @@ test_that("сторож ждёт интервал из настроек", {
   })
 })
 
-test_that("сторож при сбое базы сессию не закрывает", {
+test_that("the guard does not end the session when the database fails", {
   con <- users_db()
   raw_user(con, "ivan", "user")
   auth <- fake_auth_obj("ivan", "user")
@@ -76,7 +76,7 @@ test_that("сторож при сбое базы сессию не закрыв�
   expect_length(auth$calls$logout, 0)
 })
 
-test_that("сторож ничего не делает, пока никто не вошёл", {
+test_that("the guard does nothing while nobody is signed in", {
   con <- users_db()
   auth <- fake_auth_obj(NULL)
 
@@ -88,11 +88,11 @@ test_that("сторож ничего не делает, пока никто не
   expect_length(auth$calls$logout, 0)
 })
 
-test_that("сторож требует подключение SQLite", {
-  expect_error(aa_session_guard(fake_auth_obj(), "не подключение"), class = "appauth_error_connection")
+test_that("the guard requires a database connection", {
+  expect_error(aa_session_guard(fake_auth_obj(), "not a connection"), class = "appauth_error_connection")
 })
 
-test_that("подключение сессии закрывается при её завершении, файл можно удалить", {
+test_that("the session connection is closed when the session ends, the file can be deleted", {
   skip_if_not_installed("RSQLite")
   path <- tempfile(fileext = ".db")
   withr::defer(unlink(path))
@@ -111,12 +111,12 @@ test_that("подключение сессии закрывается при е�
   expect_true(file.remove(path))
 })
 
-test_that("подключение сессии: без сессии и с неверным путём это понятная ошибка", {
+test_that("session connection: a missing session or a wrong path gives a clear error", {
   expect_error(aa_session_connection(tempfile(), session = NULL), class = "appauth_error_connection")
   expect_error(aa_session_connection(NULL, session = list(onSessionEnded = function(f) NULL)), class = "appauth_error_connection")
 })
 
-test_that("модуль регистрируется один раз и только при наличии права", {
+test_that("the module is registered once and only when the permission is granted", {
   provider <- aa_permissions_from_matrix(list(Tasks = c("admin", "user"), Access = "admin"))
   counter <- new.env()
   counter$tasks <- 0
@@ -145,7 +145,7 @@ test_that("модуль регистрируется один раз и толь
   )
 })
 
-test_that("регистрация модуля требует функцию", {
-  expect_error(aa_register_module(fake_auth_obj(), "Tasks", function(user) "Tasks", "не функция"),
+test_that("module registration requires a function", {
+  expect_error(aa_register_module(fake_auth_obj(), "Tasks", function(user) "Tasks", "not a function"),
                class = "appauth_error_permissions")
 })

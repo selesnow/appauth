@@ -2,22 +2,24 @@
 % Please edit documentation in R/protection.R
 \name{aa_global_throttled}
 \alias{aa_global_throttled}
-\title{Превышен ли общий лимит неудачных попыток входа}
+\title{Is the global failed login limit exceeded}
 \usage{
 aa_global_throttled(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE} или \code{FALSE}.
+\code{TRUE} or \code{FALSE}.
 }
 \description{
-Считает неудачные попытки по всем логинам вместе за последнюю минуту. Если
-их не меньше \code{max_failed_logins_per_minute}, вход временно закрыт для всех:
-это останавливает перебор по многим логинам и рост таблицы попыток.
+Counts failed attempts across all logins together over the last minute. If
+there are at least \code{max_failed_logins_per_minute} of them, login is
+temporarily closed for everyone: this stops guessing across many logins and
+growth of the attempts table.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

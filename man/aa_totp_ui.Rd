@@ -2,20 +2,20 @@
 % Please edit documentation in R/mod-totp.R
 \name{aa_totp_ui}
 \alias{aa_totp_ui}
-\title{Модуль двухфакторной аутентификации: интерфейс}
+\title{Two-factor authentication module: UI}
 \usage{
 aa_totp_ui(id)
 }
 \arguments{
-\item{id}{Идентификатор модуля.}
+\item{id}{Module id.}
 }
 \value{
-Элемент интерфейса Shiny.
+A Shiny UI element.
 }
 \description{
-Блок для личного кабинета: статус двухфакторной аутентификации, подключение
-(секрет, QR-код и подтверждение кодом) и выключение. Ничего не показывает,
-пока в настройках не включено \code{totp_enabled}. Стили подключаются через
+A block for the account page: the two-factor authentication status, enabling
+(secret, QR code and confirmation with a code) and disabling. Shows nothing
+until \code{totp_enabled} is set in the settings. Styles are attached through
 \code{\link[=aa_app_head]{aa_app_head()}}.
 }
 \examples{

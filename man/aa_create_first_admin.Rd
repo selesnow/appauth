@@ -2,31 +2,34 @@
 % Please edit documentation in R/users.R
 \name{aa_create_first_admin}
 \alias{aa_create_first_admin}
-\title{Создать первого пользователя (администратора)}
+\title{Create the first user (administrator)}
 \usage{
 aa_create_first_admin(conn, login, password, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{password}{Пароль в открытом виде (в базу попадёт только хеш).}
+\item{password}{The password in plain text (only the hash goes to the
+database).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE}, если администратор создан, \code{FALSE}, если пользователи уже есть.
+\code{TRUE} if the administrator was created, \code{FALSE} if users already
+exist.
 }
 \description{
-Создаёт пользователя с ролью \code{admin_role} из настроек \strong{только если
-таблица \code{users} пуста}. Проверка и вставка выполняются одним SQL-запросом,
-поэтому из двух одновременных запросов (две вкладки браузера, две сессии)
-сработает только один.
+Creates a user with the \code{admin_role} role from the settings \strong{only if the
+\code{users} table is empty}. The check and the insert run in one SQL statement,
+so of two simultaneous requests (two browser tabs, two sessions) only one
+succeeds.
 }
 \details{
-Логин и пароль проверяются по тем же правилам, что и в \code{\link[=aa_create_user]{aa_create_user()}}
-(при нарушении ошибка класса \code{appauth_error_user}).
+The login and password are checked by the same rules as in
+\code{\link[=aa_create_user]{aa_create_user()}} (on a violation, an error of class \code{appauth_error_user}).
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

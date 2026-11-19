@@ -2,35 +2,36 @@
 % Please edit documentation in R/permissions.R
 \name{aa_permissions_from_matrix}
 \alias{aa_permissions_from_matrix}
-\title{Источник прав из матрицы «право -> роли»}
+\title{Permission provider from a "permission -> roles" matrix}
 \usage{
 aa_permissions_from_matrix(matrix)
 }
 \arguments{
-\item{matrix}{Именованный список «право -> роли» либо функция без аргументов,
-возвращающая такой список.}
+\item{matrix}{A named list "permission -> roles", or a function without
+arguments that returns such a list.}
 }
 \value{
-Функция \verb{function(user)}: по списку с полем \code{role} возвращает
-названия прав. Для пустой или неизвестной роли возвращает \code{character(0)}.
+A function \verb{function(user)}: for a list with a \code{role} field it
+returns the permission names. For an empty or unknown role it returns
+\code{character(0)}.
 }
 \description{
-Создаёт источник прав (\code{provider}) для \code{\link[=aa_can]{aa_can()}} и \code{\link[=aa_require]{aa_require()}} по схеме,
-которая используется в Server Manager: именованный список, где имя это право,
-а значение это роли, которым оно доступно (вектор или одна строка).
+Creates a permission provider (\code{provider}) for \code{\link[=aa_can]{aa_can()}} and \code{\link[=aa_require]{aa_require()}}
+from a named list, where the name is a permission and the value is the roles
+that hold it (a vector or a single string).
 }
 \details{
-Роль администратора не получает прав автоматически: право есть только у тех
-ролей, которые перечислены в матрице.
+The administrator role does not receive permissions automatically: a
+permission is held only by the roles listed in the matrix.
 
-Если матрица меняется во время работы приложения (редактор прав), передайте
-функцию без аргументов, которая возвращает актуальную матрицу, например
-\code{function() conf_rv()$access_managemet}. Тогда она читается при каждой проверке.
+If the matrix changes while the app is running (a permission editor), pass a
+function without arguments that returns the current matrix, for example
+\code{function() conf_rv()$access_matrix}. It is then read on every check.
 
-Источник прав это любая функция \verb{function(user)}, возвращающая вектор названий
-прав пользователя. Если матрица вам не подходит (права на пользователя из базы,
-по группам), напишите такую функцию сами: остальные функции пакета работают с
-ней одинаково.
+A permission provider is any function \verb{function(user)} that returns a vector
+of the user's permission names. If a matrix does not suit you (per-user
+permissions from a database, group-based permissions), write such a function
+yourself: the other package functions treat it the same way.
 }
 \examples{
 provider <- aa_permissions_from_matrix(list(

@@ -2,29 +2,31 @@
 % Please edit documentation in R/permissions.R
 \name{aa_can}
 \alias{aa_can}
-\title{Есть ли у пользователя право}
+\title{Does the user have a permission}
 \usage{
 aa_can(user, permission, provider)
 }
 \arguments{
-\item{user}{Пользователь: список с полями \code{login} и \code{role}, например
-\code{auth$user()}. Роль нужно брать из серверного состояния, а не из \code{input}.}
+\item{user}{The user: a list with \code{login} and \code{role} fields, for example
+\code{auth$user()}. Take the role from server-side state, not from \code{input}.}
 
-\item{permission}{Название права (одна непустая строка).}
+\item{permission}{Permission name (a single non-empty string).}
 
-\item{provider}{Источник прав: функция \verb{function(user)}, возвращающая вектор
-названий прав, например результат \code{\link[=aa_permissions_from_matrix]{aa_permissions_from_matrix()}}.}
+\item{provider}{Permission provider: a function \verb{function(user)} that returns
+a vector of permission names, for example the result of
+\code{\link[=aa_permissions_from_matrix]{aa_permissions_from_matrix()}}.}
 }
 \value{
-\code{TRUE} или \code{FALSE}.
+\code{TRUE} or \code{FALSE}.
 }
 \description{
-Серверная проверка права. Скрытие кнопок и вкладок защитой не является,
-поэтому её нужно вызывать в каждом обработчике действия (см. \code{\link[=aa_require]{aa_require()}}).
+Server-side permission check. Hiding buttons and tabs is not protection, so
+call this in every action handler (see \code{\link[=aa_require]{aa_require()}}).
 }
 \details{
-Проверка закрыта по умолчанию: любая неопределённость (пользователя нет,
-право не строка, источник прав вернул мусор или упал с ошибкой) даёт \code{FALSE}.
+The check is closed by default: any uncertainty (no user, the permission is
+not a string, the provider returned garbage or failed with an error) gives
+\code{FALSE}.
 }
 \examples{
 provider <- aa_permissions_from_matrix(list(Access = "admin"))

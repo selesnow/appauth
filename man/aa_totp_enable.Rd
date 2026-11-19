@@ -2,26 +2,27 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_enable}
 \alias{aa_totp_enable}
-\title{Включить двухфакторную аутентификацию}
+\title{Enable two-factor authentication}
 \usage{
 aa_totp_enable(conn, login, code, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{code}{Код из приложения-аутентификатора.}
+\item{code}{Code from the authenticator app.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} с \code{totp_enabled = TRUE}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 }
 \value{
-Вектор резервных кодов (невидимо).
+A vector of recovery codes (invisibly).
 }
 \description{
-Проверяет код из приложения для ожидающего секрета (\code{\link[=aa_totp_setup]{aa_totp_setup()}}) и
-включает 2FA. Создаёт 10 резервных кодов: \strong{они возвращаются один раз}, в базе
-остаются только хеши. Неверный код даёт ошибку класса \code{appauth_error_user}
+Checks the app code against the pending secret (\code{\link[=aa_totp_setup]{aa_totp_setup()}}) and
+enables 2FA. Creates 10 recovery codes: \strong{they are returned once}, only hashes
+stay in the database. A wrong code raises an error of class \code{appauth_error_user}
 (\code{reason = "totp_wrong"}).
 }
 \examples{

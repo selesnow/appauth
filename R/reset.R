@@ -1,23 +1,23 @@
-# Восстановление пароля по email и email пользователей.
+# Password recovery by email and user emails.
 #
-# Правила, которые держат эти функции:
-#  - в базе хранится только sha256 токена восстановления, как у токенов автовхода;
-#    сам токен существует только в письме;
-#  - токен одноразовый и живёт `reset_ttl_minutes` минут; новый запрос гасит
-#    предыдущие неиспользованные токены этого пользователя;
-#  - запрос восстановления никогда не раскрывает, существует ли логин или email:
-#    результат aa_request_password_reset() предназначен для журнала, а не для
-#    показа пользователю;
-#  - письма ограничены по числу на пользователя за час и по общему числу за минуту;
-#  - после смены пароля по ссылке отзываются все токены автовхода, гасятся все
-#    токены восстановления и снимается блокировка по неудачным попыткам входа.
+# Rules these functions uphold:
+#  - only the sha256 of the recovery token is stored in the database, as with auto-login tokens;
+#    the token itself exists only in the email;
+#  - the token is one-time and lives `reset_ttl_minutes` minutes; a new request consumes the
+#    user's previous unused tokens;
+#  - a recovery request never reveals whether a login or email exists:
+#    the result of aa_request_password_reset() is meant for the journal, not for
+#    showing to the user;
+#  - emails are limited per user per hour and in total per minute;
+#  - after a password change by link all auto-login tokens are revoked, all recovery
+#    tokens are consumed and the lock for failed login attempts is cleared.
 
-#' Привести email к хранимому виду
+#' Normalize an email to the stored form
 #'
-#' @param email Строка или `NULL`.
+#' @param email A string or `NULL`.
 #'
-#' @returns Адрес без пробелов по краям в нижнем регистре, `""` для пустого
-#'   значения (`NULL`, `NA`, пустая строка).
+#' @returns The address without surrounding spaces in lower case, `""` for an empty
+#'   value (`NULL`, `NA`, an empty string).
 #' @noRd
 aa_normalize_email <- function(email) {
   if (is.null(email) || length(email) != 1 || is.na(email)) {
@@ -27,25 +27,25 @@ aa_normalize_email <- function(email) {
   tolower(trimws(as.character(email)))
 }
 
-#' Допустимый ли формат email
+#' Whether the email format is acceptable
 #'
-#' @param email Нормализованный адрес.
+#' @param email A normalized address.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @noRd
 aa_email_is_valid <- function(email) {
   is.character(email) && length(email) == 1 && nchar(email) <= 254 &&
     grepl("^[^@[:space:]]+@[^@[:space:].][^@[:space:]]*\\.[^@[:space:].]+$", email)
 }
 
-#' Найти проблему в email пользователя
+#' Find a problem in a user's email
 #'
-#' @param conn Подключение к базе данных.
-#' @param email Нормализованный адрес (не пустой).
-#' @param login Логин, которому адрес принадлежит (его собственный адрес не
-#'   считается занятым), либо `NULL`.
+#' @param conn Database connection.
+#' @param email A normalized address (not empty).
+#' @param login The login the address belongs to (its own address is not
+#'   considered taken), or `NULL`.
 #'
-#' @returns `NULL` или список `reason` и `args`.
+#' @returns `NULL` or a list with `reason` and `args`.
 #' @noRd
 aa_email_problem <- function(conn, email, login = NULL) {
   if (!aa_email_is_valid(email)) {
@@ -63,12 +63,12 @@ aa_email_problem <- function(conn, email, login = NULL) {
   NULL
 }
 
-#' Email пользователя
+#' User email
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns Адрес в нижнем регистре или `NA_character_`, если адрес не указан или
-#'   пользователя нет. Если схема не достроена до версии 7, тоже `NA_character_`.
+#' @returns The address in lower case or `NA_character_` if no address is set or
+#'   the user does not exist. If the schema is not upgraded to version 7, also `NA_character_`.
 #' @export
 #'
 #' @examples
@@ -95,19 +95,19 @@ aa_get_email <- function(conn, login) {
   if (length(email) == 0) NA_character_ else as.character(email[1])
 }
 
-#' Указать, сменить или удалить email пользователя
+#' Set, change or remove a user's email
 #'
-#' Адрес нужен для восстановления пароля ([aa_request_password_reset()]).
-#' Хранится в нижнем регистре, у двух пользователей один адрес быть не может.
-#' Пустое значение (`NULL`, `NA` или `""`) удаляет адрес. Ошибки (неверный формат,
-#' адрес занят, пользователя нет) имеют класс `appauth_error_user` и текст на
-#' языке настроек.
+#' The address is needed for password recovery ([aa_request_password_reset()]).
+#' It is stored in lower case, and two users cannot have the same address.
+#' An empty value (`NULL`, `NA` or `""`) removes the address. Errors (invalid format,
+#' address taken, no such user) have the class `appauth_error_user` and a text in the
+#' settings language.
 #'
 #' @inheritParams aa_get_user
-#' @param email Адрес или пустое значение для удаления.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param email An address or an empty value to remove it.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `TRUE`, если адрес сохранён, и `FALSE`, если он удалён (невидимо).
+#' @returns `TRUE` if the address was saved and `FALSE` if it was removed (invisibly).
 #' @export
 #'
 #' @examples
@@ -139,7 +139,7 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   tryCatch(
     aa_execute(conn, "UPDATE users SET email = ? WHERE login = ?", params = list(email, login)),
     error = function(e) {
-      # при одновременной записи сработает ограничение уникальности адреса
+      # on a simultaneous write the address uniqueness constraint fires
       if (aa_is_unique_violation(e)) {
         aa_abort_user(settings, "email_exists")
       }
@@ -151,14 +151,14 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   invisible(TRUE)
 }
 
-#' Погасить токены восстановления пароля пользователя
+#' Consume a user's password recovery tokens
 #'
-#' Таблицы может не быть (схема не достроена), это не должно мешать вызывающему.
+#' The table may be missing (schema not upgraded); this must not get in the caller's way.
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин пользователя.
+#' @param conn Database connection.
+#' @param login User login.
 #'
-#' @returns Число погашенных токенов (невидимо).
+#' @returns The number of consumed tokens (invisibly).
 #' @noRd
 aa_invalidate_resets <- function(conn, login) {
   n <- tryCatch(
@@ -173,11 +173,11 @@ aa_invalidate_resets <- function(conn, login) {
   invisible(n)
 }
 
-#' Удалить токены восстановления пароля пользователя
+#' Delete a user's password recovery tokens
 #'
 #' @inheritParams aa_invalidate_resets
 #'
-#' @returns Число удалённых токенов (невидимо).
+#' @returns The number of deleted tokens (invisibly).
 #' @noRd
 aa_delete_user_resets <- function(conn, login) {
   n <- tryCatch(
@@ -188,41 +188,41 @@ aa_delete_user_resets <- function(conn, login) {
   invisible(n)
 }
 
-#' Ссылка для смены пароля
+#' Password change link
 #'
-#' @param settings Настройки, результат [aa_settings()].
-#' @param token Токен восстановления.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param token Recovery token.
 #'
-#' @returns Строка со ссылкой.
+#' @returns A string with the link.
 #' @noRd
 aa_reset_link <- function(settings, token) {
   base <- sub("/+$", "", settings$reset_base_url)
   paste0(base, if (grepl("?", base, fixed = TRUE)) "&" else "/?", "reset=", token)
 }
 
-#' Запросить восстановление пароля
+#' Request password recovery
 #'
-#' Находит пользователя по логину или email, создаёт одноразовый токен и вызывает
-#' `settings$send_reset(email, link, login)`, чтобы отправить письмо со ссылкой.
-#' В базе остаётся только хеш токена. Предыдущие неиспользованные ссылки этого
-#' пользователя перестают работать.
+#' Finds a user by login or email, creates a one-time token and calls
+#' `settings$send_reset(email, link, login)` to send an email with the link.
+#' Only the token hash stays in the database. The user's previous unused links
+#' stop working.
 #'
-#' Письмо не отправляется, если пользователя нет, у него не указан email, он
-#' заблокирован администратором или превышен лимит (`reset_max_per_hour` на
-#' пользователя, `reset_max_per_minute` общий). Результат функции предназначен
-#' для журнала: пользователю нужно показывать один и тот же ответ в любом из
-#' случаев, чтобы нельзя было узнать, какие логины и адреса существуют.
+#' No email is sent if the user does not exist, has no email, is
+#' blocked by an administrator, or a limit is exceeded (`reset_max_per_hour` per
+#' user, `reset_max_per_minute` overall). The function result is meant
+#' for the journal: the user should be shown the same answer in every
+#' case, so that it is impossible to find out which logins and addresses exist.
 #'
-#' Ошибка в `send_reset` не прерывает функцию, а возвращается как `send_failed`:
-#' токен при этом гасится.
+#' An error in `send_reset` does not abort the function but is returned as `send_failed`:
+#' the token is consumed in that case.
 #'
 #' @inheritParams aa_get_user
-#' @param identifier Логин или email, который ввёл пользователь.
-#' @param settings Настройки, результат [aa_settings()] с `reset_enabled = TRUE`.
+#' @param identifier The login or email the user entered.
+#' @param settings Settings, the result of [aa_settings()] with `reset_enabled = TRUE`.
 #'
-#' @returns Список (невидимо): `sent` (`TRUE`, если письмо отправлено), `reason`
+#' @returns A list (invisibly): `sent` (`TRUE` if the email was sent), `reason`
 #'   (`"sent"`, `"disabled"`, `"no_user"`, `"no_email"`, `"blocked"`,
-#'   `"throttled"` или `"send_failed"`) и `login` (найденный логин или `NA`).
+#'   `"throttled"` or `"send_failed"`) and `login` (the found login or `NA`).
 #' @export
 #'
 #' @examples
@@ -235,7 +235,7 @@ aa_reset_link <- function(settings, token) {
 #'   settings <- aa_settings(
 #'     reset_enabled  = TRUE,
 #'     reset_base_url = "https://apps.example.com/my_app",
-#'     send_reset     = function(email, link, login) message("Ссылка для ", login, ": ", link)
+#'     send_reset     = function(email, link, login) message("Link for ", login, ": ", link)
 #'   )
 #'   aa_request_password_reset(conn, "boss", settings)$reason
 #'   aa_request_password_reset(conn, "nobody", settings)$reason
@@ -257,7 +257,7 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
     return(result("no_user"))
   }
 
-  # логин сравнивается точно, адрес без учёта регистра; оба запроса выполняются всегда
+  # the login is compared exactly, the address case-insensitively; both queries always run
   by_login <- aa_query(
     conn, "SELECT login, blocked, email FROM users WHERE login = ?", params = list(identifier)
   )
@@ -316,7 +316,7 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
       TRUE
     },
     error = function(e) {
-      message("appauth: не удалось отправить письмо восстановления пароля: ", conditionMessage(e))
+      message("appauth: could not send the password recovery email: ", conditionMessage(e))
       FALSE
     }
   )
@@ -329,16 +329,16 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
   result("sent", login)
 }
 
-#' Пользователь, которому принадлежит ссылка восстановления
+#' User who owns a recovery link
 #'
-#' Проверяет токен из ссылки, ничего не меняя: он должен существовать, быть
-#' неиспользованным и непросроченным, а пользователь не должен быть заблокирован
-#' или удалён. Нужна, чтобы показать форму нового пароля только по рабочей ссылке.
+#' Checks the token from the link without changing anything: it must exist, be
+#' unused and not expired, and the user must not be blocked
+#' or deleted. Needed to show the new password form only for a working link.
 #'
 #' @inheritParams aa_get_user
-#' @param token Токен из ссылки (параметр `reset` адресной строки).
+#' @param token Token from the link (the `reset` parameter of the address bar).
 #'
-#' @returns Логин пользователя или `NULL`.
+#' @returns The user login or `NULL`.
 #' @export
 #'
 #' @examples
@@ -370,24 +370,24 @@ aa_reset_token_login <- function(conn, token) {
   if (nrow(res) != 1) NULL else res$login[1]
 }
 
-#' Задать новый пароль по ссылке из письма
+#' Set a new password by the link from the email
 #'
-#' Проверяет токен ([aa_reset_token_login()]), проверяет новый пароль по правилам
-#' из настроек и записывает его. Токен одноразовый: слабый пароль ошибкой
-#' отклоняется и токен не тратит, а после успешной смены ссылка перестаёт
-#' работать. Вместе с паролем отзываются все токены автовхода пользователя, гасятся
-#' остальные ссылки восстановления, снимается требование смены пароля и
-#' блокировка по неудачным попыткам входа.
+#' Checks the token ([aa_reset_token_login()]), checks the new password against the rules
+#' from the settings and writes it. The token is one-time: a weak password is rejected
+#' with an error and does not spend the token, and after a successful change the link stops
+#' working. Along with the password, all of the user's auto-login tokens are revoked, the
+#' other recovery links are consumed, and the password change requirement and the
+#' lock for failed login attempts are cleared.
 #'
-#' Неверная, просроченная или использованная ссылка даёт ошибку класса
-#' `appauth_error_user` с `reason = "reset_link_invalid"`, слабый пароль ошибку
-#' того же класса с причиной пароля.
+#' A wrong, expired or used link raises an error of class
+#' `appauth_error_user` with `reason = "reset_link_invalid"`, a weak password an error
+#' of the same class with a password reason.
 #'
 #' @inheritParams aa_reset_token_login
-#' @param password Новый пароль.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param password New password.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Логин пользователя, чей пароль изменён (невидимо).
+#' @returns The login of the user whose password was changed (invisibly).
 #' @export
 #'
 #' @examples
@@ -412,7 +412,7 @@ aa_reset_password_with_token <- function(conn, token, password, settings = aa_se
   problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
-  # токен занимает тот, кто успел первым: из двух одновременных запросов сработает один
+  # the token is taken by whoever is first: of two simultaneous requests only one works
   claimed <- aa_execute(
     conn,
     "UPDATE password_resets SET used = 1

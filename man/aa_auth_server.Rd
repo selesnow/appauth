@@ -2,7 +2,7 @@
 % Please edit documentation in R/mod-auth.R
 \name{aa_auth_server}
 \alias{aa_auth_server}
-\title{Модуль входа: сервер}
+\title{Sign-in module: server}
 \usage{
 aa_auth_server(
   id,
@@ -15,96 +15,96 @@ aa_auth_server(
 )
 }
 \arguments{
-\item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_auth_ui]{aa_auth_ui()}}.}
+\item{id}{Module id, the same as in \code{\link[=aa_auth_ui]{aa_auth_ui()}}.}
 
-\item{conn}{Подключение к базе данных со схемой \code{\link[=aa_init_db]{aa_init_db()}}.}
+\item{conn}{Database connection with the \code{\link[=aa_init_db]{aa_init_db()}} schema.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Хук событий \verb{function(event, user, session_id, value)} или \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
 
-\item{title}{Заголовок формы входа. По умолчанию текст \code{login_title}.}
+\item{title}{Sign-in form title. Defaults to the \code{login_title} text.}
 
-\item{logo}{Адрес картинки над заголовком (например \code{"logo.png"} из папки
-\code{www}) или \code{NULL}.}
+\item{logo}{Address of an image above the title (for example \code{"logo.png"} from the
+\code{www} folder) or \code{NULL}.}
 
-\item{cookie_name}{Имя cookie автовхода. Cookie не изолируются по порту,
-поэтому приложениям на одном хосте нужны разные имена.}
+\item{cookie_name}{Auto-login cookie name. Cookies are not isolated by port,
+so apps on the same host need different names.}
 }
 \value{
-Список: \code{user} (реактивное значение, список \code{login} и \code{role} либо
-\code{NULL}), \code{logged_in} (реактивное логическое), \code{role} (реактивная роль либо
-\code{NULL}), функция \code{token()} (токен автовхода этой сессии или \code{NULL}, нужен
-\code{\link[=aa_session_guard]{aa_session_guard()}}), функция \code{logout(reason = NULL, reload = FALSE)} и
-функция \code{logout_all(reload = TRUE)}. Без \code{reason}
-это обычный выход (событие \code{logout}), с \code{reason} (\code{"blocked"}, \code{"deleted"},
-\code{"role_changed"}, \code{"token_revoked"}) принудительный (\code{session_forced_logout}). При
-\code{reload = TRUE} страница перезагружается, чтобы модули прежнего пользователя
-исчезли.
+A list: \code{user} (reactive value, a list with \code{login} and \code{role} or
+\code{NULL}), \code{logged_in} (reactive logical), \code{role} (reactive role or
+\code{NULL}), a \code{token()} function (the auto-login token of this session or \code{NULL}, needed by
+\code{\link[=aa_session_guard]{aa_session_guard()}}), a \code{logout(reason = NULL, reload = FALSE)} function and
+a \code{logout_all(reload = TRUE)} function. Without \code{reason}
+this is an ordinary sign-out (event \code{logout}); with \code{reason} (\code{"blocked"}, \code{"deleted"},
+\code{"role_changed"}, \code{"token_revoked"}) it is forced (\code{session_forced_logout}). With
+\code{reload = TRUE} the page is reloaded so that the modules of the previous user
+disappear.
 
-\code{logout_all()} это «выйти на всех устройствах»: отзывает все токены
-пользователя (событие \code{sessions_revoked}) и сразу выходит; открытые сессии на
-других устройствах закроет \code{\link[=aa_session_guard]{aa_session_guard()}} при ближайшей проверке. Перед
-вызовом покажите пользователю окно подтверждения: кнопка выбросит его везде.
+\code{logout_all()} is "sign out on all devices": it revokes all tokens of the
+user (event \code{sessions_revoked}) and signs out immediately; open sessions on
+other devices are closed by \code{\link[=aa_session_guard]{aa_session_guard()}} at the next check. Show the user a
+confirmation dialog before calling it: the button kicks them out everywhere.
 }
 \description{
-Вход по логину и паролю с защитой от подбора (\code{\link[=aa_login_gate]{aa_login_gate()}}), создание
-первого администратора на пустой базе, автовход по cookie (если включён в
-настройках) и выход. Обо всех событиях модуль сообщает хуку \code{on_event}
-(каталог в \code{\link[=aa_events]{aa_events()}}), сам в логи ничего не пишет.
+Sign-in with login and password protected against guessing (\code{\link[=aa_login_gate]{aa_login_gate()}}), creation of the
+first administrator on an empty database, auto-login by cookie (if enabled in the
+settings) and sign-out. The module reports all events to the \code{on_event} hook
+(catalog in \code{\link[=aa_events]{aa_events()}}) and writes nothing to logs itself.
 }
 \details{
-Если пароль пользователю задал администратор (\code{must_change}), после ввода
-верного пароля показывается форма смены пароля, и в приложение пользователь
-попадает только после смены.
+If the password was set by an administrator (\code{must_change}), the password change form
+is shown after the correct password is entered, and the user gets into the app
+only after the change.
 }
-\section{Двухфакторная аутентификация}{
+\section{Two-factor authentication}{
 
-При \code{totp_enabled = TRUE} в настройках (\code{\link[=aa_settings]{aa_settings()}}) пользователь, у которого
-включена 2FA (\code{\link[=aa_totp_server]{aa_totp_server()}}), после верного пароля вводит код из
-приложения-аутентификатора или резервный код. До этого токен автовхода не
-выдаётся, а успешная попытка входа не записывается: неверные коды считаются
-неудачными попытками входа, и логин блокируется по тем же правилам, что и при
-переборе пароля. Вход по cookie автовхода второй фактор не спрашивает (cookie
-выдан после его прохождения). Модуль сообщает события \code{totp_failed} и
+With \code{totp_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a user who has
+2FA enabled (\code{\link[=aa_totp_server]{aa_totp_server()}}) enters, after the correct password, a code from the
+authenticator app or a recovery code. Until then no auto-login token is
+issued and the successful login attempt is not recorded: wrong codes count as
+failed login attempts, and the login is locked by the same rules as for
+password guessing. Auto-login by cookie does not ask for the second factor (the cookie
+was issued after it was passed). The module reports the events \code{totp_failed} and
 \code{recovery_code_used}.
 }
 
-\section{Восстановление пароля по email}{
+\section{Password recovery by email}{
 
-При \code{reset_enabled = TRUE} в настройках (\code{\link[=aa_settings]{aa_settings()}}) на форме входа
-появляется ссылка «Забыли пароль?». Пользователь вводит логин или email, ему
-уходит письмо со ссылкой \verb{<reset_base_url>/?reset=<токен>}, а ответ на экране
-всегда один и тот же, независимо от того, найден ли пользователь. Модуль сам
-читает параметр \code{reset} из адресной строки, убирает его из адреса и показывает
-форму нового пароля, если ссылка рабочая. После смены пароля пользователь входит
-как обычно: автоматически его не пускают. Модуль сообщает события
-\code{password_reset_requested}, \code{password_reset_done} и \code{password_reset_failed}.
-Логика без интерфейса: \code{\link[=aa_request_password_reset]{aa_request_password_reset()}} и
+With \code{reset_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Forgot password?"
+link appears on the sign-in form. The user enters a login or email and is
+sent an email with a link \verb{<reset_base_url>/?reset=<token>}, and the on-screen answer is
+always the same, whether or not the user was found. The module itself
+reads the \code{reset} parameter from the address bar, removes it from the address and shows
+the new password form if the link works. After the password is changed the user signs in
+as usual: they are not signed in automatically. The module reports the events
+\code{password_reset_requested}, \code{password_reset_done} and \code{password_reset_failed}.
+Logic without UI: \code{\link[=aa_request_password_reset]{aa_request_password_reset()}} and
 \code{\link[=aa_reset_password_with_token]{aa_reset_password_with_token()}}.
 }
 
-\section{Вход через Google}{
+\section{Sign-in with Google}{
 
-При \code{google_enabled = TRUE} в настройках (\code{\link[=aa_settings]{aa_settings()}}) на форме входа появляется
-кнопка «Войти через Google». Пользователь подтверждает вход у Google и возвращается
-на \code{google_redirect_uri}; пакет проверяет подпись и содержимое токена Google, домен
-организации (\code{google_domains}) и находит пользователя \strong{по email среди уже созданных}:
-новых пользователей вход не создаёт, роль берётся из базы, заблокированный
-пользователь не входит. Двухфакторный код приложения при этом не спрашивается
-(подтверждение делает Google). \code{state} из адреса сверяется с коротким cookie
-браузера, начавшего вход, поэтому чужую ссылку возврата подсунуть нельзя. При
-\code{password_login = FALSE} форма пароля скрыта, а попытки входа по паролю отклоняются
-на сервере. Модуль сообщает \code{login_success} со значением \code{google} и
-\code{google_login_failed} (причина и email в \code{value}); пользователю при отказе
-показывается общий текст. Если страница открыта не на адресе
-\code{google_redirect_uri} (например, приложение открыто по IP, а возврат настроен на
-домен), кнопка переводит пользователя на адрес возврата, и вход начинается там сам
-(параметр \code{?google=1}): \code{state} лежит в cookie адреса сайта, а cookie по IP и по домену
-разные. Вход по паролю и автовход по cookie на каждом адресе работают независимо.
+With \code{google_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Sign in with Google"
+button appears on the sign-in form. The user confirms the sign-in with Google and returns
+to \code{google_redirect_uri}; the package checks the signature and contents of the Google token, the organization
+domain (\code{google_domains}) and finds the user \strong{by email among already created ones}:
+sign-in does not create new users, the role is taken from the database, a blocked
+user does not get in. The two-factor code is not asked for in this case
+(Google does the confirmation). \code{state} from the address is compared with a short cookie
+of the browser that started the sign-in, so someone else's return link cannot be slipped in. With
+\code{password_login = FALSE} the password form is hidden and password sign-in attempts are rejected
+on the server. The module reports \code{login_success} with the value \code{google} and
+\code{google_login_failed} (reason and email in \code{value}); on refusal the user
+sees a generic text. If the page is opened not at the
+\code{google_redirect_uri} address (for example, the app is opened by IP while the return is configured for a
+domain), the button sends the user to the return address and sign-in starts there on its own
+(parameter \code{?google=1}): \code{state} is stored in the cookie of the site address, and cookies for an IP and for a domain
+are different. Password sign-in and cookie auto-login work independently at each address.
 
-Роль и логин берутся из базы, а не из введённой строки. Подключение \code{conn}
-принадлежит приложению: закрывайте его при завершении сессии.
+The role and login are taken from the database, not from the entered string. The \code{conn}
+connection belongs to the app: close it when the session ends.
 }
 
 \examples{

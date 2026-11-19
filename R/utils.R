@@ -1,11 +1,11 @@
-#' Проверка числового параметра настроек
+#' Check a numeric settings parameter
 #'
-#' @param x Значение.
-#' @param name Название параметра для сообщения об ошибке.
-#' @param whole Требовать целое число.
-#' @param call Окружение для сообщения об ошибке.
+#' @param x Value.
+#' @param name Parameter name for the error message.
+#' @param whole Require a whole number.
+#' @param call Environment for the error message.
 #'
-#' @returns Значение (невидимо), либо ошибка класса `appauth_error_settings`.
+#' @returns The value (invisibly), or an error of class `appauth_error_settings`.
 #' @noRd
 aa_check_positive <- function(x, name, whole = TRUE, call = rlang::caller_env()) {
   ok <- is.numeric(x) && length(x) == 1 && is.finite(x) && x > 0 &&
@@ -14,9 +14,9 @@ aa_check_positive <- function(x, name, whole = TRUE, call = rlang::caller_env())
   if (!ok) {
     rlang::abort(
       paste0(
-        "Параметр `", name, "` должен быть ",
-        if (whole) "целым " else "",
-        "положительным числом."
+        "`", name, "` must be a positive ",
+        if (whole) "whole " else "",
+        "number."
       ),
       class = "appauth_error_settings",
       call = call
@@ -26,16 +26,16 @@ aa_check_positive <- function(x, name, whole = TRUE, call = rlang::caller_env())
   invisible(x)
 }
 
-#' Проверка логического параметра настроек
+#' Check a logical settings parameter
 #'
 #' @inheritParams aa_check_positive
 #'
-#' @returns Значение (невидимо), либо ошибка класса `appauth_error_settings`.
+#' @returns The value (invisibly), or an error of class `appauth_error_settings`.
 #' @noRd
 aa_check_flag <- function(x, name, call = rlang::caller_env()) {
   if (!(is.logical(x) && length(x) == 1 && !is.na(x))) {
     rlang::abort(
-      paste0("Параметр `", name, "` должен быть TRUE или FALSE."),
+      paste0("`", name, "` must be TRUE or FALSE."),
       class = "appauth_error_settings",
       call = call
     )
@@ -44,14 +44,14 @@ aa_check_flag <- function(x, name, call = rlang::caller_env()) {
   invisible(x)
 }
 
-#' Дата из базы в местном времени для показа
+#' Database date in local time for display
 #'
-#' В базе даты хранятся по UTC текстом `"ГГГГ-ММ-ДД ЧЧ:ММ:СС"`.
+#' Dates are stored in the database in UTC as text `"YYYY-MM-DD HH:MM:SS"`.
 #'
-#' @param x Вектор дат из базы (текст или `NA`).
-#' @param missing Текст для пустых значений.
+#' @param x Vector of dates from the database (text or `NA`).
+#' @param missing Text for empty values.
 #'
-#' @returns Вектор строк `"ГГГГ-ММ-ДД ЧЧ:ММ"` в часовом поясе сервера.
+#' @returns A character vector `"YYYY-MM-DD HH:MM"` in the server time zone.
 #' @noRd
 aa_format_db_time <- function(x, missing = "") {
   x <- as.character(x)
@@ -62,11 +62,11 @@ aa_format_db_time <- function(x, missing = "") {
   out
 }
 
-#' Одна ли это непустая строка
+#' Whether this is a single non-empty string
 #'
-#' @param x Значение.
+#' @param x Value.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @noRd
 aa_is_string <- function(x) {
   is.character(x) && length(x) == 1 && !is.na(x) && nzchar(x)

@@ -1,26 +1,27 @@
-#' Источник прав из матрицы «право -> роли»
+#' Permission provider from a "permission -> roles" matrix
 #'
-#' Создаёт источник прав (`provider`) для [aa_can()] и [aa_require()] по схеме,
-#' которая используется в Server Manager: именованный список, где имя это право,
-#' а значение это роли, которым оно доступно (вектор или одна строка).
+#' Creates a permission provider (`provider`) for [aa_can()] and [aa_require()]
+#' from a named list, where the name is a permission and the value is the roles
+#' that hold it (a vector or a single string).
 #'
-#' Роль администратора не получает прав автоматически: право есть только у тех
-#' ролей, которые перечислены в матрице.
+#' The administrator role does not receive permissions automatically: a
+#' permission is held only by the roles listed in the matrix.
 #'
-#' Если матрица меняется во время работы приложения (редактор прав), передайте
-#' функцию без аргументов, которая возвращает актуальную матрицу, например
-#' `function() conf_rv()$access_managemet`. Тогда она читается при каждой проверке.
+#' If the matrix changes while the app is running (a permission editor), pass a
+#' function without arguments that returns the current matrix, for example
+#' `function() conf_rv()$access_matrix`. It is then read on every check.
 #'
-#' Источник прав это любая функция `function(user)`, возвращающая вектор названий
-#' прав пользователя. Если матрица вам не подходит (права на пользователя из базы,
-#' по группам), напишите такую функцию сами: остальные функции пакета работают с
-#' ней одинаково.
+#' A permission provider is any function `function(user)` that returns a vector
+#' of the user's permission names. If a matrix does not suit you (per-user
+#' permissions from a database, group-based permissions), write such a function
+#' yourself: the other package functions treat it the same way.
 #'
-#' @param matrix Именованный список «право -> роли» либо функция без аргументов,
-#'   возвращающая такой список.
+#' @param matrix A named list "permission -> roles", or a function without
+#'   arguments that returns such a list.
 #'
-#' @returns Функция `function(user)`: по списку с полем `role` возвращает
-#'   названия прав. Для пустой или неизвестной роли возвращает `character(0)`.
+#' @returns A function `function(user)`: for a list with a `role` field it
+#'   returns the permission names. For an empty or unknown role it returns
+#'   `character(0)`.
 #' @export
 #'
 #' @examples
@@ -61,7 +62,7 @@ aa_check_matrix <- function(matrix, call = rlang::caller_env()) {
 
   if (!ok) {
     rlang::abort(
-      "`matrix` должен быть именованным списком вида право -> роли (или функцией, которая его возвращает).",
+      "`matrix` must be a named list of the form permission -> roles (or a function that returns one).",
       class = "appauth_error_permissions",
       call = call
     )
@@ -70,21 +71,23 @@ aa_check_matrix <- function(matrix, call = rlang::caller_env()) {
   invisible(matrix)
 }
 
-#' Есть ли у пользователя право
+#' Does the user have a permission
 #'
-#' Серверная проверка права. Скрытие кнопок и вкладок защитой не является,
-#' поэтому её нужно вызывать в каждом обработчике действия (см. [aa_require()]).
+#' Server-side permission check. Hiding buttons and tabs is not protection, so
+#' call this in every action handler (see [aa_require()]).
 #'
-#' Проверка закрыта по умолчанию: любая неопределённость (пользователя нет,
-#' право не строка, источник прав вернул мусор или упал с ошибкой) даёт `FALSE`.
+#' The check is closed by default: any uncertainty (no user, the permission is
+#' not a string, the provider returned garbage or failed with an error) gives
+#' `FALSE`.
 #'
-#' @param user Пользователь: список с полями `login` и `role`, например
-#'   `auth$user()`. Роль нужно брать из серверного состояния, а не из `input`.
-#' @param permission Название права (одна непустая строка).
-#' @param provider Источник прав: функция `function(user)`, возвращающая вектор
-#'   названий прав, например результат [aa_permissions_from_matrix()].
+#' @param user The user: a list with `login` and `role` fields, for example
+#'   `auth$user()`. Take the role from server-side state, not from `input`.
+#' @param permission Permission name (a single non-empty string).
+#' @param provider Permission provider: a function `function(user)` that returns
+#'   a vector of permission names, for example the result of
+#'   [aa_permissions_from_matrix()].
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @export
 #'
 #' @examples
@@ -95,7 +98,7 @@ aa_check_matrix <- function(matrix, call = rlang::caller_env()) {
 aa_can <- function(user, permission, provider) {
   if (!is.function(provider)) {
     rlang::abort(
-      "`provider` должен быть функцией `function(user)`, например результатом `aa_permissions_from_matrix()`.",
+      "`provider` must be a function `function(user)`, for example the result of `aa_permissions_from_matrix()`.",
       class = "appauth_error_permissions"
     )
   }
@@ -107,7 +110,7 @@ aa_can <- function(user, permission, provider) {
   granted <- tryCatch(
     provider(user),
     error = function(e) {
-      message("appauth: источник прав завершился ошибкой: ", conditionMessage(e))
+      message("appauth: the permission provider failed: ", conditionMessage(e))
       NULL
     }
   )
@@ -119,30 +122,32 @@ aa_can <- function(user, permission, provider) {
   permission %in% granted
 }
 
-#' Требовать право в обработчике действия
+#' Require a permission in an action handler
 #'
-#' Вызывается первой строкой обработчика. Если право есть, возвращает `TRUE`.
-#' Если нет, сообщает хуку `on_event` событие `access_denied` (в `value`
-#' название права), показывает пользователю уведомление и тихо прерывает
-#' обработчик через [shiny::req()].
+#' Call it on the first line of a handler. If the user has the permission, it
+#' returns `TRUE`. If not, it reports an `access_denied` event to the `on_event`
+#' hook (the permission name goes into `value`), shows the user a notification
+#' and quietly aborts the handler through [shiny::req()].
 #'
-#' @param auth Объект авторизации (список с реактивным значением `user`, как
-#'   возвращает модуль входа) либо сам пользователь (список с `login` и `role`).
-#' @param permission Название права.
-#' @param provider Источник прав, см. [aa_can()].
-#' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
-#' @param settings Настройки, результат [aa_settings()] (язык текста отказа).
-#' @param session_id Идентификатор сессии для хука. По умолчанию берётся из
-#'   текущей сессии Shiny.
+#' @param auth The authorization object (a list with a reactive `user` value, as
+#'   returned by the login module) or the user itself (a list with `login` and
+#'   `role`).
+#' @param permission Permission name.
+#' @param provider Permission provider, see [aa_can()].
+#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param settings Settings, the result of [aa_settings()] (language of the
+#'   denial text).
+#' @param session_id Session identifier for the hook. By default it is taken
+#'   from the current Shiny session.
 #'
-#' @returns Невидимо `TRUE`. При отсутствии права прерывает обработчик.
+#' @returns Invisibly `TRUE`. If the permission is missing, aborts the handler.
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' observeEvent(input$run_task, {
 #'   aa_require(auth, "Run", provider, on_event = log_event)
-#'   # ... действие ...
+#'   # ... the action ...
 #' })
 #' }
 aa_require <- function(auth, permission, provider, on_event = NULL,
@@ -160,9 +165,9 @@ aa_require <- function(auth, permission, provider, on_event = NULL,
   }
 
   message(
-    "appauth: отказано в доступе: пользователь=",
+    "appauth: access denied: user=",
     if (aa_is_string(login)) login else "anonymous",
-    ", право=", if (aa_is_string(permission)) permission else "?"
+    ", permission=", if (aa_is_string(permission)) permission else "?"
   )
   aa_emit(on_event, "access_denied", login, session_id, permission)
 

@@ -2,26 +2,27 @@
 % Please edit documentation in R/sessions.R
 \name{aa_find_session_user}
 \alias{aa_find_session_user}
-\title{Найти пользователя по токену автовхода}
+\title{Find a user by autologin token}
 \usage{
 aa_find_session_user(conn, token)
 }
 \arguments{
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{token}{Токен из cookie.}
+\item{token}{Token from the cookie.}
 }
 \value{
-Список с полями \code{login} и \code{role} или \code{NULL}.
+A list with \code{login} and \code{role} fields, or \code{NULL}.
 }
 \description{
-Возвращает пользователя только если токен существует, не отозван и не истёк,
-а сам пользователь есть, не заблокирован и не обязан сменить пароль (после
-смены пароля войти нужно заново). Роль берётся из базы на момент проверки.
+Returns the user only if the token exists, is not revoked and has not
+expired, and the user exists, is not blocked and is not required to change
+the password (after a password change the user must log in again). The role
+is taken from the database at the time of the check.
 }
 \examples{
 \dontrun{
 user <- aa_find_session_user(conn, input$auth_cookie)
-if (!is.null(user)) { # пользователь входит без пароля }
+if (!is.null(user)) { # the user logs in without a password }
 }
 }

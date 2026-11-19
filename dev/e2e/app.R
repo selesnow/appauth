@@ -1,5 +1,5 @@
 suppressMessages({
-  pkgload::load_all("C:/scripts/alsey/netpeak_core/nc_analytics_team/internal_packages/appauth", quiet = TRUE)
+  pkgload::load_all(Sys.getenv("AA_PKG", "."), quiet = TRUE)
   library(shiny)
 })
 
@@ -34,7 +34,7 @@ server <- function(input, output, session) {
     tagList(
       div(style = "padding: 16px;",
         h3(id = "whoami", paste0(auth$user()$login, " / ", auth$user()$role)),
-        actionButton("logout", "Выйти"),
+        actionButton("logout", "Sign out"),
         aa_password_ui("pw"),
         if (aa_can(auth$user(), "Access", provider)) aa_users_ui("users")
       )

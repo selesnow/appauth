@@ -2,20 +2,21 @@
 % Please edit documentation in R/totp.R
 \name{aa_recovery_codes_left}
 \alias{aa_recovery_codes_left}
-\title{Сколько резервных кодов осталось}
+\title{How many recovery codes are left}
 \usage{
 aa_recovery_codes_left(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-Целое число неиспользованных резервных кодов.
+An integer: the number of unused recovery codes.
 }
 \description{
-Сколько резервных кодов осталось
+How many recovery codes are left
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

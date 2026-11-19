@@ -1,4 +1,4 @@
-suppressMessages(pkgload::load_all("C:/scripts/alsey/netpeak_core/nc_analytics_team/internal_packages/appauth", quiet = TRUE))
+suppressMessages(pkgload::load_all(Sys.getenv("AA_PKG", "."), quiet = TRUE))
 db <- file.path(Sys.getenv("TEMP"), "aa_e2e", "e2e.db")
 for (f in c(db, paste0(db, c("-wal", "-shm")))) if (file.exists(f)) unlink(f)
 con <- DBI::dbConnect(RSQLite::SQLite(), db)

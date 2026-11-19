@@ -1,22 +1,22 @@
-#' Подключить стили и скрипты appauth
+#' Attach appauth styles and scripts
 #'
-#' Нужно вызвать один раз в интерфейсе приложения (внутри `fluidPage()` или
-#' `tagList()`). Добавляет CSS формы входа и вкладки пользователей и JS, который
-#' читает, пишет и удаляет cookie автовхода.
+#' Call it once in the application UI (inside `fluidPage()` or `tagList()`).
+#' Adds the CSS of the sign-in form and the users tab, and the JS that reads,
+#' writes and deletes the auto sign-in cookie.
 #'
-#' Оформление меняется CSS-переменными `--aa-*` (например `--aa-primary`),
-#' которые нужно переопределить в своём CSS после `aa_app_head()`. Светлая тема
-#' включается классом `aa-theme-light` на `<body>` или родительском элементе.
+#' The look is changed with `--aa-*` CSS variables (for example `--aa-primary`),
+#' which you override in your own CSS after `aa_app_head()`. The light theme is
+#' enabled with the `aa-theme-light` class on `<body>` or a parent element.
 #'
-#' Cookie пишется с `SameSite=Lax`, а на HTTPS ещё и с `Secure`.
+#' The cookie is written with `SameSite=Lax`, and on HTTPS also with `Secure`.
 #'
-#' @returns Объект `shiny.tag.list`, который подключает зависимость `appauth`.
+#' @returns A `shiny.tag.list` object that attaches the `appauth` dependency.
 #' @export
 #'
 #' @examples
 #' ui <- shiny::fluidPage(
 #'   aa_app_head()
-#'   # ... остальной интерфейс приложения
+#'   # ... the rest of the application UI
 #' )
 aa_app_head <- function() {
   htmltools::tagList(

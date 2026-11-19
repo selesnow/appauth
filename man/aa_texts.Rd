@@ -2,32 +2,35 @@
 % Please edit documentation in R/texts.R
 \name{aa_texts}
 \alias{aa_texts}
-\title{Тексты интерфейса и сообщений}
+\title{Interface and message texts}
 \usage{
-aa_texts(lang = c("ru", "en"), ...)
+aa_texts(lang = c("en", "ru"), ...)
 }
 \arguments{
-\item{lang}{Язык текстов: \code{"ru"} (по умолчанию) или \code{"en"}.}
+\item{lang}{Language of the texts: \code{"en"} (default) or \code{"ru"}.}
 
-\item{...}{Свои тексты в виде \code{ключ = "строка"}, заменяют стандартные.}
+\item{...}{Your own texts as \code{key = "string"}, they replace the default ones.}
 }
 \value{
-Именованный список строк класса \code{aa_texts}.
+A named list of strings of class \code{aa_texts}.
 }
 \description{
-Возвращает набор текстов для выбранного языка. Любую строку можно заменить
-своей, указав её название и новое значение. Тексты с подстановкой значений
-содержат маркеры \verb{\%d} (число) и \verb{\%s} (строка), значения подставляет
-\code{\link[=aa_text]{aa_text()}}.
+Returns the set of texts for the chosen language. Any string can be replaced
+with your own by passing its key and the new value. Texts with substituted
+values contain \verb{\%d} (number) and \verb{\%s} (string) placeholders, the values are
+filled in by \code{\link[=aa_text]{aa_text()}}.
 }
 \details{
-Доступные ключи можно посмотреть через \code{\link[=aa_text_keys]{aa_text_keys()}}.
+Available keys are listed by \code{\link[=aa_text_keys]{aa_text_keys()}}.
 }
 \examples{
-# английские тексты
-texts <- aa_texts("en")
+# English texts (default)
+texts <- aa_texts()
 
-# русские тексты со своим названием кнопки входа
-texts <- aa_texts("ru", login_button = "Войти в систему")
+# English texts with a custom sign-in button label
+texts <- aa_texts("en", login_button = "Log in")
 texts$login_button
+
+# Russian texts
+texts <- aa_texts("ru")
 }

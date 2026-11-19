@@ -2,40 +2,40 @@
 % Please edit documentation in R/mod-totp.R
 \name{aa_totp_server}
 \alias{aa_totp_server}
-\title{Модуль двухфакторной аутентификации: сервер}
+\title{Two-factor authentication module: server}
 \usage{
 aa_totp_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
 }
 \arguments{
-\item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_totp_ui]{aa_totp_ui()}}.}
+\item{id}{Module id, the same as in \code{\link[=aa_totp_ui]{aa_totp_ui()}}.}
 
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{auth}{Объект авторизации, результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
+\item{auth}{Authentication object, the result of \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} с \code{totp_enabled = TRUE}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 
-\item{on_event}{Хук событий \verb{function(event, user, session_id, value)} или \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
 }
 \value{
-Список с функцией \code{refresh()}, которая перерисовывает блок.
+A list with a \code{refresh()} function that redraws the block.
 }
 \description{
-Пользователь сам включает и выключает двухфакторную аутентификацию (TOTP):
+The user enables and disables two-factor authentication (TOTP) on their own:
 }
 \details{
 \itemize{
-\item \strong{включение}: кнопка создаёт секрет (\code{\link[=aa_totp_setup]{aa_totp_setup()}}), показывает QR-код
-(если установлен пакет \code{qrcode}) и ключ для ручного ввода, а после ввода кода
-из приложения (\code{\link[=aa_totp_enable]{aa_totp_enable()}}) включает защиту и \strong{один раз} показывает
-10 резервных кодов. Остальные сессии пользователя при включении завершаются;
-\item \strong{выключение}: нужны пароль и код (или резервный код), иначе тот, кто
-занял открытую сессию, мог бы снять защиту.
+\item \strong{enabling}: a button creates a secret (\code{\link[=aa_totp_setup]{aa_totp_setup()}}), shows a QR code
+(if the \code{qrcode} package is installed) and a key for manual entry, and after a code
+from the authenticator app is entered (\code{\link[=aa_totp_enable]{aa_totp_enable()}}) turns protection on and shows
+10 recovery codes \strong{once}. The user's other sessions are ended on enabling;
+\item \strong{disabling}: needs the password and a code (or a recovery code), otherwise whoever
+took over an open session could remove the protection.
 }
 
-Неверные коды считаются неудачными попытками входа (\code{\link[=aa_record_attempt]{aa_record_attempt()}}),
-поэтому перебор кода в личном кабинете блокирует логин так же, как перебор
-пароля. События: \code{totp_enabled}, \code{totp_disabled}, \code{totp_failed}.
+Wrong codes count as failed login attempts (\code{\link[=aa_record_attempt]{aa_record_attempt()}}),
+so guessing a code on the account page locks the login the same way as guessing
+a password. Events: \code{totp_enabled}, \code{totp_disabled}, \code{totp_failed}.
 }
 \examples{
 \dontrun{

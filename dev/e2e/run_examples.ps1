@@ -1,11 +1,11 @@
-# Запускает оба пример-приложения (из исходников пакета через pkgload) и прогоняет examples.py.
-# Приложения: minimal-app на 8771, custom-permissions-app на 8772. Базы временные.
+# Starts both example apps (from the package sources via pkgload) and runs examples.py.
+# Apps: minimal-app on 8771, custom-permissions-app on 8772. The databases are temporary.
 $pkg = (Resolve-Path "$PSScriptRoot\..\..").Path.Replace('\', '/')
 $tmp = "$env:TEMP\aa_examples"
 New-Item -ItemType Directory -Force $tmp | Out-Null
 $rscript = "C:\Program Files\R\R-4.6.1\bin\Rscript.exe"
 
-# прежние процессы примеров
+# previous example processes
 Get-CimInstance Win32_Process -Filter "Name='Rscript.exe'" | Where-Object { $_.CommandLine -like "*aa_examples_run*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 Start-Sleep -Seconds 1
 
@@ -23,7 +23,7 @@ foreach ($a in $apps) {
     Start-Sleep -Milliseconds 800
     try { $r = Invoke-WebRequest -Uri "http://127.0.0.1:$($a.port)" -UseBasicParsing -TimeoutSec 3; if ($r.StatusCode -eq 200) { $up = $true; break } } catch {}
   }
-  "$($a.name): запущено = $up"
+  "$($a.name): started = $up"
 }
 
 $env:PYTHONIOENCODING = "utf-8"

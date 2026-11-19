@@ -2,7 +2,7 @@
 % Please edit documentation in R/permissions.R
 \name{aa_require}
 \alias{aa_require}
-\title{Требовать право в обработчике действия}
+\title{Require a permission in an action handler}
 \usage{
 aa_require(
   auth,
@@ -14,34 +14,36 @@ aa_require(
 )
 }
 \arguments{
-\item{auth}{Объект авторизации (список с реактивным значением \code{user}, как
-возвращает модуль входа) либо сам пользователь (список с \code{login} и \code{role}).}
+\item{auth}{The authorization object (a list with a reactive \code{user} value, as
+returned by the login module) or the user itself (a list with \code{login} and
+\code{role}).}
 
-\item{permission}{Название права.}
+\item{permission}{Permission name.}
 
-\item{provider}{Источник прав, см. \code{\link[=aa_can]{aa_can()}}.}
+\item{provider}{Permission provider, see \code{\link[=aa_can]{aa_can()}}.}
 
-\item{on_event}{Хук событий \verb{function(event, user, session_id, value)} или \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} (язык текста отказа).}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} (language of the
+denial text).}
 
-\item{session_id}{Идентификатор сессии для хука. По умолчанию берётся из
-текущей сессии Shiny.}
+\item{session_id}{Session identifier for the hook. By default it is taken
+from the current Shiny session.}
 }
 \value{
-Невидимо \code{TRUE}. При отсутствии права прерывает обработчик.
+Invisibly \code{TRUE}. If the permission is missing, aborts the handler.
 }
 \description{
-Вызывается первой строкой обработчика. Если право есть, возвращает \code{TRUE}.
-Если нет, сообщает хуку \code{on_event} событие \code{access_denied} (в \code{value}
-название права), показывает пользователю уведомление и тихо прерывает
-обработчик через \code{\link[shiny:req]{shiny::req()}}.
+Call it on the first line of a handler. If the user has the permission, it
+returns \code{TRUE}. If not, it reports an \code{access_denied} event to the \code{on_event}
+hook (the permission name goes into \code{value}), shows the user a notification
+and quietly aborts the handler through \code{\link[shiny:req]{shiny::req()}}.
 }
 \examples{
 \dontrun{
 observeEvent(input$run_task, {
   aa_require(auth, "Run", provider, on_event = log_event)
-  # ... действие ...
+  # ... the action ...
 })
 }
 }

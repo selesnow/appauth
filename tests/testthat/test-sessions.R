@@ -1,4 +1,4 @@
-test_that("токен выдаётся, в базе только sha256-хеш, срок равен session_days", {
+test_that("a token is issued, the database holds only the sha256 hash, the lifetime equals session_days", {
   con <- users_db()
   raw_user(con, "ivan", "user")
 
@@ -18,14 +18,14 @@ test_that("токен выдаётся, в базе только sha256-хеш, 
   expect_equal(days, 30, tolerance = 0.01)
 })
 
-test_that("токены уникальны", {
+test_that("tokens are unique", {
   con <- users_db()
   raw_user(con, "ivan")
 
   expect_false(identical(aa_issue_token(con, "ivan"), aa_issue_token(con, "ivan")))
 })
 
-test_that("срок токена берётся из настроек", {
+test_that("the token lifetime comes from the settings", {
   con <- users_db()
   raw_user(con, "ivan")
 
@@ -34,7 +34,7 @@ test_that("срок токена берётся из настроек", {
   expect_equal(days, 1, tolerance = 0.01)
 })
 
-test_that("токен не выдаётся: автовход выключен, нет пользователя, блокировка, пустой логин", {
+test_that("no token is issued: autologin disabled, no user, blocked, empty login", {
   con <- users_db()
   raw_user(con, "ivan")
   raw_user(con, "bad", blocked = 1)
@@ -47,14 +47,14 @@ test_that("токен не выдаётся: автовход выключен, 
   expect_equal(nrow(rows_of(con, "auth_sessions")), 0)
 })
 
-test_that("токен выдаётся строго для точного логина (регистр различается)", {
+test_that("a token is issued strictly for the exact login (case matters)", {
   con <- users_db()
   raw_user(con, "kiruka")
 
   expect_null(aa_issue_token(con, "Kiruka"))
 })
 
-test_that("по токену находится пользователь с актуальной ролью", {
+test_that("the token finds the user with the current role", {
   con <- users_db()
   raw_user(con, "ivan", "user")
   token <- aa_issue_token(con, "ivan")
@@ -65,7 +65,7 @@ test_that("по токену находится пользователь с ак
   expect_equal(aa_find_session_user(con, token)$role, "admin")
 })
 
-test_that("чужой, пустой и повреждённый токен никого не пускает", {
+test_that("a foreign, empty and corrupted token lets nobody in", {
   con <- users_db()
   raw_user(con, "ivan")
   token <- aa_issue_token(con, "ivan")
@@ -75,11 +75,11 @@ test_that("чужой, пустой и повреждённый токен ни�
   expect_null(aa_find_session_user(con, NA_character_))
   expect_null(aa_find_session_user(con, NULL))
   expect_null(aa_find_session_user(con, c(token, token)))
-  # хеш из базы в качестве токена не работает
+  # the hash from the database does not work as a token
   expect_null(aa_find_session_user(con, rows_of(con, "auth_sessions")$token_hash))
 })
 
-test_that("истёкший и отозванный токены не работают", {
+test_that("expired and revoked tokens do not work", {
   con <- users_db()
   raw_user(con, "ivan")
   token <- aa_issue_token(con, "ivan")
@@ -94,7 +94,7 @@ test_that("истёкший и отозванный токены не работ
   expect_null(aa_find_session_user(con, token))
 })
 
-test_that("отзыв токена не трогает остальные и безопасен на мусоре", {
+test_that("revoking a token leaves the others alone and is safe on garbage", {
   con <- users_db()
   raw_user(con, "ivan")
   t1 <- aa_issue_token(con, "ivan")
@@ -109,7 +109,7 @@ test_that("отзыв токена не трогает остальные и б�
   expect_equal(aa_revoke_token(con, ""), 0)
 })
 
-test_that("блокировка, удаление и смена пароля лишают токены силы", {
+test_that("blocking, deletion and a password change invalidate tokens", {
   con <- users_db()
   raw_user(con, "admin", "admin")
   aa_set_password(con, "admin", "adminpass1")
@@ -129,7 +129,7 @@ test_that("блокировка, удаление и смена пароля л�
   expect_null(aa_find_session_user(con, t_olga))
 })
 
-test_that("после разблокировки старый токен остаётся отозванным", {
+test_that("after unblocking the old token stays revoked", {
   con <- users_db()
   raw_user(con, "admin", "admin")
   raw_user(con, "ivan")
@@ -141,7 +141,7 @@ test_that("после разблокировки старый токен ост�
   expect_null(aa_find_session_user(con, token))
 })
 
-test_that("токен удалённого пользователя не переходит к новому владельцу логина", {
+test_that("the token of a deleted user does not pass to a new owner of the login", {
   con <- users_db()
   raw_user(con, "admin", "admin")
   raw_user(con, "ivan")
@@ -153,7 +153,7 @@ test_that("токен удалённого пользователя не пер�
   expect_null(aa_find_session_user(con, token))
 })
 
-test_that("токен другого регистра логина не подходит", {
+test_that("a token for a login of another case does not fit", {
   con <- users_db()
   raw_user(con, "kiruka")
   raw_user(con, "Kiruka")
@@ -162,10 +162,10 @@ test_that("токен другого регистра логина не подх
   expect_equal(aa_find_session_user(con, token)$login, "kiruka")
 })
 
-test_that("старые токены Server Manager (sha256 как текст) продолжают работать", {
+test_that("legacy tokens (sha256 as text) keep working", {
   skip_if_not_sqlite()
   con <- new_db()
-  fixture_server_manager_prod(con)
+  fixture_legacy_full(con)
   aa_init_db(con)
   texec(con, "UPDATE auth_sessions SET token_hash = ? WHERE token_hash = 'tok1'",
                  params = list(as.character(openssl::sha256("raw-cookie"))))
@@ -173,7 +173,7 @@ test_that("старые токены Server Manager (sha256 как текст) �
   expect_equal(aa_find_session_user(con, "raw-cookie")$login, "alsey")
 })
 
-test_that("проверка живой сессии: действует, пока всё совпадает", {
+test_that("live session check: valid while everything matches", {
   con <- users_db()
   raw_user(con, "ivan", "user")
 
@@ -184,7 +184,7 @@ test_that("проверка живой сессии: действует, пок�
   expect_equal(res$role, "user")
 })
 
-test_that("проверка живой сессии видит блокировку, удаление и смену роли", {
+test_that("live session check sees blocking, deletion and a role change", {
   con <- users_db()
   raw_user(con, "admin", "admin")
   raw_user(con, "ivan", "user")
@@ -209,7 +209,7 @@ test_that("проверка живой сессии видит блокиров�
   expect_equal(changed$role, "viewer")
 })
 
-test_that("понижение роли вступает в силу и для повышения", {
+test_that("a role change takes effect for a promotion as well", {
   con <- users_db()
   raw_user(con, "admin", "admin")
   raw_user(con, "ivan", "user")
@@ -218,7 +218,7 @@ test_that("понижение роли вступает в силу и для п
   expect_equal(aa_user_session_valid(con, "ivan", "user")$reason, "role_changed")
 })
 
-test_that("проверка живой сессии при сбое базы не выбрасывает пользователя", {
+test_that("live session check does not kick out the user on a database failure", {
   con <- users_db()
   raw_user(con, "ivan", "user")
   texec(con, "DROP TABLE users")
@@ -229,14 +229,14 @@ test_that("проверка живой сессии при сбое базы н�
   expect_equal(res$reason, "check_failed")
 })
 
-test_that("логин другого регистра не считается тем же пользователем", {
+test_that("a login of another case is not the same user", {
   con <- users_db()
   raw_user(con, "kiruka", "user")
 
   expect_equal(aa_user_session_valid(con, "Kiruka", "user")$reason, "deleted")
 })
 
-test_that("aa_active_autologins считает только действующие токены автовхода", {
+test_that("aa_active_autologins counts only active autologin tokens", {
   con <- users_db()
   raw_user(con, "ivan")
   raw_user(con, "olga")
@@ -255,7 +255,7 @@ test_that("aa_active_autologins считает только действующи
   expect_setequal(all$login, c("ivan", "olga"))
   expect_identical(all$n[all$login == "ivan"], 2L)
 
-  # отозванный и истёкший токены не считаются
+  # revoked and expired tokens are not counted
   aa_revoke_token(con, t1)
   expect_identical(aa_active_autologins(con, "ivan"), 1L)
 
@@ -264,7 +264,7 @@ test_that("aa_active_autologins считает только действующи
   expect_identical(aa_active_autologins(con, "olga"), 1L)
 })
 
-test_that("aa_active_autologins: логин с другим регистром, пустой логин, нет таблицы", {
+test_that("aa_active_autologins: a login of another case, an empty login, no table", {
   con <- users_db()
   raw_user(con, "ivan")
   aa_issue_token(con, "ivan")

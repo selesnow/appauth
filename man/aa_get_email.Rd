@@ -2,21 +2,22 @@
 % Please edit documentation in R/reset.R
 \name{aa_get_email}
 \alias{aa_get_email}
-\title{Email пользователя}
+\title{User email}
 \usage{
 aa_get_email(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-Адрес в нижнем регистре или \code{NA_character_}, если адрес не указан или
-пользователя нет. Если схема не достроена до версии 7, тоже \code{NA_character_}.
+The address in lower case or \code{NA_character_} if no address is set or
+the user does not exist. If the schema is not upgraded to version 7, also \code{NA_character_}.
 }
 \description{
-Email пользователя
+User email
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

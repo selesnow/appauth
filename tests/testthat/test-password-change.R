@@ -2,7 +2,7 @@ must_change_of <- function(con, login) {
   tquery(con, "SELECT must_change FROM users WHERE login = ?", params = list(login))$must_change
 }
 
-test_that("создание с must_change и вход возвращают признак", {
+test_that("creation with must_change and login return the flag", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
   aa_create_user(con, "bob", "secret123", "user")
@@ -14,7 +14,7 @@ test_that("создание с must_change и вход возвращают пр
   expect_named(aa_authenticate(con, "bob", "secret123"), c("login", "role", "blocked", "must_change"))
 })
 
-test_that("сброс пароля может потребовать смену, обычная установка снимает требование", {
+test_that("a reset can require a change, a normal set clears the requirement", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
 
@@ -25,7 +25,7 @@ test_that("сброс пароля может потребовать смену,
   expect_equal(must_change_of(con, "ann"), 0)
 })
 
-test_that("keep_token оставляет текущий токен и отзывает остальные", {
+test_that("keep_token keeps the current token and revokes the others", {
   con <- users_db()
   raw_user(con, "ann")
   keep <- aa_issue_token(con, "ann")
@@ -37,7 +37,7 @@ test_that("keep_token оставляет текущий токен и отзыв
   expect_null(aa_find_session_user(con, other))
 })
 
-test_that("токен пользователя, обязанного сменить пароль, в приложение не пускает", {
+test_that("the token of a user who must change the password does not let into the app", {
   con <- users_db()
   raw_user(con, "ann")
   token <- aa_issue_token(con, "ann")
@@ -46,7 +46,7 @@ test_that("токен пользователя, обязанного смени�
   expect_null(aa_find_session_user(con, token))
 })
 
-test_that("смена своего пароля: успех, проверка нового, снятие требования, токены", {
+test_that("changing your own password: success, new password check, requirement cleared, tokens", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
   raw_keep <- NULL
@@ -64,7 +64,7 @@ test_that("смена своего пароля: успех, проверка н
   expect_null(aa_find_session_user(con, other))
 })
 
-test_that("смена своего пароля: неверный текущий, тот же, слабый, заблокированный, чужой логин", {
+test_that("changing your own password: wrong current, same, weak, blocked, unknown login", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
   hash_before <- stored_password(con, "ann")
@@ -85,17 +85,18 @@ test_that("смена своего пароля: неверный текущий
   expect_equal(stored_password(con, "ann"), hash_before)
 })
 
-test_that("сообщения смены пароля на языке настроек", {
+test_that("password change messages are in the settings language", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
-  settings <- aa_settings(texts = aa_texts("en"))
+  settings <- aa_settings(texts = aa_texts("ru"))
 
   e <- tryCatch(aa_change_own_password(con, "ann", "bad", "brand-new-1", settings), appauth_error_user = function(e) e)
 
-  expect_equal(conditionMessage(e), "The current password is incorrect")
+  expect_equal(conditionMessage(e), aa_text(settings, "password_wrong"))
+  expect_false(identical(conditionMessage(e), aa_text(aa_settings(), "password_wrong")))
 })
 
-test_that("завершение сессий отзывает все токены пользователя и только его", {
+test_that("ending sessions revokes all tokens of the user and only theirs", {
   con <- users_db()
   raw_user(con, "ann")
   raw_user(con, "bob")
@@ -112,7 +113,7 @@ test_that("завершение сессий отзывает все токен�
   expect_equal(aa_revoke_sessions(con, NULL), 0)
 })
 
-test_that("проверка сессии видит отозванный токен, без токена не проверяет его", {
+test_that("the session check sees a revoked token and does not check it without a token", {
   con <- users_db()
   raw_user(con, "ann", "user")
   token <- aa_issue_token(con, "ann")
@@ -129,7 +130,7 @@ test_that("проверка сессии видит отозванный ток�
   expect_true(aa_user_session_valid(con, "ann", "user", "")$valid)
 })
 
-test_that("истёкший токен сессии тоже недействителен", {
+test_that("an expired session token is invalid too", {
   con <- users_db()
   raw_user(con, "ann", "user")
   token <- aa_issue_token(con, "ann")
@@ -138,7 +139,7 @@ test_that("истёкший токен сессии тоже недействи�
   expect_equal(aa_user_session_valid(con, "ann", "user", token)$reason, "token_revoked")
 })
 
-test_that("сторож завершает сессию при отозванном токене и чистит устаревшее", {
+test_that("the guard ends the session on a revoked token and cleans up stale data", {
   con <- users_db()
   raw_user(con, "ann", "user")
   token <- aa_issue_token(con, "ann")
@@ -161,7 +162,7 @@ test_that("сторож завершает сессию при отозванн�
   expect_equal(auth$calls$logout[[1]]$reason, "token_revoked")
 })
 
-test_that("модуль входа: пароль от администратора требует смены, в приложение не пускает", {
+test_that("login module: an administrator-set password requires a change and does not let into the app", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
 
@@ -169,19 +170,19 @@ test_that("модуль входа: пароль от администратор
     session$setInputs(login = "ann", password = "secret123", login_btn = 1)
     expect_false(session$returned$logged_in())
     expect_match(form_html(output), "change_btn", fixed = TRUE)
-    expect_match(form_html(output), "Смените пароль", fixed = TRUE)
+    expect_match(form_html(output), aa_text(aa_settings(), "must_change_title"), fixed = TRUE)
     expect_equal(nrow(rows_of(con, "auth_sessions")), 0)
 
     session$setInputs(change_password = "brand-new-1", change_confirm = "other", change_btn = 1)
-    expect_equal(output$message, "Пароли не совпадают")
+    expect_equal(output$message, aa_text(aa_settings(), "passwords_mismatch"))
     expect_false(session$returned$logged_in())
 
     session$setInputs(change_password = "123", change_confirm = "123", change_btn = 2)
-    expect_match(output$message, "минимум")
+    expect_match(output$message, "at least")
     expect_false(session$returned$logged_in())
 
     session$setInputs(change_password = "secret123", change_confirm = "secret123", change_btn = 3)
-    expect_match(output$message, "отличаться")
+    expect_match(output$message, "must differ")
     expect_false(session$returned$logged_in())
 
     session$setInputs(change_password = "brand-new-1", change_confirm = "brand-new-1", change_btn = 4)
@@ -197,7 +198,7 @@ test_that("модуль входа: пароль от администратор
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
-test_that("модуль входа: перезагрузка во время смены пароля начинает заново с пароля", {
+test_that("login module: a reload during a password change starts over from the password", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
 
@@ -206,7 +207,7 @@ test_that("модуль входа: перезагрузка во время с�
     expect_false(session$returned$logged_in())
   })
 
-  # новая сессия: без пароля пользователь не вошёл
+  # new session: without a password the user is not logged in
   run_auth(con, {
     session$flushReact()
     expect_match(form_html(output), "login_btn", fixed = TRUE)
@@ -214,7 +215,7 @@ test_that("модуль входа: перезагрузка во время с�
   })
 })
 
-test_that("модуль входа отдаёт токен сессии для сторожа", {
+test_that("the login module exposes the session token for the guard", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
 
@@ -225,7 +226,7 @@ test_that("модуль входа отдаёт токен сессии для �
   })
 })
 
-test_that("модуль смены пароля: успех меняет пароль, событие, токен текущей сессии остаётся", {
+test_that("password module: success changes the password, emits an event, keeps the current session token", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
   keep <- aa_issue_token(con, "ann")
@@ -247,23 +248,23 @@ test_that("модуль смены пароля: успех меняет пар�
   expect_null(aa_find_session_user(con, other))
 })
 
-test_that("модуль смены пароля: ошибки показываются, пароль не меняется", {
+test_that("password module: errors are shown, the password does not change", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
   auth <- fake_auth("ann", "user")
 
   log <- password_run(con, auth, {
     session$setInputs(old = "secret123", new = "brand-new-1", confirm = "different", change = 1)
-    expect_equal(output$message, "Пароли не совпадают")
+    expect_equal(output$message, aa_text(aa_settings(), "passwords_mismatch"))
 
     session$setInputs(old = "wrong", new = "brand-new-1", confirm = "brand-new-1", change = 2)
-    expect_equal(output$message, "Неверный текущий пароль")
+    expect_equal(output$message, aa_text(aa_settings(), "password_wrong"))
 
     session$setInputs(old = "secret123", new = "123", confirm = "123", change = 3)
-    expect_match(output$message, "минимум")
+    expect_match(output$message, "at least")
 
     session$setInputs(old = "secret123", new = "secret123", confirm = "secret123", change = 4)
-    expect_match(output$message, "отличаться")
+    expect_match(output$message, "must differ")
 
     expect_equal(session$returned$changed(), 0)
   })
@@ -272,17 +273,17 @@ test_that("модуль смены пароля: ошибки показываю
   expect_false(is.null(aa_authenticate(con, "ann", "secret123")))
 })
 
-test_that("модуль смены пароля ничего не показывает без пользователя", {
+test_that("the password module shows nothing without a user", {
   con <- users_db()
 
   password_run(con, list(user = shiny::reactiveVal(NULL)), {
     session$flushReact()
-    # без пользователя форма не строится (тихая остановка renderUI)
+    # without a user the form is not built (silent stop of renderUI)
     expect_error(output$form, class = "shiny.silent.error")
   })
 })
 
-test_that("модуль пользователей: сброс пароля требует смену по умолчанию, галочку можно снять", {
+test_that("users module: a reset requires a change by default, the checkbox can be cleared", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -298,7 +299,7 @@ test_that("модуль пользователей: сброс пароля тр
   expect_equal(log$names(), c("password_reset", "password_reset"))
 })
 
-test_that("модуль пользователей: новый пользователь с обязательной сменой пароля", {
+test_that("users module: a new user with a mandatory password change", {
   con <- users_fixture()
 
   run_users(con, {
@@ -313,7 +314,7 @@ test_that("модуль пользователей: новый пользова�
   expect_equal(must_change_of(con, "petr"), 0)
 })
 
-test_that("модуль пользователей: завершение всех сессий отзывает токены и шлёт событие", {
+test_that("users module: ending all sessions revokes tokens and emits an event", {
   con <- users_fixture()
   t1 <- aa_issue_token(con, "ivan")
   t2 <- aa_issue_token(con, "ivan")
@@ -329,7 +330,7 @@ test_that("модуль пользователей: завершение все�
   expect_equal(log$events[[1]]$value, "ivan")
 })
 
-test_that("завершение сессий без открытой карточки или не администратором ничего не делает", {
+test_that("ending sessions without an open card or by a non-administrator does nothing", {
   con <- users_fixture()
   token <- aa_issue_token(con, "ivan")
 

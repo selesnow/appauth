@@ -2,25 +2,26 @@
 % Please edit documentation in R/sessions.R
 \name{aa_active_autologins}
 \alias{aa_active_autologins}
-\title{Сколько действующих автовходов у пользователей}
+\title{How many active autologins users have}
 \usage{
 aa_active_autologins(conn, login = NULL)
 }
 \arguments{
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{login}{Логин пользователя или \code{NULL}.}
+\item{login}{User login or \code{NULL}.}
 }
 \value{
-Для заданного \code{login} целое число (0, если токенов нет). При \code{login = NULL}
-таблица с колонками \code{login} и \code{n} для пользователей, у которых есть действующие
-токены.
+For a given \code{login}, an integer (0 if there are no tokens). With
+\code{login = NULL}, a table with \code{login} and \code{n} columns for users that have
+active tokens.
 }
 \description{
-Считает токены автовхода, которые не отозваны и не истекли: столько устройств
-сейчас «помнят» вход пользователя (cookie), то есть могут войти без пароля.
-Это не число открытых вкладок: приложение их не отслеживает. Если таблицы
-токенов нет или к ней не удалось обратиться, считается, что токенов нет.
+Counts autologin tokens that are not revoked and have not expired: that many
+devices currently "remember" the user's login (cookie), i.e. can log in
+without a password. This is not the number of open tabs: the app does not
+track them. If the token table does not exist or cannot be queried, it is
+assumed there are no tokens.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

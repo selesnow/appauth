@@ -2,23 +2,24 @@
 % Please edit documentation in R/passwords.R
 \name{aa_validate_login}
 \alias{aa_validate_login}
-\title{Проверить логин нового пользователя}
+\title{Validate a new user's login}
 \usage{
 aa_validate_login(login, settings = aa_settings())
 }
 \arguments{
-\item{login}{Проверяемый логин.}
+\item{login}{The login to check.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{NULL}, если логин подходит, иначе текст ошибки (на языке настроек).
+\code{NULL} if the login is fine, otherwise the error text (in the
+settings language).
 }
 \description{
-Логин не должен быть пустым, не должен начинаться или заканчиваться
-пробелом (вход сравнивает логин точно, поэтому такие логины создавали бы
-путаницу; поле ввода в интерфейсе пакета обрезает пробелы по краям само) и не
-должен быть длиннее \code{login_max} символов из настроек.
+The login must not be empty, must not start or end with whitespace (login
+compares the login exactly, so such logins would cause confusion; the input
+field in the package UI trims edge whitespace itself) and must not be longer
+than \code{login_max} characters from the settings.
 }
 \examples{
 aa_validate_login("alsey")

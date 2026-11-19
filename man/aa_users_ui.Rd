@@ -2,25 +2,25 @@
 % Please edit documentation in R/mod-users.R
 \name{aa_users_ui}
 \alias{aa_users_ui}
-\title{Модуль пользователей: интерфейс}
+\title{Users module: UI}
 \usage{
 aa_users_ui(id)
 }
 \arguments{
-\item{id}{Идентификатор модуля.}
+\item{id}{Module id.}
 }
 \value{
-Элемент интерфейса Shiny.
+A Shiny UI element.
 }
 \description{
-Таблица пользователей со статусами и кнопка добавления. Двойной клик по строке
-открывает карточку пользователя. Модуль виден только администратору, остальным
-ничего не показывает. Стили подключаются через \code{\link[=aa_app_head]{aa_app_head()}}.
+A table of users with statuses and an add button. Double-clicking a row
+opens the user card. The module is visible only to an administrator and shows
+nothing to anyone else. Styles are attached through \code{\link[=aa_app_head]{aa_app_head()}}.
 }
 \details{
-Остальное содержимое вкладки «Доступ» (редактор прав, переключатели логов)
-собирает приложение, например
-\code{tabPanel("Доступ", aa_users_ui("users"), мой_редактор_прав())}.
+The rest of the "Access" tab content (permissions editor, log switches)
+is assembled by the app, for example
+\code{tabPanel("Access", aa_users_ui("users"), my_permissions_editor())}.
 }
 \examples{
 ui <- shiny::fluidPage(aa_app_head(), aa_users_ui("users"))

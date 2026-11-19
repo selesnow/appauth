@@ -2,15 +2,15 @@
 % Please edit documentation in R/passwords.R
 \name{aa_common_passwords}
 \alias{aa_common_passwords}
-\title{Список распространённых слабых паролей}
+\title{List of common weak passwords}
 \usage{
 aa_common_passwords()
 }
 \value{
-Вектор строк.
+A character vector.
 }
 \description{
-Используется функцией \code{\link[=aa_check_default_accounts]{aa_check_default_accounts()}} по умолчанию.
+Used by \code{\link[=aa_check_default_accounts]{aa_check_default_accounts()}} by default.
 }
 \examples{
 head(aa_common_passwords())

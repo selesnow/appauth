@@ -2,33 +2,34 @@
 % Please edit documentation in R/users.R
 \name{aa_authenticate}
 \alias{aa_authenticate}
-\title{Проверить логин и пароль (вход)}
+\title{Verify login and password (login)}
 \usage{
 aa_authenticate(conn, login, password)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{password}{Введённый пароль.}
+\item{password}{The entered password.}
 }
 \value{
-Таблица из одной строки с колонками \code{login}, \code{role}, \code{blocked} и
-\code{must_change} (пароль в результат не попадает) либо \code{NULL}, если логин или
-пароль неверны.
+A one-row table with \code{login}, \code{role}, \code{blocked} and \code{must_change}
+columns (the password is not included in the result), or \code{NULL} if the
+login or password is wrong.
 }
 \description{
-Ищет пользователя по логину (точно, с учётом регистра) и проверяет пароль по
-хешу. Если пользователя нет, проверка всё равно выполняется на фиктивном
-хеше, чтобы по времени ответа нельзя было понять, существует ли логин. Пароль
-в открытом виде в базе никогда не принимается.
+Looks up the user by login (exact, case-sensitive) and verifies the password
+against the hash. If the user does not exist, verification is still run
+against a dummy hash so the response time does not reveal whether the login
+exists. A plain-text password in the database is never accepted.
 }
 \details{
-Для пользователя, заблокированного администратором, при верном пароле
-возвращается строка с \code{blocked = 1}: что делать дальше, решает вызывающий код
-(модуль входа сообщает о блокировке только тому, кто знает пароль). При
-неверном пароле результат всегда \code{NULL}.
+For a user blocked by an administrator, with a correct password a row with
+\code{blocked = 1} is returned: what to do next is up to the calling code (the
+login module reports the block only to someone who knows the password). With
+a wrong password the result is always \code{NULL}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

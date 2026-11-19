@@ -2,7 +2,7 @@
 % Please edit documentation in R/event-logger.R
 \name{aa_event_logger}
 \alias{aa_event_logger}
-\title{Готовый обработчик событий для записи в журнал}
+\title{Ready-made event handler for writing to a log}
 \usage{
 aa_event_logger(
   writer,
@@ -13,55 +13,55 @@ aa_event_logger(
 )
 }
 \arguments{
-\item{writer}{Функция записи \verb{function(action, user, session_id, value)}:
-пишет строку в вашу базу, файл, Telegram и т.д. Все четыре аргумента строки.}
+\item{writer}{Writer function \verb{function(action, user, session_id, value)}:
+writes a row to your database, file, messenger, etc. All four arguments are
+strings.}
 
-\item{actions}{Именованный вектор строк: имя это ключ события из
-\code{\link[=aa_events]{aa_events()}}, значение это название действия в вашем журнале. Если задан,
-пишутся только перечисленные события. Если \code{NULL}, пишутся все события, а
-названием действия служит ключ события.}
+\item{actions}{A named character vector: the name is an event key from
+\code{\link[=aa_events]{aa_events()}}, the value is the action name in your log. If set, only the
+listed events are written. If \code{NULL}, all events are written and the event
+key serves as the action name.}
 
-\item{events}{Вектор ключей событий, которые нужно писать. Если \code{NULL}, берутся
-все (или перечисленные в \code{actions}).}
+\item{events}{A vector of event keys to write. If \code{NULL}, all are taken (or
+those listed in \code{actions}).}
 
-\item{enabled}{Включена ли запись: \code{TRUE}, \code{FALSE} или функция
-\verb{function(event)}, которая решает по событию (например, по переключателям из
-конфига). Функция вызывается при каждом событии, поэтому изменения
-конфига действуют сразу.}
+\item{enabled}{Whether writing is on: \code{TRUE}, \code{FALSE} or a function
+\verb{function(event)} that decides by event (for example, by switches from a
+config). The function is called on every event, so config changes take
+effect immediately.}
 
-\item{format_value}{Необязательная функция \verb{function(event, user, value)},
-которая возвращает значение для записи (например, оставляет в \code{value} только
-логин). По умолчанию \code{value} записывается как есть.}
+\item{format_value}{An optional function \verb{function(event, user, value)} that
+returns the value to write (for example, keeps only the login in \code{value}).
+By default \code{value} is written as is.}
 }
 \value{
-Функция \verb{function(event, user, session_id, value)}, которую нужно
-передать в \code{on_event} модулей пакета.
+A function \verb{function(event, user, session_id, value)} to pass as
+\code{on_event} to the package modules.
 }
 \description{
-Пакет сообщает о событиях функции \code{on_event(event, user, session_id, value)}
-(каталог: \code{\link[=aa_events]{aa_events()}}). Эта функция собирает такой обработчик из функции
-записи \code{writer}, чтобы приложению не нужно было каждый раз писать одно и то
-же: отбор нужных событий, названия действий для вашего журнала, включение и
-выключение записи и преобразование значения.
+The package reports events to the function \code{on_event(event, user, session_id, value)} (catalog: \code{\link[=aa_events]{aa_events()}}). This function builds such a
+handler from a \code{writer} function, so that the application does not have to
+write the same code every time: selecting the events needed, action names
+for your log, switching writing on and off, and transforming the value.
 }
 \details{
-Что делает обработчик на каждое событие:
+What the handler does for each event:
 \enumerate{
-\item пропускает событие, которого нет в \code{events} (если \code{events} задан) или у
-которого нет названия в \code{actions} (если \code{actions} задан);
-\item спрашивает \code{enabled}: если запись выключена, ничего не пишет;
-\item определяет название действия: из \code{actions}, а если \code{actions} не задан, это
-ключ события;
-\item вызывает \code{writer(action, user, session_id, value)}, где \code{value} прошло через
-\code{format_value(event, user, value)}, если функция задана.
+\item skips the event if it is not in \code{events} (when \code{events} is set) or has no
+name in \code{actions} (when \code{actions} is set);
+\item asks \code{enabled}: if writing is off, writes nothing;
+\item determines the action name: from \code{actions}, and if \code{actions} is not set,
+it is the event key;
+\item calls \code{writer(action, user, session_id, value)}, where \code{value} has passed
+through \code{format_value(event, user, value)} if that function is set.
 }
 
-Ошибка в \code{writer} не прерывает действие пакета (её перехватывает пакет и
-выводит сообщением), поэтому сбой журнала не мешает входу и работе
-пользователей.
+An error in \code{writer} does not interrupt a package action (the package
+catches it and prints a message), so a logging failure does not get in the
+way of sign-in and of users' work.
 }
 \examples{
-# все события в память
+# all events into memory
 rows <- list()
 handler <- aa_event_logger(function(action, user, session_id, value) {
   rows[[length(rows) + 1]] <<- c(action = action, user = user, value = value)
@@ -69,7 +69,7 @@ handler <- aa_event_logger(function(action, user, session_id, value) {
 handler("login_failed", "boss", "s1", "")
 length(rows)
 
-# только выбранные события со своими названиями действий и переключателем
+# only selected events with their own action names and a switch
 log_on <- TRUE
 handler <- aa_event_logger(
   function(action, user, session_id, value) message(action, " ", user),

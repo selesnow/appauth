@@ -2,33 +2,34 @@
 % Please edit documentation in R/users.R
 \name{aa_delete_user}
 \alias{aa_delete_user}
-\title{Удалить пользователя}
+\title{Delete a user}
 \usage{
 aa_delete_user(conn, login, acting_login = NULL, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{acting_login}{Логин того, кто блокирует (текущий администратор), либо
-\code{NULL} (например, при вызове из скрипта).}
+\item{acting_login}{Login of the person blocking (the current administrator),
+or \code{NULL} (for example, when called from a script).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Число удалённых пользователей (невидимо).
+The number of deleted users (invisibly).
 }
 \description{
-Удаляет запись пользователя, \strong{его токены автовхода и неудачные попытки
-входа}. Это важно: без удаления токенов человек, которому позже достанется
-такой же логин, мог бы войти по cookie прежнего владельца.
+Deletes the user record, \strong{the user's autologin tokens and failed login
+attempts}. This matters: without deleting the tokens, a person who later
+gets the same login could log in with the cookie of the previous owner.
 }
 \details{
-Удаление выполняется только если \code{\link[=aa_check_can_delete]{aa_check_can_delete()}} разрешает его
-(нельзя удалить себя и последнего активного администратора), иначе ошибка
-класса \code{appauth_error_user}. Открытая у пользователя сессия закрывается при
-ближайшей проверке модулем входа.
+Deletion is performed only if \code{\link[=aa_check_can_delete]{aa_check_can_delete()}} allows it (you cannot
+delete yourself or the last active administrator), otherwise an error of
+class \code{appauth_error_user}. A session open for the user is closed at the
+login module's next check.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

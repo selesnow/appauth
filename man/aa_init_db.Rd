@@ -2,32 +2,32 @@
 % Please edit documentation in R/schema.R
 \name{aa_init_db}
 \alias{aa_init_db}
-\title{Создать или обновить схему таблиц авторизации}
+\title{Create or update the authentication table schema}
 \usage{
 aa_init_db(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
-(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
 }
 \value{
-Список (невидимо): \code{applied} (версии миграций, применённые в этом
-вызове), \code{version} (текущая версия схемы) и \code{legacy} (\code{TRUE}, если таблица
-\code{users} уже существовала до подключения пакета).
+A list (invisibly): \code{applied} (migration versions applied in this
+call), \code{version} (the current schema version) and \code{legacy} (\code{TRUE} if the
+\code{users} table already existed before the package was connected).
 }
 \description{
-Применяет версионные миграции: создаёт недостающие таблицы и колонки и
-записывает применённые версии в служебную таблицу \code{appauth_migrations}.
-Существующие данные не изменяются, повторный запуск ничего не меняет.
-Распознаются и старые схемы (например, таблица \code{users} без колонки \code{id} или
-без \code{blocked}, база без таблиц сессий и попыток входа): недостающее
-достраивается, пользователи, пароли и токены остаются как были.
+Applies versioned migrations: creates missing tables and columns and
+records the applied versions in the service table \code{appauth_migrations}.
+Existing data is not changed, a repeated run changes nothing.
+Old schemas are recognized too (for example, a \code{users} table without an \code{id} column or
+without \code{blocked}, a database without session and login attempt tables): what is missing
+is completed, users, passwords and tokens stay as they were.
 }
 \details{
-Миграции выполняются одной транзакцией: при ошибке изменения откатываются.
-Функцию безопасно вызывать при каждом запуске приложения, в том числе на
-работающих базах. Для запуска, который не должен останавливать приложение
-при ошибке, используйте \code{\link[=aa_prepare_db]{aa_prepare_db()}}.
+Migrations run in a single transaction: on error the changes are rolled back.
+It is safe to call the function on every app start, including on
+live databases. For a start that must not stop the app
+on error, use \code{\link[=aa_prepare_db]{aa_prepare_db()}}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

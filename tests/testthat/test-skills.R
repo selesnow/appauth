@@ -1,5 +1,5 @@
-test_that("aa_install_skills() копирует оба навыка в нужный каталог", {
-  skip_if(!nzchar(system.file("skills", package = "appauth")), "нет inst/skills")
+test_that("aa_install_skills() copies both skills into the target directory", {
+  skip_if(!nzchar(system.file("skills", package = "appauth")), "no inst/skills")
 
   dir <- withr::local_tempdir()
   out <- suppressMessages(aa_install_skills(path = file.path(dir, "skills")))
@@ -9,8 +9,8 @@ test_that("aa_install_skills() копирует оба навыка в нужн�
   expect_true(all(file.exists(file.path(out, "SKILL.md"))))
 })
 
-test_that("aa_install_skills() по умолчанию выбирает каталог по агенту", {
-  skip_if(!nzchar(system.file("skills", package = "appauth")), "нет inst/skills")
+test_that("aa_install_skills() picks the directory by agent by default", {
+  skip_if(!nzchar(system.file("skills", package = "appauth")), "no inst/skills")
 
   dir <- withr::local_tempdir()
   withr::local_dir(dir)
@@ -22,8 +22,8 @@ test_that("aa_install_skills() по умолчанию выбирает ката
   expect_true(file.exists(".agents/skills/appauth-secure-shiny/SKILL.md"))
 })
 
-test_that("aa_install_skills() не затирает установленное без overwrite", {
-  skip_if(!nzchar(system.file("skills", package = "appauth")), "нет inst/skills")
+test_that("aa_install_skills() does not overwrite installed skills without overwrite", {
+  skip_if(!nzchar(system.file("skills", package = "appauth")), "no inst/skills")
 
   dir <- withr::local_tempdir()
   suppressMessages(aa_install_skills(path = dir))
@@ -39,7 +39,7 @@ test_that("aa_install_skills() не затирает установленное 
   expect_false(file.exists(marker))
 })
 
-test_that("aa_install_skills() проверяет аргументы", {
+test_that("aa_install_skills() validates arguments", {
   expect_error(aa_install_skills(path = c("a", "b")), class = "appauth_error_settings")
   expect_error(aa_install_skills(agent = "unknown"))
 })

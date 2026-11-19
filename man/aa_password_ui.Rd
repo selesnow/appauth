@@ -2,20 +2,20 @@
 % Please edit documentation in R/mod-password.R
 \name{aa_password_ui}
 \alias{aa_password_ui}
-\title{Модуль смены собственного пароля: интерфейс}
+\title{Own password change module: UI}
 \usage{
 aa_password_ui(id)
 }
 \arguments{
-\item{id}{Идентификатор модуля.}
+\item{id}{Module id.}
 }
 \value{
-Элемент интерфейса Shiny.
+A Shiny UI element.
 }
 \description{
-Форма «текущий пароль, новый пароль, подтверждение». Показывается только
-вошедшему пользователю. Разместите её там, где у приложения личный кабинет или
-настройки (на вкладке или в модальном окне). Стили подключаются через
+A form with "current password, new password, confirmation". Shown only to a
+signed-in user. Place it wherever the app has an account page or
+settings (in a tab or a modal window). Styles are attached through
 \code{\link[=aa_app_head]{aa_app_head()}}.
 }
 \examples{

@@ -2,28 +2,30 @@
 % Please edit documentation in R/protection.R
 \name{aa_login_lock_remaining}
 \alias{aa_login_lock_remaining}
-\title{Сколько секунд осталось до конца блокировки логина}
+\title{Seconds left until a login lockout ends}
 \usage{
 aa_login_lock_remaining(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Введённый логин (точный, с учётом регистра).}
+\item{login}{The entered login (exact, case-sensitive).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Целое число секунд, 0 если вход разрешён.
+An integer number of seconds, 0 if login is allowed.
 }
 \description{
-Считает неудачные попытки логина после его последнего успешного входа и
-внутри окна \code{lockout_minutes}. Если их не меньше \code{max_failed_logins}, логин
-заблокирован до конца окна, считая от последней неудачи.
+Counts the failed attempts of a login after its last successful login and
+within the \code{lockout_minutes} window. If there are at least
+\code{max_failed_logins} of them, the login is blocked until the end of the
+window, counted from the last failure.
 }
 \details{
-Логин считается \strong{точно}: \code{Alsey} и \code{alsey} это разные логины с отдельными
-счётчиками, как и при входе.
+The login is matched \strong{exactly}: \code{Alsey} and \code{alsey} are different logins
+with separate counters, as at login.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

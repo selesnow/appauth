@@ -1,8 +1,8 @@
 ---
-title: "Архитектура и безопасность appauth"
+title: "Architecture and security"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Архитектура и безопасность appauth}
+  %\VignetteIndexEntry{Architecture and security}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -11,323 +11,323 @@ vignette: >
 knitr::opts_chunk$set(eval = FALSE)
 ```
 
-# Для кого этот документ
+# Who this document is for
 
-Этот документ описывает, как устроена авторизация в пакете `appauth`, от каких угроз она защищает, какие решения приняты и почему, и что остаётся на стороне приложения. Он написан для разработчика, который собирается подключить пакет к Shiny приложению, проверить безопасность готового приложения или развивать сам пакет. Знать код приложения Server Manager, на основе которого создан пакет, для чтения не требуется.
+This document describes how authentication works in the `appauth` package, which threats it protects against, which decisions were made and why, and what remains the responsibility of the application. It is written for a developer who is going to add the package to a Shiny app, review the security of an existing app, or work on the package itself. No knowledge of the application the package was originally extracted from is required.
 
-Документ описывает **целевое поведение пакета**. Функции появляются в пакете поэтапно, а справочник по каждой из них находится в справке (`?appauth`) и в других виньетках. Поэтому здесь нет примеров запуска, а только устройство и обоснования.
+The document describes the **intended behaviour of the package**. Functions are documented individually in the help pages (`?appauth`) and in the other vignettes. For that reason there are no usage examples here, only the design and its rationale.
 
-# Что решает пакет и что он не решает
+# What the package does and does not do
 
-**Решает (ядро, одинаковое во всех приложениях):**
+**Does (the core, identical in every application):**
 
-* хранение паролей только в виде хешей, открытые пароли не принимаются никогда;
-* вход по логину и паролю, автовход по cookie, выход и принудительный выход;
-* защита от подбора пароля (блокировка логина и общий лимит попыток);
-* блокировка и удаление пользователей с защитой от потери последнего администратора;
-* серверная проверка прав (а не только скрытие кнопок в интерфейсе);
-* восстановление пароля по email: одноразовая ссылка из письма (выключено по умолчанию);
-* двухфакторная аутентификация (TOTP): добровольная, код из приложения-аутентификатора и резервные коды (выключено по умолчанию);
-* схема таблиц авторизации (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL) и её версионные миграции;
-* модули интерфейса: вход (в том числе окно создания первого администратора) и управление пользователями.
+* stores passwords only as hashes; plain-text passwords are never accepted;
+* login and password sign-in, cookie auto-login, sign-out and forced sign-out;
+* brute-force protection (per-login lockout and a global attempt limit);
+* blocking and deleting users, with protection against losing the last administrator;
+* server-side permission checks (not just hiding buttons in the UI);
+* password recovery by email: a one-time link from the email (off by default);
+* two-factor authentication (TOTP): optional, a code from an authenticator app plus backup codes (off by default);
+* the auth table schema (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL) and its versioned migrations;
+* UI modules: sign-in (including the first-administrator creation dialog) and user management.
 
-**Не решает (за это отвечает приложение или инфраструктура):**
+**Does not (the application or infrastructure is responsible):**
 
-* какие права существуют и какие роли что могут (матрицу прав задаёт приложение);
-* какие действия логируются и куда (пакет сообщает о событиях через хук, а запись делает приложение);
-* защиту транспорта (HTTPS), настройки прокси, права на файлы сервера, хранение секретов;
-* проверку данных, которые приложение принимает от пользователя в своих функциях (имена файлов, команды, SQL приложения);
-* отправку писем (письмо с ссылкой восстановления отправляет функция приложения, например через `emayili`), создание OAuth-клиента в Google Cloud Console и публикацию приложения на домене с HTTPS (без домена вход через Google невозможен).
+* which permissions exist and which roles can do what (the application defines the permission matrix);
+* which actions are logged and where (the package reports events through a hook, and the application does the writing);
+* transport protection (HTTPS), proxy settings, server file permissions, secret storage;
+* validation of the data the application accepts from the user in its own functions (file names, commands, the application's own SQL);
+* sending emails (the email with the recovery link is sent by an application function, for example via `emayili`), creating an OAuth client in the Google Cloud Console, and publishing the app on a domain with HTTPS (sign-in with Google is impossible without a domain).
 
-Граница проведена по принципу: *в пакете то, что обязано быть одинаковым во всех приложениях, потому что ошибка здесь создаёт уязвимость везде; в приложении то, что законно отличается.*
+The boundary follows one principle: *the package contains what must be identical in all applications, because a mistake there creates a vulnerability everywhere; the application contains what legitimately differs.*
 
-# Основные понятия
+# Basic concepts
 
-| Понятие | Значение |
+| Concept | Meaning |
 |---|---|
-| Пользователь | запись в таблице `users`: логин, хеш пароля, роль, признак блокировки |
-| Роль | строка из настраиваемого списка (по умолчанию `admin`, `user`, `viewer`) |
-| Право | название функции приложения (например `Запуск задач`), которое роль может иметь или не иметь |
-| Источник прав | функция, которая по пользователю возвращает его права; по умолчанию строится из матрицы «право → роли» |
-| Администратор | пользователь с ролью `admin_role`; управление пользователями доступно только ему независимо от матрицы прав |
-| Токен автовхода | случайная строка в cookie браузера, по которой пользователь входит без пароля |
-| Блокировка по попыткам | временное закрытие входа под логином после серии неудачных попыток |
-| Ручная блокировка | постоянное закрытие входа пользователю администратором, пока он не снимет её |
-| Событие | уведомление пакета приложению о значимом действии (неудачный вход, блокировка, удаление и т.д.) |
+| User | a record in the `users` table: login, password hash, role, blocked flag |
+| Role | a string from a configurable list (by default `admin`, `user`, `viewer`) |
+| Permission | the name of an application feature (for example `Run tasks`) that a role may or may not have |
+| Permission source | a function that returns a user's permissions; by default it is built from a "permission -> roles" matrix |
+| Administrator | a user with the `admin_role` role; user management is available only to them regardless of the permission matrix |
+| Auto-login token | a random string in the browser cookie that lets the user sign in without a password |
+| Attempt lockout | a temporary block of sign-in for a login after a series of failed attempts |
+| Manual block | a permanent block of a user's sign-in by an administrator until the administrator lifts it |
+| Event | a notification from the package to the application about a significant action (failed sign-in, block, deletion, etc.) |
 
-# Состав системы
+# System overview
 
 ```
- Браузер                      Сервер приложения (R, Shiny)                     База данных
- ───────                      ───────────────────────────                      ──────
- форма входа  ──пароль──►  aa_auth_server()  ──проверка──►  users            (хеш, роль, blocked)
- cookie с токеном ──────►  автовход          ──поиск────►  auth_sessions    (sha256 токена, срок, отзыв)
- вкладки и кнопки ──────►  aa_can()/aa_require() в каждом   login_attempts   (логин, успех, время)
-                            обработчике приложения
- вкладка «Доступ» ──────►  aa_users_server()  ──изменения──► users, auth_sessions, login_attempts
-                            └─► on_event(...) ──► приложение пишет журнал по-своему
+ Browser                      Application server (R, Shiny)                    Database
+ -------                      -----------------------------                    --------
+ sign-in form --password-->  aa_auth_server()  --check-->  users            (hash, role, blocked)
+ cookie with token ------->  auto-login        --lookup->  auth_sessions    (sha256 of token, expiry, revoked)
+ tabs and buttons -------->  aa_can()/aa_require() in each  login_attempts  (login, success, time)
+                             application handler
+ "Access" tab ------------>  aa_users_server()  --changes--> users, auth_sessions, login_attempts
+                             `-> on_event(...) --> the application writes its own log
 ```
 
-## Данные
+## Data
 
-Пакет владеет семью таблицами. Имена и колонки зафиксированы и совпадают с базами приложения Server Manager, поэтому уже работающие базы подключаются без переноса данных.
+The package owns seven tables. Their names and columns are fixed, so existing compatible databases can be connected without migrating data.
 
-* **`users`**: `id` (автоинкремент), `login` (уникальный, не пустой), `password` (хеш), `role`, `blocked` (0 или 1, по умолчанию 0), `must_change` (0 или 1, по умолчанию 0: пароль задал администратор, и пользователь обязан сменить его при входе).
-  Колонки `totp_secret` (секрет TOTP **в зашифрованном виде**), `totp_enabled` (0 или 1) и `totp_last_step` (последний принятый шаг времени, защита от повторного использования кода) появились в версии 0.5.0.
-  Колонка `email` (с версии 0.4.0) хранит адрес для восстановления пароля в нижнем регистре; она допускает пустое значение, а уникальность действует только для заданных адресов.
-* **`auth_sessions`**: `id`, `user_login`, `token_hash`, `created_at`, `expires_at`, `revoked`. В базе хранится **sha256 токена**, сам токен существует только в cookie браузера. Кража базы не даёт готовых токенов.
-* **`login_attempts`**: `id`, `login` (точный введённый логин с учётом регистра, усечённый до `login_max` символов), `success`, `attempted_at` (UTC). Индекс по `(login, attempted_at)`.
-* **`password_resets`**: `id`, `user_login`, `token_hash`, `created_at`, `expires_at`, `used`. В базе хранится **sha256 токена** из письма, сам токен существует только в письме. Токен одноразовый и живёт `reset_ttl_minutes` минут (по умолчанию 60).
-* **`totp_recovery`**: `id`, `user_login`, `code_hash`, `used`, `created_at`. В базе хранится **sha256 резервного кода**, сами коды показываются пользователю один раз при включении 2FA.
-* **`oauth_states`** (с версии 0.7.0): параметры входа через Google (`state_hash` только в виде sha256, `nonce`, `code_verifier`, `created_at`, `expires_at`, `used`), запись живёт 10 минут и используется один раз.
-* **`appauth_migrations`**: служебная таблица версий миграций схемы.
+* **`users`**: `id` (auto-increment), `login` (unique, not empty), `password` (hash), `role`, `blocked` (0 or 1, default 0), `must_change` (0 or 1, default 0: an administrator set the password and the user must change it at sign-in).
+  The columns `totp_secret` (the TOTP secret **in encrypted form**), `totp_enabled` (0 or 1) and `totp_last_step` (the last accepted time step, protection against code reuse) appeared in version 0.5.0.
+  The `email` column (since version 0.4.0) stores the password recovery address in lower case; it allows NULL, and uniqueness applies only to addresses that are set.
+* **`auth_sessions`**: `id`, `user_login`, `token_hash`, `created_at`, `expires_at`, `revoked`. The database stores the **sha256 of the token**; the token itself exists only in the browser cookie. Stealing the database does not yield usable tokens.
+* **`login_attempts`**: `id`, `login` (the exact login as typed, case-sensitive, truncated to `login_max` characters), `success`, `attempted_at` (UTC). Index on `(login, attempted_at)`.
+* **`password_resets`**: `id`, `user_login`, `token_hash`, `created_at`, `expires_at`, `used`. The database stores the **sha256 of the token** from the email; the token itself exists only in the email. The token is single-use and lives for `reset_ttl_minutes` minutes (60 by default).
+* **`totp_recovery`**: `id`, `user_login`, `code_hash`, `used`, `created_at`. The database stores the **sha256 of the backup code**; the codes themselves are shown to the user once, when 2FA is enabled.
+* **`oauth_states`** (since version 0.7.0): parameters of the sign-in with Google (`state_hash` only as sha256, `nonce`, `code_verifier`, `created_at`, `expires_at`, `used`); a record lives for 10 minutes and is used once.
+* **`appauth_migrations`**: an internal table of schema migration versions.
 
-## Базы данных
+## Databases
 
-Имена таблиц и колонок одинаковы во всех поддерживаемых базах (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL); различия собраны в одном файле исходников, `R/dialect.R`:
+Table and column names are the same in all supported databases (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL); the differences are collected in a single source file, `R/dialect.R`:
 
-* **Время** хранится текстом `ГГГГ-ММ-ДД ЧЧ:ММ:СС` по UTC и считается в R (а не функциями базы), поэтому сравнение сроков одинаково везде и не зависит от часов и часового пояса сервера базы.
-* **Логины, роли и хеши** сравниваются точно. В MySQL, где обычное сравнение строк без учёта регистра, такие колонки создаются с двоичной collation без игнорирования пробелов в конце (`utf8mb4_0900_bin`, в MariaDB `utf8mb4_nopad_bin`), поэтому `Alsey`, `alsey` и `alsey ` остаются разными логинами.
-* **Одноразовость токенов** (сброс пароля, `state` Google, резервные коды 2FA) обеспечивает атомарное `UPDATE ... WHERE used = 0`: из двух одновременных запросов сработает один. Именно поэтому не подходят хранилища без таких обновлений и уникальных ограничений (BigQuery и подобные).
-* **Миграции** идемпотентны. В MySQL и PostgreSQL они идут под блокировкой (`GET_LOCK`, `pg_advisory_xact_lock`), чтобы одновременный старт нескольких экземпляров приложения не конфликтовал. В MySQL DDL нельзя откатить, поэтому при обрыве миграции повторный запуск достраивает недостающее.
-* **DuckDB** открывает файл одним процессом и не позволяет менять таблицу с индексом, поэтому `users` создаётся сразу со всеми колонками.
+* **Time** is stored as text `YYYY-MM-DD HH:MM:SS` in UTC and computed in R (not by database functions), so comparing deadlines works the same everywhere and does not depend on the database server's clock or time zone.
+* **Logins, roles and hashes** are compared exactly. In MySQL, where ordinary string comparison is case-insensitive, such columns are created with a binary collation that does not ignore trailing spaces (`utf8mb4_0900_bin`, in MariaDB `utf8mb4_nopad_bin`), so `Alice`, `alice` and `alice ` remain different logins.
+* **Single use of tokens** (password reset, Google `state`, 2FA backup codes) is ensured by an atomic `UPDATE ... WHERE used = 0`: of two simultaneous requests only one succeeds. This is exactly why stores without such updates and unique constraints (BigQuery and similar) are not suitable.
+* **Migrations** are idempotent. In MySQL and PostgreSQL they run under a lock (`GET_LOCK`, `pg_advisory_xact_lock`) so that several app instances starting at once do not conflict. In MySQL DDL cannot be rolled back, so if a migration is interrupted, a rerun completes what is missing.
+* **DuckDB** opens the file from a single process and does not allow altering a table that has an index, so `users` is created with all columns at once.
 
-## Границы доверия
+## Trust boundaries
 
-Всё, что приходит из браузера, считается недоверенным: в Shiny клиент может отправить **любое значение любого input**, в том числе кнопки, которой он не видит в интерфейсе. Поэтому:
+Everything that comes from the browser is untrusted: in Shiny the client can send **any value of any input**, including a button it does not see in the UI. Therefore:
 
-* роль и признак входа берутся только из серверного состояния сессии, которое выставляет код входа пакета, а не из input;
-* каждое действие проверяет право на сервере в начале обработчика;
-* серверные модули вкладок регистрируются только для ролей с правом на вкладку, чтобы у остальных не было обработчиков, которые можно вызвать подделкой запроса.
+* the role and the signed-in flag are taken only from the server-side session state set by the package's sign-in code, never from an input;
+* every action checks the permission on the server at the start of the handler;
+* server modules of tabs are registered only for roles that have the permission for the tab, so other roles have no handlers that could be invoked with a forged request.
 
-# Модель угроз
+# Threat model
 
-## Что защищаем
+## What we protect
 
-Хеши паролей, токены автовхода, состояние входа пользователя, функции администрирования (создание и удаление пользователей, смена ролей и паролей), а через них любые функции приложения, доступные ролям.
+Password hashes, auto-login tokens, the user's sign-in state, administration functions (creating and deleting users, changing roles and passwords), and through them any application functions available to roles.
 
-## От кого защищаемся
+## Who we protect against
 
-1. **Анонимный нападающий в сети**: перебирает пароли, подделывает запросы к серверу, пытается войти без пароля.
-2. **Авторизованный пользователь с малыми правами** (`viewer`, `user`): пытается выполнить действия, которых у него нет (повышение прав, управление пользователями, обращение к чужим данным).
-3. **Тот, кто получил копию базы или резервной копии**: пытается восстановить пароли и использовать токены.
-4. **Тот, кто перехватывает трафик** (при отсутствии HTTPS).
-5. **Ошибки оператора**: удаление или блокировка последнего администратора, оставленные пароли по умолчанию.
+1. **An anonymous attacker on the network**: guesses passwords, forges requests to the server, tries to sign in without a password.
+2. **An authenticated user with low privileges** (`viewer`, `user`): tries to perform actions they are not allowed (privilege escalation, user management, access to other people's data).
+3. **Someone who obtained a copy of the database or a backup**: tries to recover passwords and use tokens.
+4. **Someone who intercepts traffic** (when HTTPS is absent).
+5. **Operator mistakes**: deleting or blocking the last administrator, leaving default passwords.
 
-## Угрозы и меры
+## Threats and mitigations
 
-| Угроза | Мера | Остаточный риск |
+| Threat | Mitigation | Residual risk |
 |---|---|---|
-| SQL-инъекция | Весь SQL пакета параметризован, значения из интерфейса никогда не подставляются в текст запроса | SQL самого приложения не покрывается пакетом |
-| Хищение паролей из базы | Пароли хранятся только как хеш scrypt (пакет `sodium`) с индивидуальной солью, открытый пароль в базе невозможен | Слабые пароли подбираются офлайн, шифрование базы не предусмотрено |
-| Подбор пароля | Блокировка логина после N неудач за окно, общий лимит неудач в минуту по всем логинам | Блокировка по логину, а не по IP: можно намеренно блокировать чужой логин |
-| Перечисление логинов | Одинаковое сообщение для существующих и несуществующих логинов, выравнивание времени ответа фиктивной проверкой хеша, блокировка считается и для несуществующих логинов | Различие в сообщениях для заблокированной вручную учётной записи показывается только тому, кто знает верный пароль |
-| Вход без пароля | Нет резервных путей входа: пароль проверяется только по хешу, сравнения открытого текста нет | |
-| Подделка запросов Shiny (вызов действий без нужной роли) | Проверка права на сервере в каждом обработчике, регистрация модулей по правам, роль только из серверного состояния | Приложение обязано само вызывать проверки в своих обработчиках |
-| Повышение прав через управление пользователями | Управление пользователями доступно только роли администратора независимо от матрицы прав, допустимость роли проверяется на сервере | |
-| Кража токена автовхода | В базе только sha256 токена, токен случайный (32 байта), срок жизни ограничен, токены отзываются при блокировке, смене пароля, удалении пользователя | Cookie выставляется из JavaScript и не имеет `HttpOnly`: XSS в приложении может украсть токен |
-| Перехват токена в сети | Cookie пишется с `SameSite=Lax`, а на HTTPS ещё и с `Secure` (пакет делает это сам); HTTPS обеспечивает приложение (см. раздел об ответственности приложения) | Без HTTPS токен и пароль идут открытым текстом |
-| Использование чужой cookie после удаления пользователя и создания нового с тем же логином | При удалении пользователя удаляются его токены и неудачные попытки | |
-| Сессия заблокированного или удалённого пользователя продолжает работать | Проверка живой сессии раз в 30 секунд и принудительный выход, автовход таких пользователей невозможен | Окно до 30 секунд между блокировкой и закрытием уже открытой сессии |
-| Гонка при создании первого администратора | Создание одним SQL-запросом «вставить, если таблица пуста», из двух одновременных сессий сработает одна | Окно создания администратора доступно любому, кто открыл приложение на пустой базе, поэтому приложение не следует выставлять наружу до создания администратора |
-| Потеря доступа к приложению | Нельзя удалить или заблокировать самого себя и последнего активного администратора | |
-| Перебор логинов и адресов через форму «Забыли пароль?» | Ответ на экране всегда один и тот же (найден пользователь или нет, есть ли у него адрес, заблокирован ли он); причина попадает только в событие `password_reset_requested` | Время ответа может зависеть от того, отправлялось ли письмо: если это важно, отправку письма в `send_reset` нужно выносить в фон |
-| Рассылка писем восстановления чужим пользователям | Не больше `reset_max_per_hour` писем на пользователя в час и `reset_max_per_minute` писем в минуту по всем | Пользователя можно «заспамить» до лимита |
-| Повторное использование и подбор токена из письма | Токен 256 бит, в базе только хеш, одноразовый, срок жизни ограничен, новый запрос гасит прошлые ссылки, слабый пароль токен не тратит, гонка из двух запросов решается атомарным занятием токена | |
-| Утечка ссылки из письма через адресную строку | Модуль сразу убирает `reset` из адреса страницы; ссылка одноразовая и короткоживущая | Адрес с токеном остаётся в журналах прокси, пока ссылка действует: ключ в них не защищён лучше, чем сами журналы |
-| Подбор кода второго фактора | Код проверяется только после верного пароля; неверный код считается неудачной попыткой входа, и логин блокируется по тем же правилам, что и при переборе пароля; успешный пароль не записывается до верного кода, поэтому не обнуляет счётчик | Окно из 3 шагов времени по 30 секунд: при лимите по умолчанию (5 неудач за 15 минут) шанс угадать код за одну блокировку около 15 из миллиона |
-| Повторное использование подсмотренного кода | Принятый шаг времени запоминается атомарным запросом, тот же код и все более ранние шаги больше не проходят | |
-| Кража файла базы | Секрет TOTP шифруется (sodium) ключом `totp_key`, который хранится вне базы; пароли и резервные коды хранятся только в виде хешей | Тот, кто украл и базу, и ключ, получает секреты: ключ нужно держать отдельно от базы и резервных копий |
-| Потеря телефона | 10 резервных кодов (одноразовые), а также сброс 2FA администратором в карточке пользователя (сессии пользователя при этом завершаются) | Резервные коды нужно хранить отдельно от телефона |
-| Пароли по умолчанию (`root/root`, логин = пароль) | Пакет не создаёт пользователей по умолчанию, функция гигиены находит учётные записи с очевидно слабыми паролями | Нужно запускать проверку и менять пароли |
+| SQL injection | All package SQL is parameterised; values from the UI are never substituted into the query text | The application's own SQL is not covered by the package |
+| Theft of passwords from the database | Passwords are stored only as scrypt hashes (the `sodium` package) with a per-password salt; a plain-text password in the database is impossible | Weak passwords can be guessed offline; database encryption is not provided |
+| Password guessing | Login lockout after N failures within a window, a global limit of failures per minute across all logins | Lockout is per login, not per IP: someone can deliberately lock another person's login |
+| Login enumeration | The same message for existing and non-existing logins, response time equalised by a dummy hash check, lockout is counted for non-existing logins too | The different message for a manually blocked account is shown only to someone who knows the correct password |
+| Sign-in without a password | There are no fallback sign-in paths: the password is checked only against the hash, there is no plain-text comparison | |
+| Forged Shiny requests (calling actions without the required role) | A server-side permission check in every handler, module registration by permission, the role only from server-side state | The application must itself call the checks in its handlers |
+| Privilege escalation through user management | User management is available only to the administrator role regardless of the permission matrix; the validity of a role is checked on the server | |
+| Theft of the auto-login token | The database holds only the sha256 of the token, the token is random (32 bytes), its lifetime is limited, tokens are revoked on block, password change and user deletion | The cookie is set from JavaScript and has no `HttpOnly`: XSS in the application can steal the token |
+| Interception of the token on the network | The cookie is written with `SameSite=Lax`, and on HTTPS also with `Secure` (the package does this itself); HTTPS is provided by the application (see the section on application responsibility) | Without HTTPS the token and password travel in plain text |
+| Use of someone else's cookie after a user is deleted and a new one is created with the same login | Deleting a user deletes their tokens and failed attempts | |
+| The session of a blocked or deleted user keeps working | The live session is checked every 30 seconds and a forced sign-out follows; auto-login for such users is impossible | A window of up to 30 seconds between the block and closing an already open session |
+| Race when creating the first administrator | Creation with a single "insert if the table is empty" SQL statement; of two simultaneous sessions only one succeeds | The administrator creation dialog is available to anyone who opens the app on an empty database, so the app should not be exposed externally before the administrator is created |
+| Loss of access to the application | You cannot delete or block yourself or the last active administrator | |
+| Enumeration of logins and addresses via the "Forgot your password?" form | The on-screen response is always the same (user found or not, has an address or not, blocked or not); the reason goes only into the `password_reset_requested` event | Response time may depend on whether an email was sent: if this matters, move sending the email in `send_reset` to the background |
+| Mass-mailing recovery emails to other users | No more than `reset_max_per_hour` emails per user per hour and `reset_max_per_minute` emails per minute overall | A user can be "spammed" up to the limit |
+| Reuse and guessing of the token from the email | A 256-bit token, only the hash in the database, single use, limited lifetime, a new request invalidates earlier links, a weak password does not consume the token, a race between two requests is resolved by atomically claiming the token | |
+| Leak of the link from the email through the address bar | The module immediately removes `reset` from the page address; the link is single-use and short-lived | The address with the token stays in proxy logs while the link is valid: the key in them is no better protected than the logs themselves |
+| Guessing the second-factor code | The code is checked only after the correct password; a wrong code counts as a failed sign-in attempt, and the login is blocked under the same rules as for password guessing; a successful password is not recorded until the correct code, so it does not reset the counter | A window of 3 time steps of 30 seconds: with the default limit (5 failures in 15 minutes) the chance of guessing the code within one lockout is about 15 in a million |
+| Reuse of an observed code | The accepted time step is stored with an atomic query; the same code and all earlier steps no longer pass | |
+| Theft of the database file | The TOTP secret is encrypted (sodium) with the `totp_key` key, which is stored outside the database; passwords and backup codes are stored only as hashes | Someone who steals both the database and the key obtains the secrets: keep the key separate from the database and its backups |
+| Loss of the phone | 10 backup codes (single use), and also a 2FA reset by an administrator in the user card (the user's sessions are ended) | Backup codes should be stored separately from the phone |
+| Default passwords (`root/root`, login = password) | The package creates no default users; the hygiene function finds accounts with obviously weak passwords | The check must be run and the passwords changed |
 
-## Что вне модели угроз
+## Outside the threat model
 
-Единый вход, защита почтового ящика пользователя и устройства с приложением-аутентификатором (кто получил письмо, тот может сменить пароль), защита от вредоносного кода на компьютере пользователя, физический доступ к серверу, атаки на уровне сети и инфраструктуры.
+Single sign-on, protection of the user's mailbox and of the device with the authenticator app (whoever receives the email can change the password), protection against malicious code on the user's computer, physical access to the server, attacks at the network and infrastructure level.
 
-# Потоки
+# Flows
 
-## Вход по паролю
+## Password sign-in
 
-1. Проверяется **общий лимит** неудачных попыток за последнюю минуту по всем логинам. Если превышен, вход временно закрыт для всех, пароль не проверяется.
-2. Проверяется **блокировка логина**. Логин считается **точно**, как и при самом входе: регистр и пробелы сохраняются (усечение только до `login_max` символов), поэтому `Alsey` и `alsey` это разные логины с отдельными счётчиками. Если логин заблокирован, пароль не проверяется и попытка не записывается, чтобы блокировка не продлевалась.
-3. Выполняется **проверка пароля**. Пользователь ищется по логину, пароль проверяется по хешу. Если пользователя нет, проверка выполняется на фиктивном хеше, чтобы время ответа не выдавало существование логина.
-4. Если пароль верный, но учётная запись **заблокирована вручную**, показывается сообщение об этом, попытка не считается ни успешной, ни неудачной, токен не выдаётся.
-5. Иначе записывается результат попытки. Успешный вход **обнуляет** счётчик неудач (по монотонному номеру записи, а не по времени, потому что время хранится с точностью до секунды). Неудача, после которой накопился лимит, переводит логин в блокировку и сообщает об этом.
-6. Если у пользователя стоит `must_change` (пароль задал администратор), вместо входа показывается **форма смены пароля**: токен не выдаётся и в приложение пользователь не попадает, пока не задаст свой пароль. Старый пароль после смены не работает.
-7. При успехе выдаётся **токен автовхода**: 32 случайных байта в кодировке base64, в базе хранится sha256, срок жизни по умолчанию 30 дней, токен передаётся браузеру в cookie.
+1. The **global limit** of failed attempts in the last minute across all logins is checked. If exceeded, sign-in is temporarily closed for everyone and the password is not checked.
+2. The **login lockout** is checked. The login is treated **exactly**, as in the sign-in itself: case and spaces are preserved (truncation only to `login_max` characters), so `Alice` and `alice` are different logins with separate counters. If the login is blocked, the password is not checked and the attempt is not recorded, so the lockout is not extended.
+3. The **password check** runs. The user is looked up by login and the password is verified against the hash. If the user does not exist, the check is performed against a dummy hash so that the response time does not reveal whether the login exists.
+4. If the password is correct but the account is **manually blocked**, a message about this is shown, the attempt is counted neither as successful nor as failed, and no token is issued.
+5. Otherwise the result of the attempt is recorded. A successful sign-in **resets** the failure counter (by the monotonic record number, not by time, because time is stored with one-second precision). A failure after which the limit has accumulated puts the login into lockout and reports it.
+6. If the user has `must_change` set (an administrator set the password), the **change password form** is shown instead of signing in: no token is issued and the user does not get into the app until they set their own password. The old password does not work after the change.
+7. On success an **auto-login token** is issued: 32 random bytes encoded in base64, sha256 stored in the database, a default lifetime of 30 days, passed to the browser in a cookie.
 
-Параметры (по умолчанию): 5 неудач в окне 15 минут блокируют логин на 15 минут с момента последней неудачи, общий лимит 30 неудач в минуту, пароль от 6 до 128 символов (ограничение действует только для новых и сбрасываемых паролей, существующие не затрагиваются).
+Parameters (defaults): 5 failures within a 15-minute window lock the login for 15 minutes from the last failure, a global limit of 30 failures per minute, a password of 6 to 128 characters (the restriction applies only to new and reset passwords; existing ones are not affected).
 
-## Первый запуск
+## First run
 
-Если в таблице `users` нет ни одной записи, вместо формы входа показывается форма создания администратора. Пользователь создаётся **всегда с ролью администратора** одним SQL-запросом, который вставляет запись только если таблица пуста. После создания выполняется вход.
+If the `users` table has no records, the administrator creation form is shown instead of the sign-in form. The user is **always created with the administrator role** by a single SQL statement that inserts the record only if the table is empty. After creation the user is signed in.
 
-## Автовход по cookie
+## Cookie auto-login
 
-Браузер отправляет токен, сервер вычисляет sha256 и ищет запись: токен не отозван, срок не истёк, пользователь существует, не заблокирован и не обязан сменить пароль. Заблокированные и удалённые пользователи, а также пользователи с требованием смены пароля по cookie не входят. Автовход отключается настройкой приложения (`autologin = FALSE`).
+The browser sends the token, the server computes its sha256 and looks up the record: the token is not revoked, not expired, and the user exists, is not blocked and is not required to change the password. Blocked and deleted users, as well as users required to change their password, do not sign in by cookie. Auto-login is disabled with an application setting (`autologin = FALSE`).
 
-## Выход и принудительный выход
+## Sign-out and forced sign-out
 
-Выход отзывает токен браузера, записывает событие, очищает cookie, сбрасывает состояние сессии и **перезагружает страницу**, чтобы в сессии не осталось зарегистрированных обработчиков прежнего пользователя. Раз в 30 секунд ([aa_session_guard()]) проверяется, что пользователь существует, не заблокирован, его роль в базе не изменилась и токен этой сессии не отозван; иначе выполняется принудительный выход с причиной (`deleted`, `blocked`, `role_changed`, `token_revoked`). Заодно сторож раз в час удаляет устаревшие попытки входа и токены.
+Sign-out revokes the browser token, records an event, clears the cookie, resets the session state and **reloads the page**, so that no handlers registered for the previous user are left in the session. Every 30 seconds ([aa_session_guard()]) it is checked that the user exists, is not blocked, their role in the database has not changed and the token of this session is not revoked; otherwise a forced sign-out is performed with a reason (`deleted`, `blocked`, `role_changed`, `token_revoked`). The guard also deletes stale sign-in attempts and tokens once an hour.
 
-## Смена своего пароля
+## Changing your own password
 
-Пользователь подтверждает текущий пароль и задаёт новый (по правилам из настроек, отличный от текущего). Токены остальных сессий отзываются, токен текущей остаётся, `must_change` снимается. Неверный текущий пароль, слабый или тот же пароль отклоняются с понятным сообщением.
+The user confirms the current password and sets a new one (under the rules from the settings, different from the current one). The tokens of other sessions are revoked, the token of the current one stays, and `must_change` is cleared. A wrong current password, a weak password or the same password are rejected with a clear message.
 
-## Восстановление пароля по email
+## Password recovery by email
 
-Включается настройкой `reset_enabled = TRUE`, для неё нужны функция `send_reset(email, link, login)` и адрес приложения `reset_base_url`. У пользователя должен быть указан email (его задаёт администратор в карточке или при создании пользователя).
+Enabled with the `reset_enabled = TRUE` setting; it requires the `send_reset(email, link, login)` function and the application address `reset_base_url`. The user must have an email set (an administrator sets it in the user card or when creating the user).
 
-1. На форме входа ссылка «Забыли пароль?» открывает поле «логин или email». Пользователь вводит значение и **всегда видит один и тот же ответ**.
-2. Пакет ищет пользователя (логин сравнивается точно, адрес без учёта регистра). Письмо не отправляется, если пользователя нет, у него нет адреса, он заблокирован или превышен лимит (`reset_max_per_hour` на пользователя, `reset_max_per_minute` общий). Причина записывается в событие `password_reset_requested`.
-3. Иначе создаётся случайный токен (32 байта), в базу пишется его sha256 и срок жизни, прежние неиспользованные ссылки пользователя гасятся, а функция приложения отправляет письмо со ссылкой `<reset_base_url>/?reset=<токен>`. Если отправка не удалась, токен гасится.
-4. По ссылке модуль входа читает параметр `reset`, **убирает его из адресной строки** и, если токен рабочий (есть, не использован, не просрочен, пользователь не заблокирован), показывает форму нового пароля. Иначе показывается сообщение и обычная форма входа (событие `password_reset_failed`).
-5. Новый пароль проверяется по правилам из настроек. Слабый пароль в режиме `reject` отклоняется и **токен не тратит**. Затем токен занимается атомарным запросом (из двух одновременных запросов сработает один), пароль записывается, отзываются все токены автовхода, гасятся остальные ссылки, снимаются блокировка по неудачным попыткам и требование смены пароля. Событие `password_reset_done`.
-6. Автоматического входа после смены нет: пользователь входит с новым паролем обычным путём.
+1. On the sign-in form the "Forgot your password?" link opens a "Login or email" field. The user enters a value and **always sees the same response**.
+2. The package looks up the user (the login is compared exactly, the address case-insensitively). No email is sent if the user does not exist, has no address, is blocked, or a limit is exceeded (`reset_max_per_hour` per user, `reset_max_per_minute` overall). The reason is recorded in the `password_reset_requested` event.
+3. Otherwise a random token (32 bytes) is created, its sha256 and lifetime are written to the database, the user's earlier unused links are invalidated, and the application function sends an email with the link `<reset_base_url>/?reset=<token>`. If sending fails, the token is invalidated.
+4. On opening the link the sign-in module reads the `reset` parameter, **removes it from the address bar** and, if the token is valid (exists, unused, not expired, the user is not blocked), shows the new password form. Otherwise a message and the regular sign-in form are shown (event `password_reset_failed`).
+5. The new password is checked against the rules from the settings. A weak password in `reject` mode is rejected and **does not consume the token**. Then the token is claimed with an atomic query (of two simultaneous requests only one succeeds), the password is written, all auto-login tokens are revoked, the other links are invalidated, and the attempt lockout and the must-change requirement are cleared. Event `password_reset_done`.
+6. There is no automatic sign-in after the change: the user signs in with the new password in the usual way.
 
-Администратор, который сбрасывает пароль вручную, или пользователь, который меняет свой пароль, тоже гасят неиспользованные ссылки.
+An administrator who resets a password manually, or a user who changes their own password, also invalidates unused links.
 
-## Двухфакторная аутентификация
+## Two-factor authentication
 
-Включается настройкой `totp_enabled = TRUE`, для неё нужен ключ шифрования `totp_key` (строка не короче 16 символов, вне базы и вне репозитория). Защита **добровольная**: каждый пользователь сам включает её в блоке личного кабинета (`aa_totp_ui()` и `aa_totp_server()`), у кого она включена, тот вводит код при входе.
+Enabled with the `totp_enabled = TRUE` setting; it requires an encryption key `totp_key` (a string of at least 16 characters, kept outside the database and outside the repository). The protection is **optional**: each user enables it themselves in the account block (`aa_totp_ui()` and `aa_totp_server()`), and whoever has it enabled enters a code at sign-in.
 
-**Подключение.** Кнопка создаёт секрет (160 бит) и сохраняет его зашифрованным, 2FA ещё выключена. Пользователь сканирует QR-код (если установлен необязательный пакет `qrcode`) или вводит ключ вручную. После верного кода из приложения защита включается, пользователю один раз показываются 10 резервных кодов, а остальные его сессии завершаются.
+**Setup.** A button creates a secret (160 bits) and stores it encrypted; 2FA is not yet on. The user scans the QR code (if the optional `qrcode` package is installed) or enters the key manually. After a correct code from the app the protection is enabled, the user is shown 10 backup codes once, and their other sessions are ended.
 
-**Вход.**
+**Sign-in.**
 
-1. Пароль проверяется как обычно. Если у пользователя включена 2FA, **токен автовхода не выдаётся, а успешная попытка входа не записывается**: иначе она обнуляла бы счётчик неудач, и код можно было бы подбирать бесконечно.
-2. Показывается форма кода. Перед каждой проверкой вызывается общая защита входа (`aa_login_gate()`): заблокированный логин или общий лимит закрывают форму.
-3. Принимается код из приложения (6 цифр) или резервный код. Код из приложения проходит один раз (шаг времени запоминается), в окне ±`totp_window` шагов (по умолчанию 1). Резервный код одноразовый.
-4. Неверный код записывается как неудачная попытка (событие `totp_failed`). Когда логин блокируется, форма кода закрывается, и начинать нужно с пароля, как только блокировка закончится.
-5. После верного кода записывается успешная попытка, выдаётся токен, затем (если пароль временный) форма смены пароля.
+1. The password is checked as usual. If the user has 2FA enabled, **no auto-login token is issued and the successful sign-in attempt is not recorded**: otherwise it would reset the failure counter and the code could be guessed indefinitely.
+2. The code form is shown. Before every check the shared sign-in guard (`aa_login_gate()`) is called: a blocked login or the global limit closes the form.
+3. A code from the app (6 digits) or a backup code is accepted. A code from the app passes once (the time step is remembered), within a window of +/-`totp_window` steps (1 by default). A backup code is single-use.
+4. A wrong code is recorded as a failed attempt (event `totp_failed`). When the login gets blocked, the code form is closed and the user has to start again from the password once the lockout ends.
+5. After a correct code a successful attempt is recorded, a token is issued, and then (if the password is temporary) the change password form is shown.
 
-Вход по cookie автовхода второй фактор не спрашивает: cookie выдан после его прохождения и действует `session_days` дней, фактически это «доверенное устройство». Восстановление пароля по email 2FA не обходит: после смены пароля код всё равно потребуется.
+Signing in by auto-login cookie does not ask for the second factor: the cookie was issued after it was passed and is valid for `session_days` days, effectively a "trusted device". Password recovery by email does not bypass 2FA: after the password change the code is still required.
 
-**Выключение.** Пользователю нужны пароль и код (или резервный код), иначе тот, кто занял чужую открытую сессию, снимал бы защиту. Код проверяется только при верном пароле, поэтому чужая попытка не тратит резервные коды. Неверные попытки считаются неудачными попытками входа.
+**Disabling.** The user needs the password and a code (or a backup code); otherwise someone who took over another person's open session could remove the protection. The code is checked only when the password is correct, so a third party's attempt does not consume backup codes. Wrong attempts count as failed sign-in attempts.
 
-**Потеря телефона.** Резервные коды или сброс 2FA администратором в карточке пользователя (секрет и резервные коды стираются, сессии пользователя завершаются, событие `totp_reset`).
+**Loss of the phone.** Backup codes, or a 2FA reset by an administrator in the user card (the secret and backup codes are erased, the user's sessions are ended, event `totp_reset`).
 
-## Проверка прав
+## Permission checks
 
-* Источник прав возвращает права пользователя; по умолчанию он строится из матрицы «право → роли». Неизвестное право означает отказ (закрытое по умолчанию поведение).
-* Проверка в обработчике берёт роль из серверного состояния. При отказе действие прерывается, пользователь получает уведомление, пакету сообщается событие `access_denied`.
-* Регистрация серверных модулей вкладок выполняется только для ролей с правом на вкладку.
+* The permission source returns the user's permissions; by default it is built from the "permission -> roles" matrix. An unknown permission means denial (fail-closed behaviour).
+* The check in a handler takes the role from the server-side state. On denial the action is aborted, the user gets a notification, and the `access_denied` event is reported to the package.
+* Registration of tab server modules is performed only for roles that have the permission for the tab.
 
-## Управление пользователями (только администратор)
+## User management (administrator only)
 
-* **Добавление**: логин и пароль проверяются по правилам, пользователь создаётся с допустимой ролью.
-* **Смена роли**: допустимость роли проверяется на сервере, а у последнего активного администратора роль администратора снять нельзя.
-* **Сброс 2FA**: администратор стирает секрет и резервные коды пользователя и завершает его сессии (событие `totp_reset`).
-* **Email**: администратор указывает, меняет или удаляет адрес для восстановления пароля (формат и уникальность проверяются на сервере), событие `email_changed`.
-* **Сброс пароля**: записывается новый хеш, **отзываются все токены** пользователя (открытые сессии завершит сторож), по умолчанию ставится `must_change`.
-* **Завершить все сессии**: отзываются все токены пользователя, его открытые сессии завершает сторож.
-* **Ручная блокировка**: выставляется признак `blocked`, **отзываются все токены**. Нельзя заблокировать себя и последнего активного администратора.
-* **Снятие блокировки по попыткам**: удаляются неудачные попытки логина. Разблокировка вручную снимает и её.
-* **Удаление**: нельзя удалить себя и последнего активного администратора; вместе с записью удаляются токены, ссылки восстановления пароля, резервные коды 2FA и неудачные попытки.
+* **Adding**: the login and password are checked against the rules; the user is created with a valid role.
+* **Changing the role**: the validity of the role is checked on the server, and the administrator role cannot be removed from the last active administrator.
+* **2FA reset**: the administrator erases the user's secret and backup codes and ends their sessions (event `totp_reset`).
+* **Email**: the administrator sets, changes or removes the password recovery address (format and uniqueness are checked on the server), event `email_changed`.
+* **Password reset**: a new hash is written, **all tokens of the user are revoked** (open sessions will be ended by the guard), and `must_change` is set by default.
+* **End all sessions**: all tokens of the user are revoked; the guard ends their open sessions.
+* **Manual block**: the `blocked` flag is set and **all tokens are revoked**. You cannot block yourself or the last active administrator.
+* **Lifting the attempt lockout**: the login's failed attempts are deleted. Unblocking manually lifts it as well.
+* **Deletion**: you cannot delete yourself or the last active administrator; together with the record, the tokens, password recovery links, 2FA backup codes and failed attempts are deleted.
 
-## Старт приложения
+## Application start
 
-При запуске приложение вызывает подготовку схемы: создаются недостающие таблицы и колонки, применяются миграции, удаляются устаревшие данные (попытки старше суток, токены, просроченные или отозванные более 30 дней назад, использованные и просроченные ссылки восстановления пароля старше суток). Ошибка подготовки не останавливает приложение: защита блокировками при отсутствии таблицы не работает, но вход по паролю продолжает работать (см. раздел о решениях).
+At start the application calls the schema preparation: missing tables and columns are created, migrations are applied, and stale data is removed (attempts older than a day, tokens expired or revoked more than 30 days ago, used and expired password recovery links older than a day). A preparation error does not stop the application: lockout protection does not work if the table is missing, but password sign-in keeps working (see the section on decisions).
 
-# Гарантии
+# Guarantees
 
-Это свойства, которые пакет обязан сохранять при любых изменениях. Каждое покрыто автоматическим тестом.
+These are the properties the package must preserve across all changes. Each is covered by an automated test.
 
-1. Открытый пароль нигде не принимается и не сравнивается; значение в колонке `password`, не являющееся хешем, не проходит проверку.
-2. SQL пакета содержит только параметры, пользовательские значения в текст запроса не подставляются.
-3. Сообщения о неверных данных одинаковы для существующих и несуществующих логинов.
-4. Попытки во время блокировки не записываются и блокировку не продлевают.
-5. Блокировка и вход считают логин одинаково, точно: другое написание логина (регистр, пробелы) не проходит вход вообще, поэтому обойти блокировку им нельзя, а неудачные попытки по несуществующему написанию не блокируют настоящего пользователя. Логин нового пользователя не может совпадать с существующим даже с точностью до регистра.
-6. Успешный вход обнуляет счётчик неудач независимо от того, что записи сделаны в одну секунду.
-7. Заблокированный и удалённый пользователь не входит ни по паролю, ни по cookie, его токены недействительны.
-8. Сброс пароля, блокировка и удаление отзывают или удаляют токены пользователя.
-9. Новый пользователь с логином, который раньше принадлежал другому человеку, не получает доступа по чужой cookie и не наследует его блокировку.
-10. Нельзя остаться без активного администратора ни блокировкой, ни удалением, ни сменой роли.
-11. Первый администратор создаётся только на пустой таблице, в том числе при одновременных запросах.
-12. Миграции повторяемы: повторный запуск ничего не меняет, существующие данные (пользователи, хеши, токены) не изменяются.
-13. Неизвестное право означает отказ.
+1. A plain-text password is never accepted or compared; a value in the `password` column that is not a hash does not pass verification.
+2. Package SQL contains only parameters; user values are never substituted into the query text.
+3. Messages about invalid credentials are the same for existing and non-existing logins.
+4. Attempts during a lockout are not recorded and do not extend the lockout.
+5. Lockout and sign-in treat the login identically and exactly: a different spelling of the login (case, spaces) does not sign in at all, so it cannot be used to bypass a lockout, and failed attempts under a non-existent spelling do not lock out the real user. The login of a new user cannot match an existing one even up to case.
+6. A successful sign-in resets the failure counter regardless of the records having been made within the same second.
+7. A blocked or deleted user does not sign in by password or by cookie, and their tokens are invalid.
+8. Password reset, blocking and deletion revoke or delete the user's tokens.
+9. A new user with a login that previously belonged to another person does not get access via the other person's cookie and does not inherit their lockout.
+10. You cannot be left without an active administrator through blocking, deletion or a role change.
+11. The first administrator is created only on an empty table, including under simultaneous requests.
+12. Migrations are repeatable: a rerun changes nothing, and existing data (users, hashes, tokens) is not modified.
+13. An unknown permission means denial.
 
-# Принятые решения и причины
+# Decisions and their reasons
 
-| Решение | Причина | Компромисс |
+| Decision | Reason | Trade-off |
 |---|---|---|
-| Хеширование scrypt (`sodium::password_store`) | Современный, стойкий к перебору на специальном оборудовании, хеш содержит соль и параметры, доступен в `sodium` без внешних зависимостей | Вход чуть медленнее обычного хеша, это и есть защита |
-| Токен автовхода хранится как sha256 | Утечка базы не раскрывает рабочие токены, а токены случайные и длинные, поэтому медленный хеш не нужен | |
-| Блокировка по логину, а не по IP | За обратным прокси приложение видит адрес прокси, а не клиента | Можно намеренно блокировать чужой логин. Смягчение: короткая блокировка, запись событий, кнопка снятия для администратора |
-| Логин сравнивается и считается в блокировках точно (с учётом регистра, без приведения к нижнему) | Так же сравнивает логины SQLite и так хранятся реальные данные: в рабочей базе есть разные пользователи `kiruka` и `Kiruka`; приведение к нижнему регистру давало бы им общий счётчик и позволяло неудачам по несуществующему `Alsey` блокировать настоящего `alsey` | Новому пользователю нельзя создать логин, отличающийся от существующего только регистром, существующие пары сохраняются |
-| Попытки во время блокировки не записываются | Иначе легитимный пользователь продлевает блокировку, а злоумышленник держит её бесконечно | |
-| Счётчик обнуляется по номеру записи, а не по времени | Время хранится с точностью до секунды, быстрые события терялись (ошибка найдена тестами) | |
-| Проверка блокировки без отказа при ошибке (fail-open), проверка пароля с отказом | Недоступность таблицы попыток не должна запирать всех пользователей, но проверка пароля никогда не пропускается | Если таблицу не удалось создать, защита от перебора не работает, ошибка пишется в лог приложения |
-| Cookie выставляется из JavaScript | Shiny не умеет устанавливать cookie из серверного кода без дополнительной инфраструктуры | Нет `HttpOnly`. `SameSite=Lax` и `Secure` (на HTTPS) пакет ставит сам, сам HTTPS это зона ответственности приложения |
-| Принудительный выход проверяется по таймеру | Shiny не получает событий от базы, кроме собственных обращений | До 30 секунд между блокировкой и закрытием открытой сессии |
-| Перезагрузка страницы при выходе | Иначе обработчики модулей прежнего пользователя остаются зарегистрированными в этой сессии | Страница перерисовывается |
-| Управление пользователями только для администратора независимо от матрицы прав | Иначе выдача этого права роли позволила бы ей повысить собственные права | Право на вкладку управления пользователями нельзя делегировать |
-| Источник прав подключается функцией, а не зашит структурой конфига | Приложения хранят права по-разному (YAML, база, по пользователям) | Приложение отвечает за корректность своего источника |
-| Один хук событий вместо записи в журналы | Пакет не навязывает схему логов, их у приложений разные | Приложение должно реализовать хук, иначе событий нигде не будет |
-| Восстановление пароля выключено по умолчанию, а отправку письма выполняет функция приложения | Не у всех приложений есть почта и адреса пользователей; пакет не должен тянуть SMTP и ключи отправки | Приложение пишет функцию отправки и отвечает за доставку письма |
-| Ссылка с токеном в адресе, а не код из письма | Не нужна отдельная форма ввода кода и защита кода от подбора, токен не угадать | Нужен `reset_base_url`, а токен виден в журналах прокси до использования |
-| TOTP написан в пакете (HMAC-SHA1 из `openssl`, проверен эталонными векторами RFC 4226 и 6238), без новых зависимостей | Новые пакеты пришлось бы ставить в общую библиотеку сервера; алгоритм короткий и проверяемый | Поддерживается только TOTP (без SMS, push и аппаратных ключей) |
-| QR-код через необязательный пакет `qrcode` | Не раздувает обязательные зависимости | Без пакета пользователь вводит ключ вручную |
-| Секрет шифруется ключом приложения (`totp_key`), а не хешируется | Сервер должен знать секрет, чтобы проверять коды | Потеря или замена ключа делает секреты нечитаемыми: пользователям нужно подключать 2FA заново (администратор сбрасывает её в карточке) |
-| Успешная попытка входа записывается только после кода | Иначе пароль обнулял бы счётчик неудач, и код подбирался бы без ограничений | |
-| 2FA добровольная | Принудительное включение для ролей требует сценария «первый вход без 2FA» и аварийного доступа | Администраторы могут остаться без второго фактора, если не включат его сами |
-| SQLite по умолчанию, плюс DuckDB, MySQL / MariaDB и PostgreSQL через слой диалектов (`R/dialect.R`) | Все наши приложения используют SQLite, а работающие базы должны подключаться без переноса; остальные базы нужны приложениям, у которых уже есть сервер | Время считает R и пишется текстом UTC, а не типом базы; в MySQL нельзя откатить DDL; BigQuery не поддерживается: нет уникальных ограничений и атомарных обновлений |
+| scrypt hashing (`sodium::password_store`) | Modern, resistant to brute force on specialised hardware, the hash contains the salt and parameters, available in `sodium` with no external dependencies | Sign-in is slightly slower than with a plain hash; that is the protection |
+| The auto-login token is stored as sha256 | A database leak does not reveal working tokens, and the tokens are random and long, so a slow hash is not needed | |
+| Lockout by login, not by IP | Behind a reverse proxy the application sees the proxy address, not the client's | Someone can deliberately lock another person's login. Mitigation: a short lockout, event recording, an unlock button for the administrator |
+| The login is compared and counted in lockouts exactly (case-sensitive, without lower-casing) | SQLite compares logins the same way, and real data is stored this way: a production database may contain distinct users `alice` and `Alice`; lower-casing would give them a shared counter and let failures against a non-existent `Bob` lock out the real `bob` | A new user cannot be given a login that differs from an existing one only by case; existing pairs are preserved |
+| Attempts during a lockout are not recorded | Otherwise a legitimate user extends the lockout and an attacker keeps it up indefinitely | |
+| The counter is reset by record number, not by time | Time is stored with one-second precision, and quick events were lost (a bug found by tests) | |
+| The lockout check fails open, the password check fails closed | Unavailability of the attempts table must not lock out all users, but the password check is never skipped | If the table could not be created, brute-force protection does not work; the error is written to the application log |
+| The cookie is set from JavaScript | Shiny cannot set cookies from server code without extra infrastructure | No `HttpOnly`. `SameSite=Lax` and `Secure` (on HTTPS) are set by the package itself; HTTPS itself is the application's responsibility |
+| Forced sign-out is checked on a timer | Shiny does not receive events from the database other than its own queries | Up to 30 seconds between the block and closing an open session |
+| Page reload on sign-out | Otherwise the module handlers of the previous user stay registered in this session | The page is redrawn |
+| User management only for the administrator regardless of the permission matrix | Otherwise granting this permission to a role would let it raise its own privileges | The permission for the user management tab cannot be delegated |
+| The permission source is plugged in as a function and not hard-wired into the config structure | Applications store permissions differently (YAML, database, per user) | The application is responsible for the correctness of its source |
+| A single event hook instead of writing to logs | The package does not impose a log schema, and applications have different ones | The application must implement the hook, otherwise events go nowhere |
+| Password recovery is off by default and the email is sent by an application function | Not every application has email and user addresses; the package should not pull in SMTP and sending credentials | The application writes the sending function and is responsible for delivering the email |
+| A link with the token in the address rather than a code from the email | No separate code entry form and no need to protect the code against guessing; the token cannot be guessed | `reset_base_url` is needed, and the token is visible in proxy logs until used |
+| TOTP is implemented in the package (HMAC-SHA1 from `openssl`, verified against the RFC 4226 and 6238 reference vectors), with no new dependencies | New packages would have to be installed into the shared server library; the algorithm is short and verifiable | Only TOTP is supported (no SMS, push or hardware keys) |
+| QR code through the optional `qrcode` package | Does not inflate the mandatory dependencies | Without the package the user enters the key manually |
+| The secret is encrypted with the application key (`totp_key`), not hashed | The server must know the secret to verify codes | Losing or replacing the key makes the secrets unreadable: users have to set up 2FA again (an administrator resets it in the user card) |
+| The successful sign-in attempt is recorded only after the code | Otherwise the password would reset the failure counter and the code could be guessed without limit | |
+| 2FA is optional | Forcing it on for roles requires a "first sign-in without 2FA" scenario and emergency access | Administrators may remain without a second factor if they do not enable it themselves |
+| SQLite by default, plus DuckDB, MySQL / MariaDB and PostgreSQL through a dialect layer (`R/dialect.R`) | Most applications use SQLite, and existing databases should connect without migration; the other databases are for applications that already have a server | Time is computed by R and written as UTC text rather than a database type; DDL cannot be rolled back in MySQL; BigQuery is not supported: no unique constraints or atomic updates |
 
-# Известные ограничения
+# Known limitations
 
-Эти ограничения известны и приняты. Их нужно учитывать при оценке риска приложения.
+These limitations are known and accepted. They should be taken into account when assessing an application's risk.
 
-* **Cookie без `HttpOnly`**: уязвимость к краже токена через XSS в самом приложении (в приложении нельзя выводить непроверенный HTML).
-* **Cookie и HTTPS**: cookie пишется с `SameSite=Lax`, а `Secure` ставится только если страница открыта по `https://`; при доступе без HTTPS токен может уйти открытым текстом, поэтому приложение нужно публиковать только по HTTPS (см. виньетку `deployment`).
-* **Блокировка по логину**: возможна намеренная блокировка чужого логина на время окна, в том числе администратора. Для этого должен быть запасной администратор.
-* **Пароль проверяется только по длине**: список запрещённых паролей не используется.
-* **Единый вход только через Google.** Других провайдеров (Microsoft, Okta, SAML) нет. Вход через Google равен доступу к Google-аккаунту сотрудника: кто его контролирует, тот войдёт в приложение, поэтому доступ к аккаунту защищает организация (Workspace). Пользователь должен быть заведён в приложении заранее, а его email в базе должен совпадать с адресом Google. Смена email пользователя в Workspace без правки адреса в приложении закрывает ему вход через Google, а передача адреса другому человеку открывает ему чужую учётную запись, поэтому адреса нужно держать в актуальном состоянии. Двухфакторный код приложения при входе через Google не спрашивается. Двухфакторная защита добровольная и только по кодам TOTP: без SMS, push-уведомлений, аппаратных ключей и без принудительного включения для ролей.
-* **Потеря ключа `totp_key`** делает сохранённые секреты нечитаемыми: до сброса 2FA администратором пользователи с включённой защитой не смогут войти (код не подойдёт).
-* **Часы сервера и телефона**: код привязан ко времени, расхождение больше окна (по умолчанию 30 секунд) блокирует вход; нужна синхронизация времени (NTP).
-* **Письмо восстановления равно ключу от учётной записи**: кто управляет почтовым ящиком пользователя, может сменить его пароль. Включайте восстановление, только если почтовым адресам можно доверять; для администраторов можно не указывать адрес и оставить сброс вручную.
-* **До 30 секунд** между блокировкой пользователя и закрытием его открытой сессии.
-* **Поддерживаются только SQLite, DuckDB, MySQL / MariaDB и PostgreSQL.** BigQuery и другие аналитические хранилища не подходят: одноразовые токены и защита последнего администратора требуют атомарных обновлений и уникальных ограничений. DuckDB открывает файл одним процессом. В MySQL логины сравниваются точно только в колонках, созданных пакетом (двоичная collation): таблицу `users`, созданную вручную с обычной collation, нужно пересоздать.
-* **Независимого аудита безопасности не проводилось**: свойства подтверждены автоматическими тестами и опытом исправления найденных ошибок, но не внешним специалистом.
+* **Cookie without `HttpOnly`**: vulnerable to token theft through XSS in the application itself (the application must not render unchecked HTML).
+* **Cookie and HTTPS**: the cookie is written with `SameSite=Lax`, and `Secure` is set only if the page is opened over `https://`; without HTTPS the token may travel in plain text, so the application should be published only over HTTPS (see the `deployment` vignette).
+* **Lockout by login**: deliberately locking another person's login for the duration of the window is possible, including the administrator's. A spare administrator should exist for this.
+* **The password is checked only by length**: no list of forbidden passwords is used.
+* **Single sign-on only through Google.** There are no other providers (Microsoft, Okta, SAML). Signing in with Google is equivalent to access to the person's Google account: whoever controls it can sign in to the application, so the organisation (Workspace) protects access to the account. The user must be created in the application in advance, and their email in the database must match the Google address. Changing a user's email in Workspace without updating the address in the application closes their Google sign-in, and handing the address to another person opens the first user's account to them, so addresses must be kept up to date. The two-factor code of the application is not requested when signing in with Google. Two-factor protection is optional and only by TOTP codes: no SMS, push notifications, hardware keys, and no forced enabling for roles.
+* **Losing the `totp_key` key** makes the stored secrets unreadable: until an administrator resets 2FA, users with the protection enabled cannot sign in (the code will not match).
+* **Server and phone clocks**: the code is tied to time, and a discrepancy larger than the window (30 seconds by default) blocks sign-in; time synchronisation (NTP) is required.
+* **The recovery email is a key to the account**: whoever controls the user's mailbox can change their password. Enable recovery only if the email addresses can be trusted; for administrators you can leave the address empty and keep manual reset.
+* **Up to 30 seconds** between blocking a user and closing their open session.
+* **Only SQLite, DuckDB, MySQL / MariaDB and PostgreSQL are supported.** BigQuery and other analytical stores are not suitable: single-use tokens and protection of the last administrator require atomic updates and unique constraints. DuckDB opens the file from a single process. In MySQL logins are compared exactly only in columns created by the package (binary collation): a `users` table created manually with an ordinary collation must be recreated.
+* **No independent security audit has been performed**: the properties are confirmed by automated tests and by fixing the bugs found, but not by an external specialist.
 
-# Ответственность приложения
+# Application responsibility
 
-Пакет безопасен только вместе с корректным использованием. Приложение обязано:
+The package is secure only when used correctly. The application must:
 
-1. **Вызывать проверку права в начале каждого обработчика действия** и регистрировать серверные модули вкладок только для ролей с правом на вкладку. Скрытие кнопок в интерфейсе не защита.
-2. **Проверять входные данные своих функций**: имена файлов, служб и задач сверять со списками, команды ОС запускать без склейки строк, не выводить непроверенный HTML.
-3. **Закрывать подключение к базе при завершении сессии** (`session$onSessionEnded`), иначе подключения копятся, а на Windows файл базы нельзя переименовать или удалить, пока жив процесс R.
-4. **Использовать HTTPS** (флаги cookie `Secure` на HTTPS и `SameSite=Lax` пакет ставит сам). Приложение не должно быть доступно напрямую без прокси, который обеспечивает HTTPS.
-5. **Не хранить `config.yaml`, базу и секреты в репозитории и образах**, не отдавать базу целиком через интерфейс (в ней таблицы пользователей, токенов и попыток входа).
-6. **Реализовать хук событий** и сохранять события входа, блокировок и отказов в доступе, чтобы попытки подбора были видны.
-7. **Не создавать пользователей по умолчанию**, менять пароли, найденные проверкой слабых учётных записей.
-8. **Иметь запасного администратора** на случай намеренной блокировки.
-9. **Хранить ключ `totp_key` вне базы и вне репозитория** (переменная среды) и не терять его: без него секреты TOTP не расшифровать. Резервные копии базы хранить отдельно от ключа.
+1. **Call the permission check at the start of every action handler** and register tab server modules only for roles with the permission for the tab. Hiding buttons in the UI is not protection.
+2. **Validate the inputs of its own functions**: compare file, service and task names against allow-lists, run OS commands without string concatenation, and do not render unchecked HTML.
+3. **Close the database connection when the session ends** (`session$onSessionEnded`), otherwise connections accumulate, and on Windows the database file cannot be renamed or deleted while the R process is alive.
+4. **Use HTTPS** (the `Secure` cookie flag on HTTPS and `SameSite=Lax` are set by the package itself). The application must not be reachable directly without a proxy that provides HTTPS.
+5. **Not keep `config.yaml`, the database and secrets in the repository and images**, and not serve the whole database through the UI (it holds the tables of users, tokens and sign-in attempts).
+6. **Implement the event hook** and persist sign-in, lockout and access-denied events so that guessing attempts are visible.
+7. **Not create default users**, and change the passwords found by the weak-account check.
+8. **Have a spare administrator** in case of deliberate lockout.
+9. **Keep the `totp_key` key outside the database and the repository** (an environment variable) and not lose it: without it the TOTP secrets cannot be decrypted. Keep database backups separate from the key.
 
-# Совместимость и миграции
+# Compatibility and migrations
 
-Схема таблиц авторизации в пакете совпадает с таблицами приложения Server Manager, поэтому его базы работают без переноса данных. При подключении пакета выполняются версионные миграции: недостающие таблицы и колонки создаются, существующие данные не изменяются, повторный запуск ничего не меняет. Распознаётся и старая схема (например, таблица `users` без колонки `id` или без `blocked`). Пароли, которые хранились в открытом виде, переводятся в хеши отдельной разовой функцией с резервной копией базы и транзакцией; до этого шага вход по таким паролям невозможен, так как открытые пароли пакет не принимает.
+When the package is connected, versioned migrations run: missing tables and columns are created, existing data is not modified, and a rerun changes nothing. An older schema is recognised too (for example a `users` table without the `id` column or without `blocked`). Passwords that were stored in plain text are converted to hashes by a separate one-time function with a database backup and a transaction; until this step, signing in with such passwords is impossible, because the package does not accept plain-text passwords.
 
-# Уроки найденных ошибок
+# Lessons from bugs found
 
-Пакет создан на основе приложения, где авторизацию пришлось исправлять по ходу аудита. Каждая найденная проблема стала требованием к пакету и тестом.
+The package was created from an application whose authentication had to be fixed during an audit. Each problem found became a requirement for the package and a test.
 
-| Что нашли | Урок и защита в пакете |
+| What was found | Lesson and protection in the package |
 |---|---|
-| SQL собирался склейкой строк, вход без пароля через `' OR '1'='1` | Только параметризованные запросы |
-| Пароли в базе, в резервных копиях, в истории git и на сетевом диске в открытом виде | Только хеши, миграция с резервной копией, документация про копии и история |
-| Скрытая в интерфейсе кнопка выполнялась подделанным запросом, а серверный модуль командной строки был доступен без входа | Проверки прав в каждом обработчике, регистрация модулей по правам |
-| Пользователь мог удалить себя и последнего администратора | Единые проверки допустимости блокировки и удаления |
-| Новый пользователь с тем же логином входил по cookie прежнего владельца | Удаление токенов и попыток вместе с пользователем |
-| Счётчик попыток не сбрасывался, если успех и новые неудачи попадали в одну секунду | Сброс по номеру записи |
-| Подключение к базе не закрывалось при завершении сессии и держало файл | Закрытие подключений в приложении, регрессионный тест на переименование файла базы |
-| Новый вариант настроек по умолчанию потерял право, которое было в рабочем конфиге вручную, и кнопка пропала у всех | Тест «все права, используемые кодом, есть в настройках по умолчанию», дописывание недостающих настроек без перезаписи существующих |
-| Заданный инлайн цвет строки таблицы не отображался, так как тема приложения перебивает его | Оформление строк классами CSS и проверка в реальном браузере, а не только по описанию таблицы |
+| SQL was built by string concatenation, sign-in without a password via `' OR '1'='1` | Only parameterised queries |
+| Passwords in plain text in the database, in backups, in git history and on a network drive | Only hashes, a migration with a backup, documentation about copies and history |
+| A button hidden in the UI was executed by a forged request, and the server module of the command line was reachable without signing in | Permission checks in every handler, module registration by permission |
+| A user could delete themselves and the last administrator | Unified validity checks for blocking and deletion |
+| A new user with the same login signed in by the previous owner's cookie | Deleting tokens and attempts together with the user |
+| The attempt counter was not reset if a success and new failures fell within the same second | Reset by record number |
+| The database connection was not closed when the session ended and kept the file locked | Closing connections in the application, a regression test on renaming the database file |
+| A new variant of the default settings lost a permission that was present in the hand-edited working config, and the button disappeared for everyone | A test "all permissions used by the code are in the default settings", appending missing settings without overwriting existing ones |
+| An inline table row colour was not displayed because the app theme overrides it | Styling rows with CSS classes and checking in a real browser, not only against the table description |
 
-# История документа
+# Document history
 
-* Таблица пользователей показывает, указан ли email для восстановления пароля, включена ли 2FA и сколько действующих автовходов у пользователя (версия 0.6.0, `aa_active_autologins()`). Автовход это токен в cookie: число показывает, на скольких устройствах вход запомнен, а не сколько вкладок открыто.
-* Добавлена двухфакторная аутентификация TOTP (версия 0.5.0): колонки `totp_*` в `users`, таблица `totp_recovery` (миграция 8), модуль `aa_totp_*`, событие `totp_*` и `recovery_code_used`.
-* Добавлено восстановление пароля по email (версия 0.4.0): колонка `users.email`, таблица `password_resets` (миграция 7), одноразовые ссылки, лимиты, события `password_reset_*` и `email_changed`.
-* Добавлены: смена собственного пароля, обязательная смена пароля для паролей от администратора (`must_change`), завершение всех сессий пользователя, проверка токена сессии сторожем, периодическая очистка устаревших записей, вход по Enter.
-* Первая версия: описание целевого поведения пакета до начала выноса кода из приложения. Документ уточняется по мере реализации и проверки.
+* The users table shows whether a password recovery email is set, whether 2FA is enabled, and how many active auto-logins the user has (version 0.6.0, `aa_active_autologins()`). An auto-login is a token in a cookie: the number shows on how many devices sign-in is remembered, not how many tabs are open.
+* Added TOTP two-factor authentication (version 0.5.0): `totp_*` columns in `users`, the `totp_recovery` table (migration 8), the `aa_totp_*` module, the `totp_*` events and `recovery_code_used`.
+* Added password recovery by email (version 0.4.0): the `users.email` column, the `password_resets` table (migration 7), single-use links, limits, the `password_reset_*` events and `email_changed`.
+* Added: changing your own password, mandatory password change for passwords set by an administrator (`must_change`), ending all of a user's sessions, session token checking by the guard, periodic cleanup of stale records, sign-in on Enter.
+* First version: a description of the intended behaviour of the package before code was extracted from the application. The document is refined as the package is implemented and verified.

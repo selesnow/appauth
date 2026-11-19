@@ -2,31 +2,35 @@
 % Please edit documentation in R/users.R
 \name{aa_validate_new_user}
 \alias{aa_validate_new_user}
-\title{Проверить данные нового пользователя}
+\title{Validate a new user's data}
 \usage{
 aa_validate_new_user(conn, login, password, role, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{password}{Пароль в открытом виде (в базу попадёт только хеш).}
+\item{password}{The password in plain text (only the hash goes to the
+database).}
 
-\item{role}{Роль из списка \code{roles} настроек.}
+\item{role}{A role from the \code{roles} list of the settings.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{NULL}, если данные подходят, иначе текст проблемы (на языке настроек).
+\code{NULL} if the data is fine, otherwise the problem text (in the
+settings language).
 }
 \description{
-Проверяет логин, пароль, роль и уникальность логина, ничего не создавая.
-Подходит для показа ошибки в форме до создания пользователя.
+Checks the login, password, role and login uniqueness without creating
+anything. Suitable for showing an error in a form before the user is created.
 }
 \details{
-Логин считается занятым, если он совпадает с существующим точно или без учёта
-регистра (так новые пользователи не создают пар вида \code{Kiruka} и \code{kiruka}).
+A login is considered taken if it matches an existing one exactly or
+case-insensitively (so new users do not create pairs like \code{Kiruka} and
+\code{kiruka}).
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

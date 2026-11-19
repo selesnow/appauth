@@ -1,17 +1,17 @@
 skip_if_not_sqlite()
 
-# Сквозные проверки двух пример-приложений (inst/examples) через testServer:
-# каждое приложение запускается целиком, с настоящими модулями и базой SQLite.
+# End-to-end checks of the two example apps (inst/examples) through testServer:
+# each app is started whole, with real modules and a SQLite database.
 
 example_dir <- function(name) {
   dir <- system.file("examples", name, package = "appauth")
-  testthat::skip_if(!nzchar(dir), "примеры недоступны")
+  testthat::skip_if(!nzchar(dir), "examples are not available")
   testthat::skip_if_not_installed("RSQLite")
   testthat::skip_if_not_installed("yaml")
   dir
 }
 
-# приложение собирается из app.R примера; рабочая папка нужна для config.yaml
+# the app is built from the example's app.R; the working directory is needed for config.yaml
 example_app <- function(name, env = parent.frame()) {
   dir <- example_dir(name)
   db <- tempfile(fileext = ".db")
@@ -41,7 +41,7 @@ run_app <- function(example, expr) {
   rlang::inject(suppressMessages(shiny::testServer(example$app, expr = !!rlang::enquo(expr))))
 }
 
-test_that("minimal-app: первый запуск создаёт администратора, вкладки по правам матрицы", {
+test_that("minimal-app: the first start creates an administrator, tabs follow the permission matrix", {
   ex <- example_app("minimal-app")
 
   run_app(ex, {
@@ -53,11 +53,11 @@ test_that("minimal-app: первый запуск создаёт админис�
       `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1
     )
     html <- html_of(output$main)
-    expect_match(html, "Задачи", fixed = TRUE)
-    expect_match(html, "Запустить задачу", fixed = TRUE)
-    expect_match(html, "Доступ", fixed = TRUE)
-    expect_match(html, "Сменить пароль", fixed = TRUE)
-    expect_match(html, "Выйти на всех устройствах", fixed = TRUE)
+    expect_match(html, "Tasks", fixed = TRUE)
+    expect_match(html, "Run task", fixed = TRUE)
+    expect_match(html, "Access", fixed = TRUE)
+    expect_match(html, "Change password", fixed = TRUE)
+    expect_match(html, "Sign out everywhere", fixed = TRUE)
   })
 
   db_do(ex$db, function(con) {
@@ -66,7 +66,7 @@ test_that("minimal-app: первый запуск создаёт админис�
   })
 })
 
-test_that("minimal-app: роли user и viewer видят разные вкладки и кнопки", {
+test_that("minimal-app: the user and viewer roles see different tabs and buttons", {
   ex <- example_app("minimal-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -80,20 +80,20 @@ test_that("minimal-app: роли user и viewer видят разные вкла
   run_app(ex, {
     session$setInputs(`auth-login` = "ivan", `auth-password` = "secret123", `auth-login_btn` = 1)
     html <- html_of(output$main)
-    expect_match(html, "Запустить задачу", fixed = TRUE)
-    expect_false(grepl("Доступ", html, fixed = TRUE))
+    expect_match(html, "Run task", fixed = TRUE)
+    expect_false(grepl("Access", html, fixed = TRUE))
   })
 
   run_app(ex, {
     session$setInputs(`auth-login` = "olga", `auth-password` = "secret123", `auth-login_btn` = 1)
     html <- html_of(output$main)
-    expect_match(html, "Задачи", fixed = TRUE)
-    expect_false(grepl("Запустить задачу", html, fixed = TRUE))
-    expect_false(grepl("Доступ", html, fixed = TRUE))
+    expect_match(html, "Tasks", fixed = TRUE)
+    expect_false(grepl("Run task", html, fixed = TRUE))
+    expect_false(grepl("Access", html, fixed = TRUE))
   })
 })
 
-test_that("minimal-app: обработчик защищён на сервере, даже если кнопка скрыта", {
+test_that("minimal-app: the handler is protected on the server even if the button is hidden", {
   ex <- example_app("minimal-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -114,10 +114,10 @@ test_that("minimal-app: обработчик защищён на сервере,
   )
 
   expect_true(any(grepl("access_denied user=olga value=Run", msgs, fixed = TRUE)))
-  expect_false(any(grepl("Задача запущена", msgs, fixed = TRUE)))
+  expect_false(any(grepl("Task started", msgs, fixed = TRUE)))
 })
 
-test_that("minimal-app: смена пароля в окне и выход на всех устройствах после подтверждения", {
+test_that("minimal-app: password change in a window and sign-out on all devices after confirmation", {
   ex <- example_app("minimal-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -128,14 +128,14 @@ test_that("minimal-app: смена пароля в окне и выход на �
 
   run_app(ex, {
     session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
-    expect_match(html_of(output$main), "Сменить пароль", fixed = TRUE)
-    session$setInputs(change_password = 1)               # открывает окно со сменой пароля
+    expect_match(html_of(output$main), "Change password", fixed = TRUE)
+    session$setInputs(change_password = 1)               # opens the password change window
     session$setInputs(`password-old` = "secret123", `password-new` = "brand-new-1",
                       `password-confirm` = "brand-new-1", `password-change` = 1)
 
-    session$setInputs(logout_all = 1)                   # только окно подтверждения
+    session$setInputs(logout_all = 1)                   # only the confirmation window
     expect_true(db_active_tokens(ex$db, "boss") >= 1)
-    session$setInputs(logout_all_confirm = 1)           # подтверждение
+    session$setInputs(logout_all_confirm = 1)           # confirmation
   })
 
   expect_equal(db_active_tokens(ex$db, "boss"), 0)
@@ -146,7 +146,7 @@ test_that("minimal-app: смена пароля в окне и выход на �
   })
 })
 
-test_that("minimal-app: администратор через приложение блокирует пользователя", {
+test_that("minimal-app: an administrator blocks a user through the app", {
   ex <- example_app("minimal-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -164,7 +164,7 @@ test_that("minimal-app: администратор через приложени
   db_do(ex$db, function(con) expect_equal(aa_get_user(con, "ivan")$blocked, 1))
 })
 
-test_that("custom-permissions-app: свои роли, английский интерфейс, права из базы", {
+test_that("custom-permissions-app: custom roles, English interface, permissions from the database", {
   ex <- example_app("custom-permissions-app")
 
   run_app(ex, {
@@ -186,7 +186,7 @@ test_that("custom-permissions-app: свои роли, английский ин�
   db_do(ex$db, function(con) expect_equal(aa_get_user(con, "boss")$role, "owner"))
 })
 
-test_that("custom-permissions-app: права редактора берутся из таблицы, слот карточки их сохраняет", {
+test_that("custom-permissions-app: editor permissions come from the table, the card slot saves them", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -194,7 +194,7 @@ test_that("custom-permissions-app: права редактора берутся 
   })
   db_do(ex$db, function(con) aa_create_user(con, "ann", "secret123", "editor", custom_settings))
 
-  # у редактора пока нет прав
+  # the editor has no permissions yet
   run_app(ex, {
     session$setInputs(`auth-login` = "ann", `auth-password` = "secret123", `auth-login_btn` = 1)
     html <- html_of(output$main)
@@ -203,7 +203,7 @@ test_that("custom-permissions-app: права редактора берутся 
     expect_false(grepl("Users", html, fixed = TRUE))
   })
 
-  # владелец выдаёт право через слот карточки
+  # the owner grants a permission through the card slot
   run_app(ex, {
     session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
     session$flushReact()
@@ -222,7 +222,7 @@ test_that("custom-permissions-app: права редактора берутся 
   })
 })
 
-test_that("custom-permissions-app: сохранять права может только владелец", {
+test_that("custom-permissions-app: only the owner can save permissions", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -244,7 +244,7 @@ test_that("custom-permissions-app: сохранять права может то
   })
 })
 
-test_that("custom-permissions-app: у редактора без права обработчик экспорта отказывает", {
+test_that("custom-permissions-app: an editor without the permission is refused by the export handler", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
     session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
@@ -267,18 +267,18 @@ test_that("custom-permissions-app: у редактора без права об�
   expect_true(any(grepl("access_denied user=ann value=export", msgs, fixed = TRUE)))
 })
 
-test_that("база рекрутинга (старая схема, открытые пароли, root/root) работает с английским интерфейсом", {
+test_that("a database with a home-grown schema (old schema, plain-text passwords, root/root) works with the English interface", {
   skip_if_not_installed("RSQLite")
   db <- tempfile(fileext = ".db")
   withr::defer(unlink(c(db, paste0(db, ".bak"))))
 
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
-  fixture_recruitment(con)
+  fixture_legacy_plain(con)
   DBI::dbDisconnect(con)
 
   settings <- aa_settings(texts = aa_texts("en"), roles = c("admin", "user", "viewer"))
 
-  # до миграции пароли открытые: вход невозможен ни у кого
+  # before the migration the passwords are plain text: nobody can sign in
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
   withr::defer(if (DBI::dbIsValid(con)) DBI::dbDisconnect(con))
   aa_init_db(con)

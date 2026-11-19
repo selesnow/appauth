@@ -2,32 +2,35 @@
 % Please edit documentation in R/protection.R
 \name{aa_users_overview}
 \alias{aa_users_overview}
-\title{Пользователи со статусами для таблицы}
+\title{Users with statuses for a table}
 \usage{
 aa_users_overview(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Таблица с колонками \code{login}, \code{role}, \code{blocked}, \code{state} (\code{"blocked"}
-при блокировке администратором, \code{"locked"} при блокировке по попыткам,
-иначе \code{"ok"}), \code{lock_seconds} (секунд до конца блокировки по попыткам) и
-\code{status} (текст статуса на языке настроек, для \code{"ok"} пустая строка), а
-также \code{created_at} и \code{last_login_at} (даты из базы по UTC, как в
-\code{\link[=aa_get_user]{aa_get_user()}}) и \code{created} и \code{last_login} (те же даты для показа:
-местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»),
-а также \code{has_email} (1, если для восстановления пароля указан email, адрес в
-сводку не попадает), \code{totp_on} (1, если у пользователя включена 2FA) и
-\code{autologins} (сколько действующих автовходов, см. \code{\link[=aa_active_autologins]{aa_active_autologins()}}).
+A table with columns \code{login}, \code{role}, \code{blocked}, \code{state}
+(\code{"blocked"} for a block by an administrator, \code{"locked"} for a lockout by
+attempts, otherwise \code{"ok"}), \code{lock_seconds} (seconds until the attempt
+lockout ends) and \code{status} (status text in the settings language, an empty
+string for \code{"ok"}), as well as \code{created_at} and \code{last_login_at} (dates from
+the database in UTC, as in \code{\link[=aa_get_user]{aa_get_user()}}) and \code{created} and \code{last_login}
+(the same dates for display: server local time, with the texts for
+"unknown" and "never logged in" for unknown dates), as well as \code{has_email}
+(1 if an email is set for password recovery; the address itself is not
+included), \code{totp_on} (1 if the user has 2FA enabled) and \code{autologins} (how
+many active autologins, see \code{\link[=aa_active_autologins]{aa_active_autologins()}}).
 }
 \description{
-Список пользователей с признаками, которые нужны для таблицы на вкладке
-управления доступом: заблокирован ли пользователь администратором, заблокирован
-ли вход после неудачных попыток и сколько осталось. Если таблицы попыток
-недоступны, статус блокировки по попыткам считается отсутствующим.
+A list of users with the flags needed for the table on the access management
+tab: whether the user is blocked by an administrator, whether login is
+blocked after failed attempts and how much time is left. If the attempts
+tables are unavailable, the attempt-based lockout status is treated as
+absent.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

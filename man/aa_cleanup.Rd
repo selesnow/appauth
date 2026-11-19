@@ -2,28 +2,28 @@
 % Please edit documentation in R/schema.R
 \name{aa_cleanup}
 \alias{aa_cleanup}
-\title{Удалить устаревшие данные авторизации}
+\title{Delete stale authentication data}
 \usage{
 aa_cleanup(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
-(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Список (невидимо): \code{login_attempts} (число удалённых попыток входа),
-\code{auth_sessions} (число удалённых токенов) и \code{password_resets} (число удалённых
-токенов восстановления пароля) и \code{oauth_states} (число удалённых параметров входа
-через Google).
+A list (invisibly): \code{login_attempts} (the number of deleted login attempts),
+\code{auth_sessions} (the number of deleted tokens), \code{password_resets} (the number of deleted
+password recovery tokens) and \code{oauth_states} (the number of deleted sign-in parameters
+for Google).
 }
 \description{
-Удаляет записи о попытках входа старше \code{attempts_retention_hours} часов, а
-также просроченные и отозванные токены автовхода старше \code{token_retention_days}
-дней, а также использованные и просроченные токены восстановления пароля
-и параметры входа через Google старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
-после \code{\link[=aa_init_db]{aa_init_db()}}.
+Deletes login attempt records older than \code{attempts_retention_hours} hours, as
+well as expired and revoked auto-login tokens older than \code{token_retention_days}
+days, as well as used and expired password recovery tokens
+and Google sign-in parameters older than a day. Active tokens and fresh attempts are not touched. Call it
+after \code{\link[=aa_init_db]{aa_init_db()}}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

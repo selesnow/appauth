@@ -2,22 +2,23 @@
 % Please edit documentation in R/users.R
 \name{aa_revoke_sessions}
 \alias{aa_revoke_sessions}
-\title{Завершить все сессии пользователя}
+\title{End all sessions of a user}
 \usage{
 aa_revoke_sessions(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-Число отозванных токенов (невидимо).
+The number of revoked tokens (invisibly).
 }
 \description{
-Отзывает все токены автовхода пользователя. Открытые сессии с такими
-токенами завершит \code{\link[=aa_session_guard]{aa_session_guard()}} при ближайшей проверке, а cookie в
-браузерах перестанут работать.
+Revokes all autologin tokens of the user. Open sessions with such tokens are
+ended by \code{\link[=aa_session_guard]{aa_session_guard()}} at its next check, and the cookies in browsers
+stop working.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

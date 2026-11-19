@@ -2,38 +2,38 @@
 % Please edit documentation in R/helpers.R
 \name{aa_register_module}
 \alias{aa_register_module}
-\title{Подключить серверную часть модуля, только если есть право}
+\title{Attach a module server only if the permission is granted}
 \usage{
 aa_register_module(auth, permission, provider, server)
 }
 \arguments{
-\item{auth}{Результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
+\item{auth}{A result of \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{permission}{Название права.}
+\item{permission}{Permission name.}
 
-\item{provider}{Источник прав, см. \code{\link[=aa_can]{aa_can()}}.}
+\item{provider}{Permission source, see \code{\link[=aa_can]{aa_can()}}.}
 
-\item{server}{Функция без аргументов, которая регистрирует модуль, например
-\code{function() mod_tasks_server("tasks")}.}
+\item{server}{A function without arguments that registers the module, for
+example \code{function() mod_tasks_server("tasks")}.}
 }
 \value{
-Невидимо наблюдатель Shiny.
+Invisibly a Shiny observer.
 }
 \description{
-Вызывает \code{server()} один раз за сессию, когда вошедший пользователь получает
-право \code{permission}. Для остальных пользователей серверная часть модуля не
-регистрируется вообще, а права по-прежнему нужно проверять внутри обработчиков
-(\code{\link[=aa_require]{aa_require()}}): регистрация это защита от лишней работы, а не от подделанных
-запросов.
+Calls \code{server()} once per session, when the signed-in user gets the
+\code{permission} permission. For other users the module server is not registered
+at all, and permissions still have to be checked inside handlers
+(\code{\link[=aa_require]{aa_require()}}): registration protects against unnecessary work, not
+against forged requests.
 }
 \details{
-Зарегистрированные модули нельзя убрать из сессии, поэтому при выходе
-используйте \code{auth$logout(reload = TRUE)}: страница перезагрузится и модули
-прежнего пользователя исчезнут.
+Registered modules cannot be removed from a session, so on sign-out use
+\code{auth$logout(reload = TRUE)}: the page reloads and the modules of the
+previous user disappear.
 }
 \examples{
 \dontrun{
-provider <- aa_permissions_from_matrix(conf$access_managemet)
+provider <- aa_permissions_from_matrix(conf$access_management)
 aa_register_module(auth, "Tasks", provider, function() mod_tasks_server("tasks"))
 }
 }

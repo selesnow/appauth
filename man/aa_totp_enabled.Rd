@@ -2,21 +2,22 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_enabled}
 \alias{aa_totp_enabled}
-\title{Включена ли двухфакторная аутентификация у пользователя}
+\title{Whether two-factor authentication is enabled for a user}
 \usage{
 aa_totp_enabled(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-\code{TRUE} или \code{FALSE} (\code{FALSE} и для несуществующего пользователя, и
-если схема не достроена до версии 8).
+\code{TRUE} or \code{FALSE} (\code{FALSE} both for a nonexistent user and
+if the schema is not upgraded to version 8).
 }
 \description{
-Включена ли двухфакторная аутентификация у пользователя
+Whether two-factor authentication is enabled for a user
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

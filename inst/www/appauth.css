@@ -1,9 +1,9 @@
-/* appauth: стили формы входа и вкладки пользователей. Подключается через aa_app_head().
+/* appauth: styles of the login form and the users tab. Included through aa_app_head().
  *
- * Цвета и скругления задаются переменными --aa-*. Чтобы поменять оформление,
- * переопределите переменные в своём CSS после aa_app_head():
+ * Colors and corner radii are set by --aa-* variables. To change the look,
+ * override the variables in your own CSS after aa_app_head():
  *   :root { --aa-primary: #0d9488; }
- * Светлая тема: добавьте класс aa-theme-light на <body> или любой родительский элемент.
+ * Light theme: add the aa-theme-light class to <body> or any parent element.
  */
 
 :root {
@@ -31,10 +31,10 @@
   --aa-input-border: rgba(15, 23, 42, 0.2);
 }
 
-/* Форма входа --------------------------------------------------------------- */
+/* Login form --------------------------------------------------------------- */
 
 .aa-login {
-  /* на весь экран поверх контейнера страницы, иначе по краям остаются его отступы */
+  /* full screen over the page container, otherwise its padding shows at the edges */
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -81,7 +81,7 @@
 
 .aa-login-card .form-group { margin-bottom: 20px; }
 
-/* Shiny задаёт полям ширину 300px, а карточка шире: поля и кнопка должны быть одной ширины */
+/* Shiny sets the field width to 300px, but the card is wider: fields and button must have the same width */
 .aa-login-card .shiny-input-container:not(.shiny-input-container-inline) {
   width: 100%;
   max-width: 100%;
@@ -124,7 +124,7 @@
 
 .aa-login-card .aa-login-button:hover { background-color: var(--aa-primary-hover) !important; }
 
-/* Вход через Google: кнопка с рамкой, чтобы не спорить с основной */
+/* Sign-in with Google: a bordered button so it does not compete with the main one */
 .aa-login-card .aa-google-button {
   display: flex;
   align-items: center;
@@ -165,10 +165,10 @@
   font-weight: 500;
 }
 
-/* Вкладка пользователей ----------------------------------------------------- */
+/* Users tab ----------------------------------------------------- */
 
-/* Подсветка строк таблицы. Тема приложения может задавать фон ячеек с
-   !important, поэтому и здесь !important: иначе строка не станет красной. */
+/* Highlighting of table rows. The app theme may set the cell background with
+   !important, so !important is used here too: otherwise the row will not turn red. */
 table.dataTable tbody tr.aa-row-blocked > td,
 table.dataTable tbody tr.aa-row-blocked > td.sorting_1 {
   background-color: rgba(239, 68, 68, 0.18) !important;
@@ -209,6 +209,6 @@ table.dataTable tbody tr.aa-row-locked > td.sorting_1 {
   font-size: 0.85em;
 }
 
-/* кнопка копирования рядом с ключом и резервными кодами */
+/* copy button next to the key and recovery codes */
 .aa-copy { margin-left: 4px; }
 .aa-totp-codes + .aa-copy { margin: 6px 0 0 0; }

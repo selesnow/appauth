@@ -1,27 +1,27 @@
-# Защита входа от подбора пароля.
+# Protection of login against password guessing.
 #
-# Неудачные попытки считаются по ТОЧНОМУ логину (с учётом регистра, как и сам
-# вход), независимо от того, существует ли такой логин: поэтому по сообщениям
-# нельзя узнать список пользователей. Если за окно в lockout_minutes минут
-# накопилось max_failed_logins неудачных попыток, вход под этим логином
-# блокируется на lockout_minutes минут с момента последней неудачи. Попытки
-# во время блокировки не записываются и блокировку не продлевают. Успешный
-# вход обнуляет счётчик. Дополнительно есть общий лимит неудач в минуту по всем
-# логинам, он останавливает перебор по многим логинам и рост таблицы.
+# Failed attempts are counted per EXACT login (case-sensitive, like the login
+# itself), regardless of whether such a login exists: so the messages cannot be
+# used to learn the list of users. If max_failed_logins failed attempts
+# accumulate within a window of lockout_minutes minutes, login under that login
+# is blocked for lockout_minutes minutes from the last failure. Attempts made
+# during the lockout are not recorded and do not extend it. A successful login
+# resets the counter. There is also a global limit of failures per minute across
+# all logins; it stops guessing across many logins and growth of the table.
 #
-# Время хранится в UTC и сравнивается средствами SQLite. Обнуление счётчика
-# после успеха считается по монотонному номеру записи, а не по времени: время
-# хранится с точностью до секунды, и быстрые события теряли бы порядок.
+# Time is stored in UTC and compared with SQLite. The counter reset after a
+# success is based on the monotonic row number, not on time: time is stored with
+# one-second precision, and fast events would lose their order.
 
-#' Ключ логина в таблице попыток входа
+#' Login key in the login attempts table
 #'
-#' Точный логин, усечённый до `login_max` символов. Пустые и состоящие из
-#' пробелов логины не записываются (ключ `""`).
+#' The exact login truncated to `login_max` characters. Empty and
+#' whitespace-only logins are not recorded (key `""`).
 #'
-#' @param login Введённый логин.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param login The entered login.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Строка.
+#' @returns A string.
 #' @noRd
 aa_login_key <- function(login, settings) {
   if (!(is.character(login) && length(login) == 1 && !is.na(login)) || !nzchar(trimws(login))) {
@@ -31,20 +31,22 @@ aa_login_key <- function(login, settings) {
   substr(login, 1, settings$login_max)
 }
 
-#' Записать попытку входа
+#' Record a login attempt
 #'
-#' Сохраняет результат попытки входа для защиты от подбора. Попытки с пустым
-#' логином не записываются. Вызывать нужно только для попыток, сделанных НЕ
-#' во время блокировки: попытки во время блокировки не записываются, чтобы не
-#' продлевать её.
+#' Stores the result of a login attempt for brute-force protection. Attempts
+#' with an empty login are not recorded. Call it only for attempts made NOT
+#' during a lockout: attempts during a lockout are not recorded so as not to
+#' extend it.
 #'
-#' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
-#' @param login Введённый логин (точный, с учётом регистра).
-#' @param success `TRUE` для успешного входа (обнуляет счётчик неудач), `FALSE`
-#'   для неудачной попытки.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param conn A connection to the SQLite database
+#'   (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
+#' @param login The entered login (exact, case-sensitive).
+#' @param success `TRUE` for a successful login (resets the failure counter),
+#'   `FALSE` for a failed attempt.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `TRUE`, если попытка записана, `FALSE`, если логин пустой (невидимо).
+#' @returns `TRUE` if the attempt was recorded, `FALSE` if the login is empty
+#'   (invisibly).
 #' @export
 #'
 #' @examples
@@ -73,18 +75,19 @@ aa_record_attempt <- function(conn, login, success, settings = aa_settings()) {
   invisible(TRUE)
 }
 
-#' Сколько секунд осталось до конца блокировки логина
+#' Seconds left until a login lockout ends
 #'
-#' Считает неудачные попытки логина после его последнего успешного входа и
-#' внутри окна `lockout_minutes`. Если их не меньше `max_failed_logins`, логин
-#' заблокирован до конца окна, считая от последней неудачи.
+#' Counts the failed attempts of a login after its last successful login and
+#' within the `lockout_minutes` window. If there are at least
+#' `max_failed_logins` of them, the login is blocked until the end of the
+#' window, counted from the last failure.
 #'
-#' Логин считается **точно**: `Alsey` и `alsey` это разные логины с отдельными
-#' счётчиками, как и при входе.
+#' The login is matched **exactly**: `Alsey` and `alsey` are different logins
+#' with separate counters, as at login.
 #'
 #' @inheritParams aa_record_attempt
 #'
-#' @returns Целое число секунд, 0 если вход разрешён.
+#' @returns An integer number of seconds, 0 if login is allowed.
 #' @export
 #'
 #' @examples
@@ -107,7 +110,7 @@ aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
 
   window_seconds <- as.integer(settings$lockout_minutes * 60)
 
-  # неудачи после последнего успешного входа (по номеру записи) и внутри окна
+  # failures after the last successful login (by row number) and within the window
   r <- aa_query(
     conn,
     "SELECT COUNT(*) AS n,
@@ -132,15 +135,16 @@ aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
   max(0L, as.integer(remaining))
 }
 
-#' Превышен ли общий лимит неудачных попыток входа
+#' Is the global failed login limit exceeded
 #'
-#' Считает неудачные попытки по всем логинам вместе за последнюю минуту. Если
-#' их не меньше `max_failed_logins_per_minute`, вход временно закрыт для всех:
-#' это останавливает перебор по многим логинам и рост таблицы попыток.
+#' Counts failed attempts across all logins together over the last minute. If
+#' there are at least `max_failed_logins_per_minute` of them, login is
+#' temporarily closed for everyone: this stops guessing across many logins and
+#' growth of the attempts table.
 #'
 #' @inheritParams aa_record_attempt
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @export
 #'
 #' @examples
@@ -163,15 +167,15 @@ aa_global_throttled <- function(conn, settings = aa_settings()) {
   n >= settings$max_failed_logins_per_minute
 }
 
-#' Снять блокировку логина после неудачных попыток
+#' Clear a login lockout caused by failed attempts
 #'
-#' Удаляет неудачные попытки входа логина (успешные остаются), поэтому логин
-#' сразу можно использовать снова. Блокировку администратором вручную
-#' ([aa_set_blocked()]) эта функция не снимает.
+#' Deletes the failed login attempts of a login (successful ones stay), so the
+#' login can be used again right away. A manual block by an administrator
+#' ([aa_set_blocked()]) is not lifted by this function.
 #'
 #' @inheritParams aa_record_attempt
 #'
-#' @returns Число удалённых записей (невидимо).
+#' @returns The number of deleted records (invisibly).
 #' @export
 #'
 #' @examples
@@ -199,23 +203,25 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
   ))
 }
 
-#' Можно ли сейчас пробовать войти под логином
+#' Can a login be attempted right now
 #'
-#' Единая проверка перед проверкой пароля: сначала общий лимит неудач по всем
-#' логинам, затем блокировка этого логина. Если вход закрыт, пароль проверять
-#' не нужно, а попытку записывать не нужно (иначе блокировка продлевалась бы).
+#' A single check before verifying the password: first the global failure limit
+#' across all logins, then the lockout of this login. If login is closed, there
+#' is no need to verify the password, and no need to record the attempt
+#' (otherwise the lockout would be extended).
 #'
-#' Функция **не останавливает вход при ошибке**: если таблиц защиты нет или к
-#' ним не удалось обратиться, вход считается разрешённым (пароль всё равно
-#' проверяется), а причина пишется в лог приложения. Так недоступность таблицы
-#' попыток не запирает всех пользователей.
+#' The function **does not stop login on an error**: if the protection tables
+#' do not exist or cannot be queried, login is considered allowed (the password
+#' is still verified) and the reason is written to the app log. This way an
+#' unavailable attempts table does not lock out all users.
 #'
 #' @inheritParams aa_record_attempt
 #'
-#' @returns Список: `allowed` (`TRUE` или `FALSE`), `reason` (`NA`, `"throttled"`
-#'   при общем лимите или `"locked"` при блокировке логина), `seconds` (сколько
-#'   секунд осталось до конца блокировки логина, иначе 0) и `message` (текст для
-#'   показа пользователю на языке настроек, `NA`, если вход разрешён).
+#' @returns A list: `allowed` (`TRUE` or `FALSE`), `reason` (`NA`, `"throttled"`
+#'   for the global limit or `"locked"` for a login lockout), `seconds` (how many
+#'   seconds are left until the login lockout ends, otherwise 0) and `message`
+#'   (text to show to the user in the settings language, `NA` if login is
+#'   allowed).
 #' @export
 #'
 #' @examples
@@ -251,30 +257,32 @@ aa_login_gate <- function(conn, login, settings = aa_settings()) {
 
     allowed
   }, error = function(e) {
-    message("appauth: проверка блокировки входа недоступна: ", conditionMessage(e))
+    message("appauth: the login lockout check is unavailable: ", conditionMessage(e))
     allowed
   })
 }
 
-#' Пользователи со статусами для таблицы
+#' Users with statuses for a table
 #'
-#' Список пользователей с признаками, которые нужны для таблицы на вкладке
-#' управления доступом: заблокирован ли пользователь администратором, заблокирован
-#' ли вход после неудачных попыток и сколько осталось. Если таблицы попыток
-#' недоступны, статус блокировки по попыткам считается отсутствующим.
+#' A list of users with the flags needed for the table on the access management
+#' tab: whether the user is blocked by an administrator, whether login is
+#' blocked after failed attempts and how much time is left. If the attempts
+#' tables are unavailable, the attempt-based lockout status is treated as
+#' absent.
 #'
 #' @inheritParams aa_record_attempt
 #'
-#' @returns Таблица с колонками `login`, `role`, `blocked`, `state` (`"blocked"`
-#'   при блокировке администратором, `"locked"` при блокировке по попыткам,
-#'   иначе `"ok"`), `lock_seconds` (секунд до конца блокировки по попыткам) и
-#'   `status` (текст статуса на языке настроек, для `"ok"` пустая строка), а
-#'   также `created_at` и `last_login_at` (даты из базы по UTC, как в
-#'   [aa_get_user()]) и `created` и `last_login` (те же даты для показа:
-#'   местное время сервера, для неизвестных дат текст «неизвестно» и «не входил»),
-#'   а также `has_email` (1, если для восстановления пароля указан email, адрес в
-#'   сводку не попадает), `totp_on` (1, если у пользователя включена 2FA) и
-#'   `autologins` (сколько действующих автовходов, см. [aa_active_autologins()]).
+#' @returns A table with columns `login`, `role`, `blocked`, `state`
+#'   (`"blocked"` for a block by an administrator, `"locked"` for a lockout by
+#'   attempts, otherwise `"ok"`), `lock_seconds` (seconds until the attempt
+#'   lockout ends) and `status` (status text in the settings language, an empty
+#'   string for `"ok"`), as well as `created_at` and `last_login_at` (dates from
+#'   the database in UTC, as in [aa_get_user()]) and `created` and `last_login`
+#'   (the same dates for display: server local time, with the texts for
+#'   "unknown" and "never logged in" for unknown dates), as well as `has_email`
+#'   (1 if an email is set for password recovery; the address itself is not
+#'   included), `totp_on` (1 if the user has 2FA enabled) and `autologins` (how
+#'   many active autologins, see [aa_active_autologins()]).
 #' @export
 #'
 #' @examples
@@ -301,7 +309,7 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
     ))
   }
 
-  # email и 2FA: в старой схеме колонок может не быть, тогда считаем, что не указаны
+  # email and 2FA: an old schema may lack the columns, then treat them as not set
   flags <- tryCatch(
     aa_query(
       conn,

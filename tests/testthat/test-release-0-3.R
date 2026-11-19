@@ -1,9 +1,9 @@
-# Возможности версии 0.3.0: даты создания и последнего входа, политика слабых
-# паролей, готовый обработчик событий, подтверждение удаления пользователя.
+# Features of version 0.3.0: creation and last sign-in dates, weak password
+# policy, a ready-made event handler, confirmation of user deletion.
 
-# ---- даты создания и последнего входа ------------------------------------------
+# ---- creation and last sign-in dates -------------------------------------------
 
-test_that("новый пользователь получает created_at (UTC), last_login_at пустая", {
+test_that("a new user gets created_at (UTC), last_login_at is empty", {
   con <- users_db()
   aa_create_user(con, "ivan", "secret123", "user")
 
@@ -16,21 +16,21 @@ test_that("новый пользователь получает created_at (UTC)
   expect_named(aa_list_users(con), c("login", "role", "blocked", "created_at", "last_login_at"))
 })
 
-test_that("первый администратор тоже получает created_at", {
+test_that("the first administrator gets created_at too", {
   con <- users_db()
   aa_create_first_admin(con, "boss", "secret123")
 
   expect_false(is.na(aa_get_user(con, "boss")$created_at))
 })
 
-test_that("миграция достраивает колонки в существующей базе, данные сохраняются", {
+test_that("the migration completes the columns in an existing database, data is kept", {
   skip_if_not_sqlite()
   con <- new_db()
   texec(con, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT UNIQUE NOT NULL,
                         password TEXT NOT NULL, role TEXT NOT NULL, blocked INTEGER NOT NULL DEFAULT 0)")
   texec(con, "INSERT INTO users (login, password, role) VALUES ('old', 'x', 'user')")
 
-  # до миграции чтение работает, даты неизвестны
+  # before the migration reading works, the dates are unknown
   before <- aa_list_users(con)
   expect_true(is.na(before$created_at) && is.na(before$last_login_at))
 
@@ -43,7 +43,7 @@ test_that("миграция достраивает колонки в сущес�
   expect_identical(aa_schema_version(con), 9L)
 })
 
-test_that("вход по паролю обновляет last_login_at, вход по cookie не обновляет", {
+test_that("password sign-in updates last_login_at, cookie sign-in does not", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
@@ -61,7 +61,7 @@ test_that("вход по паролю обновляет last_login_at, вход
   expect_true(is.na(aa_get_user(con, "alsey")$last_login_at))
 })
 
-test_that("неверный пароль last_login_at не меняет", {
+test_that("a wrong password does not change last_login_at", {
   con <- auth_db()
 
   run_auth(con, {
@@ -71,7 +71,7 @@ test_that("неверный пароль last_login_at не меняет", {
   expect_true(is.na(aa_get_user(con, "ivan")$last_login_at))
 })
 
-test_that("создание первого администратора через модуль записывает last_login_at", {
+test_that("creating the first administrator through the module records last_login_at", {
   con <- users_db()
 
   run_auth(con, {
@@ -83,18 +83,18 @@ test_that("создание первого администратора чере
   expect_false(is.na(aa_get_user(con, "boss")$last_login_at))
 })
 
-test_that("aa_format_db_time переводит UTC в местное время и подставляет текст для пустых", {
+test_that("aa_format_db_time converts UTC to local time and fills in text for empty values", {
   withr::local_timezone("Asia/Tokyo")
 
-  out <- appauth:::aa_format_db_time(c("2026-01-01 00:00:00", NA, ""), "нет")
+  out <- appauth:::aa_format_db_time(c("2026-01-01 00:00:00", NA, ""), "none")
 
-  expect_identical(out[2:3], c("нет", "нет"))
+  expect_identical(out[2:3], c("none", "none"))
   expect_match(out[1], "^2026-01-01 [0-9]{2}:[0-9]{2}$")
-  # 9 часов разницы, если часовой пояс из TZ применился; иначе хотя бы формат верен
+  # a 9-hour difference if the TZ time zone was applied; otherwise at least the format is right
   if (identical(Sys.timezone(), "Asia/Tokyo")) expect_identical(out[1], "2026-01-01 09:00")
 })
 
-test_that("обзор пользователей: даты для показа и тексты для неизвестных дат", {
+test_that("users overview: dates for display and texts for unknown dates", {
   con <- users_db()
   raw_user(con, "legacy")
   aa_create_user(con, "fresh", "secret123", "user")
@@ -102,20 +102,20 @@ test_that("обзор пользователей: даты для показа �
 
   ov <- aa_users_overview(con)
 
-  expect_identical(ov$created[1], "неизвестно")
-  expect_identical(ov$last_login[1], "не входил")
+  expect_identical(ov$created[1], "unknown")
+  expect_identical(ov$last_login[1], "never signed in")
   expect_match(ov$created[2], "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$")
   expect_match(ov$last_login[2], "^2026-03-0[34] ")
   expect_identical(ov$last_login_at[2], "2026-03-04 10:20:30")
 
-  en <- aa_users_overview(con, aa_settings(texts = aa_texts("en")))
-  expect_identical(en$created[1], "unknown")
-  expect_identical(en$last_login[1], "never signed in")
+  ru <- aa_users_overview(con, aa_settings(texts = aa_texts("ru")))
+  expect_identical(ru$created[1], aa_text(aa_texts("ru"), "date_unknown"))
+  expect_identical(ru$last_login[1], aa_text(aa_texts("ru"), "date_never"))
 })
 
-# ---- политика слабых паролей ----------------------------------------------------
+# ---- weak password policy -------------------------------------------------------
 
-test_that("настройка password_policy: значение по умолчанию и проверка", {
+test_that("the password_policy setting: default value and validation", {
   expect_identical(aa_settings()$password_policy, "warn")
   expect_identical(aa_settings(password_policy = "reject")$password_policy, "reject")
   expect_identical(aa_settings_from_list(list(password_policy = "off"))$password_policy, "off")
@@ -124,10 +124,10 @@ test_that("настройка password_policy: значение по умолч�
     expect_error(aa_settings(password_policy = bad), class = "appauth_error_settings")
   }
 
-  expect_output(print(aa_settings(password_policy = "reject")), "отклоняются")
+  expect_output(print(aa_settings(password_policy = "reject")), "rejected")
 })
 
-test_that("слабые места пароля: список, логин, один символ, регистр", {
+test_that("password weaknesses: list, login, single character, case", {
   weak <- appauth:::aa_password_weakness
 
   expect_identical(weak("123456"), "password_common")
@@ -141,7 +141,7 @@ test_that("слабые места пароля: список, логин, од�
   expect_null(weak(NA_character_))
 })
 
-test_that("off: слабый пароль принимается без предупреждения", {
+test_that("off: a weak password is accepted without a warning", {
   s <- aa_settings(password_policy = "off")
   con <- users_db()
 
@@ -150,20 +150,23 @@ test_that("off: слабый пароль принимается без пред
   expect_no_error(aa_create_user(con, "ivan", "123456", "user", s))
 })
 
-test_that("warn: пароль принимается, предупреждение даёт текст причины", {
+test_that("warn: the password is accepted, the warning gives the reason text", {
   s <- aa_settings()
   con <- users_db()
 
   expect_null(aa_validate_password("123456", s))
   expect_no_error(aa_create_user(con, "ivan", "123456", "user", s))
-  expect_match(aa_weak_password_warning("123456", s), "слабый.*распространённых")
-  expect_match(aa_weak_password_warning("morgan", s, login = "Morgan"), "совпадает с логином")
-  expect_match(aa_weak_password_warning("zzzzzz", s), "повторяющегося символа")
+  expect_match(aa_weak_password_warning("123456", s), "weak.*common")
+  expect_match(aa_weak_password_warning("morgan", s, login = "Morgan"), "same as the login")
+  expect_match(aa_weak_password_warning("zzzzzz", s), "single repeated character")
   expect_null(aa_weak_password_warning("long-and-unusual-phrase", s))
-  expect_match(aa_weak_password_warning("123456", aa_settings(texts = aa_texts("en"))), "weak")
+  expect_false(identical(
+    aa_weak_password_warning("123456", s),
+    aa_weak_password_warning("123456", aa_settings(texts = aa_texts("ru")))
+  ))
 })
 
-test_that("reject: слабый пароль отклоняется при создании, сбросе, смене и первом администраторе", {
+test_that("reject: a weak password is rejected on creation, reset, change and for the first administrator", {
   s <- aa_settings(password_policy = "reject")
   con <- users_db()
 
@@ -184,18 +187,18 @@ test_that("reject: слабый пароль отклоняется при со�
   expect_error(aa_change_own_password(con, "ivan", "strong-passphrase", "1234567", s), class = "appauth_error_user")
   expect_false(is.null(aa_authenticate(con, "ivan", "strong-passphrase")))
 
-  expect_match(aa_validate_password("123456", s), "распространённых")
-  expect_match(aa_validate_password("ivan11", aa_settings(password_policy = "reject", password_min = 4), login = "IVAN11"), "совпадает")
+  expect_match(aa_validate_password("123456", s), "common")
+  expect_match(aa_validate_password("ivan11", aa_settings(password_policy = "reject", password_min = 4), login = "IVAN11"), "same as the login")
   expect_null(aa_validate_password("long-and-unusual-phrase", s))
 })
 
-test_that("правила длины проверяются раньше слабых мест", {
+test_that("length rules are checked before weaknesses", {
   s <- aa_settings(password_policy = "reject")
 
-  expect_match(aa_validate_password("123", s), "минимум")
+  expect_match(aa_validate_password("123", s), "at least")
 })
 
-test_that("модуль пользователей: warn пропускает слабый пароль и сообщает событием", {
+test_that("users module: warn lets a weak password through and reports it with an event", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -208,7 +211,7 @@ test_that("модуль пользователей: warn пропускает с
   expect_equal(log$events[[2]]$value, "weak1: password_common")
 })
 
-test_that("модуль пользователей: сильный пароль не даёт события о слабом пароле", {
+test_that("users module: a strong password gives no weak password event", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -219,14 +222,14 @@ test_that("модуль пользователей: сильный пароль 
   expect_equal(log$names(), "user_added")
 })
 
-test_that("модуль пользователей: reject отклоняет слабый пароль при добавлении и сбросе", {
+test_that("users module: reject rejects a weak password on adding and on reset", {
   con <- users_fixture()
   s <- aa_settings(password_policy = "reject")
 
   log <- run_users(con, {
     session$setInputs(add = 1)
     session$setInputs(new_login = "weak1", new_user_password = "123456", new_user_confirm = "123456", new_user_role = "user", add_confirm = 1)
-    expect_match(output$add_message, "распространённых")
+    expect_match(output$add_message, "common")
 
     session$setInputs(open = "ivan")
     session$setInputs(new_password = "password", new_password_confirm = "password", reset_password = 1)
@@ -237,7 +240,7 @@ test_that("модуль пользователей: reject отклоняет с
   expect_length(log$events, 0)
 })
 
-test_that("модуль пользователей: сброс пароля на слабый в режиме warn даёт событие", {
+test_that("users module: resetting to a weak password in warn mode gives an event", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -249,7 +252,7 @@ test_that("модуль пользователей: сброс пароля на
   expect_equal(log$events[[2]]$value, "ivan: password_common")
 })
 
-test_that("модуль входа: слабый пароль первого администратора и смены пароля даёт событие", {
+test_that("sign-in module: a weak password of the first administrator and of a password change gives an event", {
   con <- users_db()
 
   log <- run_auth(con, {
@@ -270,7 +273,7 @@ test_that("модуль входа: слабый пароль первого а�
   expect_equal(log$events[[which(log$names() == "weak_password_set")]]$value, "ann: password_common")
 })
 
-test_that("модуль смены пароля: слабый новый пароль в режиме warn принимается и даёт событие", {
+test_that("password change module: a weak new password in warn mode is accepted and gives an event", {
   con <- users_db()
   aa_create_user(con, "ann", "secret123", "user")
   auth <- fake_auth("ann", "user")
@@ -285,9 +288,9 @@ test_that("модуль смены пароля: слабый новый пар�
   expect_false(is.null(aa_authenticate(con, "ann", "123456")))
 })
 
-# ---- подтверждение удаления пользователя ----------------------------------------
+# ---- confirmation of user deletion ----------------------------------------------
 
-test_that("кнопка «Удалить» только открывает подтверждение, пользователь остаётся", {
+test_that("the \"Delete\" button only opens the confirmation, the user stays", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -299,7 +302,7 @@ test_that("кнопка «Удалить» только открывает по�
   expect_length(log$events, 0)
 })
 
-test_that("отмена подтверждения удаления: пользователь остаётся, подтверждение после отмены не работает", {
+test_that("canceling the deletion confirmation: the user stays, a confirmation after cancel does not work", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -313,7 +316,7 @@ test_that("отмена подтверждения удаления: польз�
   expect_length(log$events, 0)
 })
 
-test_that("подтверждение без нажатия «Удалить» ничего не удаляет (подделанный запрос)", {
+test_that("a confirmation without pressing \"Delete\" deletes nothing (forged request)", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -325,13 +328,13 @@ test_that("подтверждение без нажатия «Удалить» �
   expect_length(log$events, 0)
 })
 
-test_that("подтверждение удаляет только того, для кого показано окно", {
+test_that("the confirmation deletes only the user the window was shown for", {
   con <- users_fixture()
 
   log <- run_users(con, {
     session$setInputs(open = "ivan")
     session$setInputs(delete = 1)
-    session$setInputs(open = "boss") # открыли другую карточку, пока висело окно
+    session$setInputs(open = "boss") # another card was opened while the window was up
     session$setInputs(delete_confirm = 1)
   })
 
@@ -340,7 +343,7 @@ test_that("подтверждение удаляет только того, дл
   expect_length(log$events, 0)
 })
 
-test_that("подтверждение удаления работает один раз", {
+test_that("the deletion confirmation works once", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -354,7 +357,7 @@ test_that("подтверждение удаления работает один
   expect_equal(log$names(), "user_removed")
 })
 
-test_that("не администратор не может подтвердить удаление", {
+test_that("a non-administrator cannot confirm a deletion", {
   con <- users_fixture()
 
   log <- run_users(con, {
@@ -367,7 +370,7 @@ test_that("не администратор не может подтвердит�
   expect_true(all(log$names() == "access_denied"))
 })
 
-# ---- готовый обработчик событий ---------------------------------------------------
+# ---- ready-made event handler ---------------------------------------------------
 
 collect_writer <- function() {
   rows <- new.env()
@@ -378,7 +381,7 @@ collect_writer <- function() {
   rows
 }
 
-test_that("aa_event_logger: без настроек пишет все события под ключами событий", {
+test_that("aa_event_logger: without settings writes all events under event keys", {
   rows <- collect_writer()
   handler <- aa_event_logger(rows$writer)
 
@@ -390,7 +393,7 @@ test_that("aa_event_logger: без настроек пишет все событ
   expect_identical(rows$items[[2]]$value, "olga (user)")
 })
 
-test_that("aa_event_logger: actions переименовывает и отбирает события", {
+test_that("aa_event_logger: actions renames and filters events", {
   rows <- collect_writer()
   handler <- aa_event_logger(rows$writer, actions = c(login_failed = "Login failed", user_added = "User add"))
 
@@ -401,7 +404,7 @@ test_that("aa_event_logger: actions переименовывает и отбир
   expect_identical(vapply(rows$items, `[[`, "", "action"), c("Login failed", "User add"))
 })
 
-test_that("aa_event_logger: events отбирает события, enabled включает и выключает на ходу", {
+test_that("aa_event_logger: events filters events, enabled switches on and off on the fly", {
   rows <- collect_writer()
   on <- TRUE
   handler <- aa_event_logger(rows$writer, events = c("login_failed", "logout"), enabled = function(event) on)
@@ -421,7 +424,7 @@ test_that("aa_event_logger: events отбирает события, enabled вк
   expect_length(rows$items, n)
 })
 
-test_that("aa_event_logger: format_value преобразует значение", {
+test_that("aa_event_logger: format_value transforms the value", {
   rows <- collect_writer()
   handler <- aa_event_logger(
     rows$writer,
@@ -435,32 +438,32 @@ test_that("aa_event_logger: format_value преобразует значение
   expect_identical(rows$items[[2]]$value, "ivan")
 })
 
-test_that("aa_event_logger: ошибки в настройках понятны, неизвестные события ловятся", {
+test_that("aa_event_logger: settings errors are clear, unknown events are caught", {
   w <- function(action, user, session_id, value) NULL
 
-  expect_error(aa_event_logger("не функция"), class = "appauth_error_settings")
+  expect_error(aa_event_logger("not a function"), class = "appauth_error_settings")
   expect_error(aa_event_logger(w, actions = c("a", "b")), class = "appauth_error_settings")
-  expect_error(aa_event_logger(w, actions = c(no_such_event = "x")), "неизвестные события")
-  expect_error(aa_event_logger(w, events = "no_such_event"), "неизвестные события")
+  expect_error(aa_event_logger(w, actions = c(no_such_event = "x")), "unknown events")
+  expect_error(aa_event_logger(w, events = "no_such_event"), "unknown events")
   expect_error(aa_event_logger(w, enabled = NA), class = "appauth_error_settings")
   expect_error(aa_event_logger(w, enabled = "yes"), class = "appauth_error_settings")
   expect_error(aa_event_logger(w, format_value = "x"), class = "appauth_error_settings")
 })
 
-test_that("aa_event_logger в модуле: сбой записи не прерывает действие пакета", {
+test_that("aa_event_logger in a module: a write failure does not interrupt the package action", {
   con <- auth_db()
-  handler <- aa_event_logger(function(action, user, session_id, value) stop("журнал недоступен"))
+  handler <- aa_event_logger(function(action, user, session_id, value) stop("log unavailable"))
 
   expect_message(
     run_auth(con, {
       session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
       expect_true(session$returned$logged_in())
     }, log = list(hook = handler)),
-    "ошибка в on_event"
+    "error in on_event"
   )
 })
 
-test_that("aa_event_logger работает как on_event у модулей и пишет реальные события", {
+test_that("aa_event_logger works as on_event of the modules and writes real events", {
   con <- users_fixture()
   rows <- collect_writer()
   handler <- aa_event_logger(rows$writer, actions = c(user_blocked = "User block"))
@@ -476,6 +479,6 @@ test_that("aa_event_logger работает как on_event у модулей и
   expect_identical(rows$items[[1]]$value, "ivan")
 })
 
-test_that("каталог событий содержит weak_password_set", {
+test_that("the event catalog contains weak_password_set", {
   expect_true("weak_password_set" %in% aa_events()$event)
 })

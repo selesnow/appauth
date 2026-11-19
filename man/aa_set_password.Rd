@@ -2,7 +2,7 @@
 % Please edit documentation in R/users.R
 \name{aa_set_password}
 \alias{aa_set_password}
-\title{Задать пользователю новый пароль}
+\title{Set a new password for a user}
 \usage{
 aa_set_password(
   conn,
@@ -14,30 +14,33 @@ aa_set_password(
 )
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{password}{Пароль в открытом виде (в базу попадёт только хеш).}
+\item{password}{The password in plain text (only the hash goes to the
+database).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{must_change}{Потребовать от пользователя сменить этот пароль при
-следующем входе (разумно, если пароль задал администратор).}
+\item{must_change}{Require the user to change this password at the next login
+(sensible if the password was set by an administrator).}
 
-\item{keep_token}{Токен автовхода, который не нужно отзывать (текущая сессия
-того, кто меняет свой пароль), либо \code{NULL}.}
+\item{keep_token}{An autologin token that must not be revoked (the current
+session of the person changing their own password), or \code{NULL}.}
 }
 \value{
-Число изменённых пользователей (невидимо): 1 или 0, если такого
-логина нет.
+The number of changed users (invisibly): 1, or 0 if there is no such
+login.
 }
 \description{
-Записывает хеш нового пароля и \strong{отзывает все токены автовхода}
-пользователя, чтобы после сброса пароля старые сессии браузера перестали
-работать (открытые сессии завершит \code{\link[=aa_session_guard]{aa_session_guard()}}). Неиспользованные
-ссылки восстановления пароля по email тоже перестают работать. Пароль проверяется
-по правилам из настроек, при нарушении ошибка класса \code{appauth_error_user}.
+Stores the hash of the new password and \strong{revokes all autologin tokens} of
+the user, so that after a password reset old browser sessions stop working
+(open sessions are ended by \code{\link[=aa_session_guard]{aa_session_guard()}}). Unused password recovery
+links sent by email also stop working. The password is checked against the
+rules from the settings; on a violation, an error of class
+\code{appauth_error_user}.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

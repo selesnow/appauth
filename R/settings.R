@@ -1,122 +1,128 @@
-#' Настройки авторизации
+#' Authorization settings
 #'
-#' Собирает настройки, от которых зависит поведение пакета: правила пароля,
-#' защита от подбора, сроки хранения данных, список ролей и язык интерфейса.
-#' Значения по умолчанию соответствуют приложению Server Manager. Объект
-#' настроек передаётся в остальные функции и модули пакета, глобальных
-#' переменных пакет не использует.
+#' Builds the settings that control the behavior of the package: password
+#' rules, brute-force protection, data retention periods, the list of roles and
+#' the interface language. The settings object is passed to the other functions
+#' and modules of the package; the package does not use global variables.
 #'
-#' @section Защита от подбора пароля:
-#' Если за `lockout_minutes` минут под одним логином накопилось
-#' `max_failed_logins` неудачных попыток, вход под этим логином блокируется на
-#' `lockout_minutes` минут с момента последней неудачной попытки. Попытки во
-#' время блокировки не записываются и блокировку не продлевают. Кроме того,
-#' если за последнюю минуту по всем логинам вместе накопилось
-#' `max_failed_logins_per_minute` неудачных попыток, вход временно закрыт для
-#' всех: это останавливает перебор по многим логинам сразу.
+#' @section Brute-force protection:
+#' If `max_failed_logins` failed attempts accumulate for one login within
+#' `lockout_minutes` minutes, sign-in for this login is blocked for
+#' `lockout_minutes` minutes starting from the last failed attempt. Attempts
+#' made during the lock are not recorded and do not extend the lock. In
+#' addition, if `max_failed_logins_per_minute` failed attempts accumulate over
+#' the last minute across all logins together, sign-in is temporarily closed
+#' for everyone: this stops password guessing spread over many logins.
 #'
-#' @param max_failed_logins Число неудачных попыток входа до блокировки логина.
-#' @param lockout_minutes Окно подсчёта неудачных попыток и длительность
-#'   блокировки, минут.
-#' @param max_failed_logins_per_minute Общий лимит неудачных попыток входа по
-#'   всем логинам за минуту.
-#' @param password_min,password_max Минимальная и максимальная длина нового
-#'   пароля. Ограничение действует только для новых и сбрасываемых паролей,
-#'   существующие пароли не затрагиваются.
-#' @param password_policy Что делать со слабыми новыми паролями (из списка
-#'   [aa_common_passwords()], совпадающими с логином без учёта регистра или
-#'   состоящими из одного повторяющегося символа): `"off"` ничего не проверять,
-#'   `"warn"` (по умолчанию) принять пароль, но показать предупреждение, `"reject"`
-#'   отклонить пароль. Существующие пароли не затрагиваются.
-#' @param login_max Максимальная длина логина (логин также приводится к нижнему
-#'   регистру и обрезается по краям при подсчёте попыток).
-#' @param autologin Использовать ли автовход по cookie. Если `FALSE`, пользователь
-#'   вводит пароль при каждой загрузке страницы, токены не выдаются.
-#' @param session_days Срок жизни токена автовхода, дней.
-#' @param session_check_seconds Как часто проверять, что открытая сессия ещё
-#'   разрешена (пользователя не заблокировали и не удалили), секунд.
-#' @param attempts_retention_hours Сколько часов хранить записи о попытках входа.
-#' @param token_retention_days Сколько дней хранить просроченные и отозванные
-#'   токены перед удалением.
-#' @param roles Допустимые роли пользователей.
-#' @param admin_role Роль администратора, она должна входить в `roles`. Только
-#'   эта роль управляет пользователями, независимо от матрицы прав приложения,
-#'   и именно её получает первый созданный пользователь.
-#' @param must_change_default Значение галочки «потребовать смену пароля при
-#'   следующем входе» в окне добавления пользователя и при сбросе пароля.
-#'   `TRUE` (по умолчанию): пароль, который задал администратор, временный, и
-#'   администратор снимает галочку, если смена не нужна. `FALSE`: галочка
-#'   выключена, администратор включает её сам.
-#' @param reset_enabled Включить восстановление пароля по email: на форме входа
-#'   появляется ссылка «Забыли пароль?». По умолчанию `FALSE`. Требует `send_reset`
-#'   и `reset_base_url`.
-#' @param send_reset Функция отправки письма `function(email, link, login)`:
-#'   отправляет письмо со ссылкой `link` на адрес `email` (например, через
-#'   `emayili`). Ошибка в функции не прерывает запрос и не видна пользователю,
-#'   причина попадает в событие `password_reset_requested`.
-#' @param reset_base_url Адрес приложения, на который ведёт ссылка из письма, например
-#'   `"https://apps.example.com/my_app"`. К нему добавляется `?reset=<токен>`.
-#' @param reset_ttl_minutes Срок жизни ссылки для смены пароля, минут.
-#' @param reset_max_per_hour Сколько писем для восстановления можно отправить
-#'   одному пользователю за час, остальные запросы молча игнорируются.
-#' @param reset_max_per_minute Общий лимит писем восстановления по всем
-#'   пользователям за минуту (защита от рассылки спама).
-#' @param totp_enabled Включить двухфакторную аутентификацию (одноразовые коды
-#'   TOTP из приложения-аутентификатора). По умолчанию `FALSE`. Требует `totp_key`.
-#'   Двухфакторная защита добровольная: каждый пользователь включает её сам в
-#'   модуле [aa_totp_server()], а у кого она включена, тот вводит код при входе по
-#'   паролю.
-#' @param totp_key Ключ шифрования секретов TOTP в базе, строка не короче 16
-#'   символов (например, из переменной среды). **Хранить вне базы и вне репозитория.**
-#'   Если ключ потерять или заменить, существующие секреты расшифровать не удастся,
-#'   и пользователям придётся подключать 2FA заново (администратор сбрасывает её в
-#'   карточке).
-#' @param totp_issuer Название сервиса, которое покажет приложение-аутентификатор.
-#' @param totp_window На сколько 30-секундных шагов в обе стороны допускается
-#'   расхождение часов (0 до 5, по умолчанию 1).
-#' @param google_enabled Включить вход через Google (OpenID Connect): на форме входа
-#'   появляется кнопка «Войти через Google». По умолчанию `FALSE`. Требует
-#'   `google_client_id`, `google_client_secret` и `google_redirect_uri`. Вход получает
-#'   только пользователь, который уже есть в базе и у которого указан email, равный
-#'   адресу Google-аккаунта: новых пользователей вход не создаёт, роль берётся из базы.
-#'   Двухфакторный код приложения при входе через Google не спрашивается (подтверждение
-#'   делает сам Google).
-#' @param google_client_id,google_client_secret Идентификатор и секрет OAuth-клиента
-#'   (тип «Web application») из Google Cloud Console. **Секрет хранить вне базы и вне
-#'   репозитория** (например, в переменной среды).
-#' @param google_redirect_uri Адрес, на который Google возвращает пользователя: адрес
-#'   приложения как его открывают пользователи, например
-#'   `"https://apps.example.com/"`. Он должен в точности совпадать с адресом в списке
-#'   «Authorized redirect URIs» OAuth-клиента. Допускается `https://`, а для разработки
-#'   `http://localhost`.
-#' @param google_domains Допустимые домены организации (вектор, например
-#'   `c("example.com", "example.net")`). Если задан, вход принимается только для
-#'   аккаунтов, у которых в подписанном токене Google указан один из этих доменов (`hd`,
-#'   основной домен организации Workspace) и домен email тоже входит в список. Если у
-#'   организации есть вторичные домены, укажите в списке и основной, и вторичные. Пустое
-#'   значение (`NULL`) отключает проверку домена, тогда решает совпадение email с
-#'   пользователем в базе.
-#' @param password_login Разрешить вход по логину и паролю. По умолчанию `TRUE`.
-#'   `FALSE` скрывает форму пароля и «Забыли пароль?» и отклоняет такие попытки на
-#'   сервере; возможно только вместе с `google_enabled = TRUE`, иначе войти было бы
-#'   нечем. Создание первого администратора на пустой базе остаётся.
-#' @param texts Тексты интерфейса, результат [aa_texts()].
+#' @param max_failed_logins Number of failed sign-in attempts before the login
+#'   is locked.
+#' @param lockout_minutes Window for counting failed attempts and the duration
+#'   of the lock, in minutes.
+#' @param max_failed_logins_per_minute Overall limit of failed sign-in attempts
+#'   across all logins per minute.
+#' @param password_min,password_max Minimum and maximum length of a new
+#'   password. The limit applies only to new and reset passwords, existing
+#'   passwords are not affected.
+#' @param password_policy What to do with weak new passwords (from the
+#'   [aa_common_passwords()] list, equal to the login ignoring case, or made of
+#'   a single repeated character): `"off"` do not check, `"warn"` (default)
+#'   accept the password but show a warning, `"reject"` reject the password.
+#'   Existing passwords are not affected.
+#' @param login_max Maximum login length (the login is also lowercased and
+#'   trimmed when attempts are counted).
+#' @param autologin Whether to use cookie-based auto sign-in. If `FALSE`, the
+#'   user enters the password on every page load and no tokens are issued.
+#' @param session_days Lifetime of the auto sign-in token, in days.
+#' @param session_check_seconds How often to check that an open session is
+#'   still allowed (the user has not been blocked or deleted), in seconds.
+#' @param attempts_retention_hours How many hours to keep records of sign-in
+#'   attempts.
+#' @param token_retention_days How many days to keep expired and revoked tokens
+#'   before deleting them.
+#' @param roles Allowed user roles.
+#' @param admin_role Administrator role, it must be one of `roles`. Only this
+#'   role manages users, regardless of the application's permission matrix, and
+#'   it is the role given to the first created user.
+#' @param must_change_default Default state of the "require a password change
+#'   at next sign-in" checkbox in the add-user dialog and when resetting a
+#'   password. `TRUE` (default): a password set by an administrator is
+#'   temporary, and the administrator clears the checkbox if a change is not
+#'   needed. `FALSE`: the checkbox is off, the administrator turns it on.
+#' @param reset_enabled Enable password recovery by email: a "Forgot your
+#'   password?" link appears on the sign-in form. Default `FALSE`. Requires
+#'   `send_reset` and `reset_base_url`.
+#' @param send_reset Function that sends the email, `function(email, link,
+#'   login)`: sends a message with the `link` to the `email` address (for
+#'   example, using `emayili`). An error in the function does not interrupt the
+#'   request and is not visible to the user, the reason goes into the
+#'   `password_reset_requested` event.
+#' @param reset_base_url Application address the link in the email points to,
+#'   for example `"https://apps.example.com/my_app"`. `?reset=<token>` is
+#'   appended to it.
+#' @param reset_ttl_minutes Lifetime of the password change link, in minutes.
+#' @param reset_max_per_hour How many recovery emails can be sent to one user
+#'   per hour, further requests are silently ignored.
+#' @param reset_max_per_minute Overall limit of recovery emails across all users
+#'   per minute (protection against spam).
+#' @param totp_enabled Enable two-factor authentication (one-time TOTP codes
+#'   from an authenticator app). Default `FALSE`. Requires `totp_key`.
+#'   Two-factor protection is voluntary: each user enables it in the
+#'   [aa_totp_server()] module, and users who have it enabled enter a code when
+#'   signing in with a password.
+#' @param totp_key Encryption key for TOTP secrets in the database, a string of
+#'   at least 16 characters (for example, from an environment variable).
+#'   **Store it outside the database and outside the repository.** If the key
+#'   is lost or replaced, existing secrets cannot be decrypted and users have
+#'   to set up 2FA again (an administrator resets it in the user card).
+#' @param totp_issuer Service name shown by the authenticator app.
+#' @param totp_window How many 30-second steps in each direction of clock drift
+#'   are tolerated (0 to 5, default 1).
+#' @param google_enabled Enable sign-in with Google (OpenID Connect): a "Sign in
+#'   with Google" button appears on the sign-in form. Default `FALSE`. Requires
+#'   `google_client_id`, `google_client_secret` and `google_redirect_uri`. Only
+#'   a user who already exists in the database and whose email equals the
+#'   Google account address can sign in: sign-in never creates new users, the
+#'   role is taken from the database. The application's two-factor code is not
+#'   requested for Google sign-in (Google does the verification itself).
+#' @param google_client_id,google_client_secret Identifier and secret of the
+#'   OAuth client (type "Web application") from the Google Cloud Console.
+#'   **Store the secret outside the database and outside the repository** (for
+#'   example, in an environment variable).
+#' @param google_redirect_uri Address Google returns the user to: the address
+#'   of the application as users open it, for example
+#'   `"https://apps.example.com/"`. It must exactly match an address in the
+#'   "Authorized redirect URIs" list of the OAuth client. `https://` is
+#'   allowed, and `http://localhost` for development.
+#' @param google_domains Allowed organization domains (a vector, for example
+#'   `c("example.com", "example.net")`). If set, sign-in is accepted only for
+#'   accounts whose signed Google token contains one of these domains (`hd`,
+#'   the primary Workspace domain of the organization) and whose email domain
+#'   is also in the list. If the organization has secondary domains, list both
+#'   the primary and the secondary ones. An empty value (`NULL`) disables the
+#'   domain check, then only the match of the email with a user in the database
+#'   decides.
+#' @param password_login Allow sign-in with a login and password. Default
+#'   `TRUE`. `FALSE` hides the password form and "Forgot your password?" and
+#'   rejects such attempts on the server; possible only together with
+#'   `google_enabled = TRUE`, otherwise there would be no way to sign in.
+#'   Creating the first administrator on an empty database is still available.
+#' @param texts Interface texts, a result of [aa_texts()].
 #'
-#' @returns Список настроек класса `aa_settings`.
+#' @returns A list of settings of class `aa_settings`.
 #' @export
 #'
 #' @examples
-#' # настройки по умолчанию
+#' # default settings
 #' settings <- aa_settings()
 #'
-#' # восстановление пароля по email
+#' # password recovery by email
 #' settings <- aa_settings(
 #'   reset_enabled  = TRUE,
 #'   reset_base_url = "https://apps.example.com/my_app",
-#'   send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+#'   send_reset     = function(email, link, login) message("Email for ", login, ": ", link)
 #' )
 #'
-#' # вход через Google (секрет из переменной среды), пароль остаётся запасным
+#' # sign-in with Google (secret from an environment variable), password stays as a fallback
 #' settings <- aa_settings(
 #'   google_enabled       = TRUE,
 #'   google_client_id     = "1234-abc.apps.googleusercontent.com",
@@ -125,13 +131,13 @@
 #'   google_domains       = c("example.com", "example.net")
 #' )
 #'
-#' # более строгая защита, английский интерфейс и свои роли
+#' # stricter protection, Russian interface and custom roles
 #' settings <- aa_settings(
 #'   max_failed_logins = 3,
 #'   lockout_minutes   = 30,
 #'   password_min      = 10,
 #'   roles             = c("admin", "editor", "viewer"),
-#'   texts             = aa_texts("en")
+#'   texts             = aa_texts("ru")
 #' )
 #' settings$lockout_minutes
 aa_settings <- function(
@@ -166,7 +172,7 @@ aa_settings <- function(
     google_redirect_uri          = NULL,
     google_domains               = NULL,
     password_login               = TRUE,
-    texts                        = aa_texts("ru")
+    texts                        = aa_texts("en")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
   aa_check_positive(lockout_minutes, "lockout_minutes")
@@ -190,49 +196,49 @@ aa_settings <- function(
 
   if (!(aa_is_string(password_policy) && password_policy %in% c("off", "warn", "reject"))) {
     rlang::abort(
-      "Параметр `password_policy` должен быть одним из значений: \"off\", \"warn\", \"reject\".",
+      "`password_policy` must be one of: \"off\", \"warn\", \"reject\".",
       class = "appauth_error_settings"
     )
   }
 
   if (!(is.null(send_reset) || is.function(send_reset))) {
     rlang::abort(
-      "Параметр `send_reset` должен быть функцией `function(email, link, login)` или `NULL`.",
+      "`send_reset` must be a function `function(email, link, login)` or `NULL`.",
       class = "appauth_error_settings"
     )
   }
 
   if (!(is.null(reset_base_url) || aa_is_string(reset_base_url))) {
     rlang::abort(
-      "Параметр `reset_base_url` должен быть строкой с адресом приложения или `NULL`.",
+      "`reset_base_url` must be a string with the application address or `NULL`.",
       class = "appauth_error_settings"
     )
   }
 
   if (reset_enabled && !(is.function(send_reset) && aa_is_string(reset_base_url))) {
     rlang::abort(
-      "Для `reset_enabled = TRUE` нужны функция `send_reset` и адрес приложения `reset_base_url`.",
+      "`reset_enabled = TRUE` requires the `send_reset` function and the application address `reset_base_url`.",
       class = "appauth_error_settings"
     )
   }
 
   if (!(is.null(totp_key) || (is.character(totp_key) && length(totp_key) == 1 && !is.na(totp_key)))) {
     rlang::abort(
-      "Параметр `totp_key` должен быть строкой или `NULL`.",
+      "`totp_key` must be a string or `NULL`.",
       class = "appauth_error_settings"
     )
   }
 
   if (totp_enabled && !(aa_is_string(totp_key) && nchar(totp_key) >= 16)) {
     rlang::abort(
-      "Для `totp_enabled = TRUE` нужен ключ шифрования `totp_key` (строка не короче 16 символов).",
+      "`totp_enabled = TRUE` requires an encryption key `totp_key` (a string of at least 16 characters).",
       class = "appauth_error_settings"
     )
   }
 
   if (!aa_is_string(totp_issuer)) {
     rlang::abort(
-      "Параметр `totp_issuer` должен быть непустой строкой.",
+      "`totp_issuer` must be a non-empty string.",
       class = "appauth_error_settings"
     )
   }
@@ -240,18 +246,18 @@ aa_settings <- function(
   if (!(is.numeric(totp_window) && length(totp_window) == 1 && is.finite(totp_window) &&
         totp_window >= 0 && totp_window <= 5 && totp_window == round(totp_window))) {
     rlang::abort(
-      "Параметр `totp_window` должен быть целым числом от 0 до 5.",
+      "`totp_window` must be an integer from 0 to 5.",
       class = "appauth_error_settings"
     )
   }
 
-  # домены из конфига приходят списком, из кода вектором: приводим к нижнему регистру
+  # domains from a config arrive as a list, from code as a vector: lowercase them
   google_domains <- tolower(trimws(as.character(unlist(google_domains))))
   google_domains <- unique(google_domains[!is.na(google_domains) & nzchar(google_domains)])
 
   if (!all(grepl("^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\.[a-z]{2,}$", google_domains))) {
     rlang::abort(
-      "Параметр `google_domains` должен содержать домены вида `example.com`.",
+      "`google_domains` must contain domains like `example.com`.",
       class = "appauth_error_settings"
     )
   }
@@ -261,7 +267,7 @@ aa_settings <- function(
 
     if (!(is.null(value) || (is.character(value) && length(value) == 1 && !is.na(value)))) {
       rlang::abort(
-        paste0("Параметр `", field, "` должен быть строкой или `NULL`."),
+        paste0("`", field, "` must be a string or `NULL`."),
         class = "appauth_error_settings"
       )
     }
@@ -270,28 +276,28 @@ aa_settings <- function(
   if (google_enabled && !(aa_is_string(google_client_id) && aa_is_string(google_client_secret) &&
                           aa_is_string(google_redirect_uri))) {
     rlang::abort(
-      "Для `google_enabled = TRUE` нужны `google_client_id`, `google_client_secret` и `google_redirect_uri`.",
+      "`google_enabled = TRUE` requires `google_client_id`, `google_client_secret` and `google_redirect_uri`.",
       class = "appauth_error_settings"
     )
   }
 
   if (google_enabled && !grepl("^(https://[^/\\s]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/\\S*)?$", google_redirect_uri, perl = TRUE)) {
     rlang::abort(
-      "Параметр `google_redirect_uri` должен быть адресом `https://...` (для разработки `http://localhost`).",
+      "`google_redirect_uri` must be an `https://...` address (`http://localhost` for development).",
       class = "appauth_error_settings"
     )
   }
 
   if (!password_login && !google_enabled) {
     rlang::abort(
-      "Вход по паролю можно отключить (`password_login = FALSE`) только вместе с `google_enabled = TRUE`.",
+      "Password sign-in can be disabled (`password_login = FALSE`) only together with `google_enabled = TRUE`.",
       class = "appauth_error_settings"
     )
   }
 
   if (password_min > password_max) {
     rlang::abort(
-      "Параметр `password_min` не может быть больше `password_max`.",
+      "`password_min` cannot be greater than `password_max`.",
       class = "appauth_error_settings"
     )
   }
@@ -299,21 +305,21 @@ aa_settings <- function(
   if (!(is.character(roles) && length(roles) >= 1 && !anyNA(roles) &&
         all(nzchar(roles)) && !anyDuplicated(roles))) {
     rlang::abort(
-      "Параметр `roles` должен быть вектором уникальных непустых строк.",
+      "`roles` must be a vector of unique non-empty strings.",
       class = "appauth_error_settings"
     )
   }
 
   if (!(aa_is_string(admin_role) && admin_role %in% roles)) {
     rlang::abort(
-      "Параметр `admin_role` должен быть одной из ролей из `roles`.",
+      "`admin_role` must be one of the roles in `roles`.",
       class = "appauth_error_settings"
     )
   }
 
   if (!inherits(texts, "aa_texts")) {
     rlang::abort(
-      "Параметр `texts` должен быть результатом `aa_texts()`.",
+      "`texts` must be a result of `aa_texts()`.",
       class = "appauth_error_settings"
     )
   }
@@ -326,7 +332,7 @@ aa_settings <- function(
       password_min                 = password_min,
       password_max                 = password_max,
       password_policy              = password_policy,
-      login_max                   = login_max,
+      login_max                    = login_max,
       autologin                    = autologin,
       session_days                 = session_days,
       session_check_seconds        = session_check_seconds,
@@ -357,17 +363,17 @@ aa_settings <- function(
   )
 }
 
-#' Настройки из списка (например, из раздела `config.yaml`)
+#' Settings from a list (for example, from a `config.yaml` section)
 #'
-#' Удобно, когда настройки защиты хранятся в конфиге приложения. Берутся только
-#' известные параметры [aa_settings()], остальные игнорируются, а любой параметр
-#' можно переопределить аргументами `...`.
+#' Convenient when the protection settings are kept in the application config.
+#' Only known parameters of [aa_settings()] are taken, the rest are ignored, and
+#' any parameter can be overridden with the `...` arguments.
 #'
-#' @param x Список настроек, например `yaml::read_yaml("config.yaml")$security`,
-#'   либо `NULL`.
-#' @param ... Параметры [aa_settings()], которые заменяют значения из `x`.
+#' @param x A list of settings, for example
+#'   `yaml::read_yaml("config.yaml")$security`, or `NULL`.
+#' @param ... Parameters of [aa_settings()] that replace the values from `x`.
 #'
-#' @returns Список настроек класса `aa_settings`.
+#' @returns A list of settings of class `aa_settings`.
 #' @export
 #'
 #' @examples
@@ -377,7 +383,7 @@ aa_settings <- function(
 aa_settings_from_list <- function(x = NULL, ...) {
   if (!(is.null(x) || is.list(x))) {
     rlang::abort(
-      "Первый аргумент должен быть списком настроек или `NULL`.",
+      "The first argument must be a list of settings or `NULL`.",
       class = "appauth_error_settings"
     )
   }
@@ -390,30 +396,28 @@ aa_settings_from_list <- function(x = NULL, ...) {
 
 #' @export
 print.aa_settings <- function(x, ...) {
-  cat("Настройки appauth\n")
-  cat("  Попыток входа до блокировки логина: ", x$max_failed_logins,
-      " за ", x$lockout_minutes, " мин., блокировка на ", x$lockout_minutes, " мин.\n", sep = "")
-  cat("  Общий лимит неудачных попыток: ", x$max_failed_logins_per_minute, " в минуту\n", sep = "")
-  cat("  Длина нового пароля: от ", x$password_min, " до ", x$password_max, " символов\n", sep = "")
-  cat("  Слабые пароли: ", switch(x$password_policy, off = "не проверяются", warn = "предупреждение", reject = "отклоняются"), "\n", sep = "")
-  cat("  Автовход: ", if (x$autologin) "включён" else "выключен",
-      ", срок токена ", x$session_days, " дн.\n", sep = "")
-  cat("  Пароль от администратора: ", if (x$must_change_default) "временный (смена при входе)" else "постоянный",
-      " по умолчанию\n", sep = "")
-  cat("  Восстановление пароля по email: ",
-      if (x$reset_enabled) paste0("включено, ссылка действует ", x$reset_ttl_minutes, " мин.") else "выключено",
+  cat("appauth settings\n")
+  cat("  Failed attempts before login lock: ", x$max_failed_logins,
+      " within ", x$lockout_minutes, " min., lock for ", x$lockout_minutes, " min.\n", sep = "")
+  cat("  Overall limit of failed attempts: ", x$max_failed_logins_per_minute, " per minute\n", sep = "")
+  cat("  New password length: from ", x$password_min, " to ", x$password_max, " characters\n", sep = "")
+  cat("  Weak passwords: ", switch(x$password_policy, off = "not checked", warn = "warning", reject = "rejected"), "\n", sep = "")
+  cat("  Auto sign-in: ", if (x$autologin) "enabled" else "disabled",
+      ", token lifetime ", x$session_days, " days\n", sep = "")
+  cat("  Password set by an administrator: ", if (x$must_change_default) "temporary (change at sign-in)" else "permanent",
+      " by default\n", sep = "")
+  cat("  Password recovery by email: ",
+      if (x$reset_enabled) paste0("enabled, link valid for ", x$reset_ttl_minutes, " min.") else "disabled",
       "\n", sep = "")
-  cat("  Двухфакторная аутентификация: ", if (x$totp_enabled) "включена (добровольная)" else "выключена", "\n", sep = "")
-  cat("  Вход по паролю: ", if (x$password_login) "разрешён" else "отключён", "
-", sep = "")
-  cat("  Вход через Google: ",
+  cat("  Two-factor authentication: ", if (x$totp_enabled) "enabled (voluntary)" else "disabled", "\n", sep = "")
+  cat("  Password sign-in: ", if (x$password_login) "allowed" else "disabled", "\n", sep = "")
+  cat("  Google sign-in: ",
       if (x$google_enabled) {
-        paste0("включён", if (length(x$google_domains)) paste0(" (домены: ", paste(x$google_domains, collapse = ", "), ")") else "")
-      } else "выключен",
-      "
-", sep = "")
-  cat("  Роли: ", paste(x$roles, collapse = ", "),
-      " (администратор: ", x$admin_role, ")\n", sep = "")
-  cat("  Язык интерфейса: ", attr(x$texts, "lang"), "\n", sep = "")
+        paste0("enabled", if (length(x$google_domains)) paste0(" (domains: ", paste(x$google_domains, collapse = ", "), ")") else "")
+      } else "disabled",
+      "\n", sep = "")
+  cat("  Roles: ", paste(x$roles, collapse = ", "),
+      " (administrator: ", x$admin_role, ")\n", sep = "")
+  cat("  Interface language: ", attr(x$texts, "lang"), "\n", sep = "")
   invisible(x)
 }

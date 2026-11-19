@@ -2,20 +2,20 @@
 % Please edit documentation in R/schema.R
 \name{aa_schema_version}
 \alias{aa_schema_version}
-\title{Текущая версия схемы таблиц авторизации}
+\title{Current version of the authentication table schema}
 \usage{
 aa_schema_version(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
-(\code{DBI::dbConnect()} с драйвером RSQLite, duckdb, RMariaDB или RPostgres).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
 }
 \value{
-Целое число: номер последней применённой миграции или \code{0}, если
-схема ещё не создана пакетом.
+An integer: the number of the last applied migration or \code{0} if the
+schema has not been created by the package yet.
 }
 \description{
-Текущая версия схемы таблиц авторизации
+Current version of the authentication table schema
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

@@ -1,23 +1,23 @@
-# Примеры приложений
+# Example applications
 
-Два готовых приложения для знакомства с пакетом. Откройте `app.R`, комментарии в начале файла объясняют, что показывает пример.
+Two ready-made applications for getting to know the package. Open `app.R`: the comments at the top of the file explain what the example shows.
 
-| Пример | Модель | Что показывает |
+| Example | Model | What it shows |
 | --- | --- | --- |
-| `minimal-app` | Матрица «право -> роли» из `config.yaml`, русский интерфейс, роли `admin`, `user`, `viewer` | Минимум, который нужен приложению: вход, вкладки по правам, защита обработчика, вкладка пользователей, смена пароля, хук событий |
-| `custom-permissions-app` | Права на каждого пользователя из таблицы базы, свои роли `owner`, `editor`, `viewer`, английский интерфейс | Что ядро не привязано к одной схеме прав: свой источник прав, слот в карточке пользователя, свои тексты и имя cookie, постоянный пароль от администратора, двухфакторная аутентификация (вкладка Profile), восстановление пароля по email (ссылку пример пишет в консоль, адрес приложения задаёт `APPAUTH_EXAMPLE_URL`) |
+| `minimal-app` | A "permission -> roles" matrix from `config.yaml`, English interface, roles `admin`, `user`, `viewer` | The minimum an app needs: login, tabs by permission, handler protection, a users tab, password change, the events hook |
+| `custom-permissions-app` | Per-user permissions from a database table, custom roles `owner`, `editor`, `viewer`, custom texts | The core is not tied to one permission scheme: a custom permission source, a slot in the user card, custom texts and cookie name, a permanent password set by the administrator, two-factor authentication (the Profile tab), password recovery by email (the example writes the link to the console; the app address is set by `APPAUTH_EXAMPLE_URL`) |
 
-## Запуск
+## Running
 
 ```r
 shiny::runApp(system.file("examples/minimal-app", package = "appauth"))
 shiny::runApp(system.file("examples/custom-permissions-app", package = "appauth"))
 ```
 
-База по умолчанию временная (в `tempdir()`), поэтому при каждом запуске приложение предложит создать первого администратора. Постоянную базу задаёт переменная среды `APPAUTH_EXAMPLE_DB`.
+The default database is temporary (in `tempdir()`), so every run offers to create the first administrator. A permanent database is set with the `APPAUTH_EXAMPLE_DB` environment variable.
 
-Чтобы использовать пример как основу, скопируйте папку себе, поправьте `config.yaml` (или настройки в начале `app.R`) и замените содержимое вкладок на свои модули.
+To use an example as a starting point, copy the folder, edit `config.yaml` (or the settings at the top of `app.R`) and replace the tab contents with your own modules.
 
-## Проверка
+## Verification
 
-Оба приложения целиком запускаются в автотестах пакета (`tests/testthat/test-example-apps.R`), а в исходниках пакета лежит сценарий проверки в настоящем браузере (`dev/e2e/run_examples.ps1`).
+Both applications are run end to end in the package tests (`tests/testthat/test-example-apps.R`), and the package sources contain a real-browser check (`dev/e2e/run_examples.ps1`).

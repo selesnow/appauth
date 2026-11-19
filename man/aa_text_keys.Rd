@@ -2,15 +2,15 @@
 % Please edit documentation in R/texts.R
 \name{aa_text_keys}
 \alias{aa_text_keys}
-\title{Ключи текстов интерфейса}
+\title{Interface text keys}
 \usage{
 aa_text_keys()
 }
 \value{
-Вектор названий ключей, которые можно переопределить в \code{\link[=aa_texts]{aa_texts()}}.
+A vector of key names that can be overridden in \code{\link[=aa_texts]{aa_texts()}}.
 }
 \description{
-Ключи текстов интерфейса
+Interface text keys
 }
 \examples{
 aa_text_keys()

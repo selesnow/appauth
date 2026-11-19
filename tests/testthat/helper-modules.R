@@ -1,7 +1,7 @@
-# Общие помощники тестов модулей (testthat подключает helper-*.R ко всем файлам).
+# Common helpers for module tests (testthat sources helper-*.R for all files).
 
-# Модуль входа через testServer. Пароли хешируются scrypt, поэтому пользователи
-# создаются только там, где они нужны.
+# The sign-in module through testServer. Passwords are hashed with scrypt, so users
+# are created only where they are needed.
 
 auth_events <- function() {
   log <- new.env()
@@ -31,8 +31,8 @@ run_auth <- function(con, expr, settings = aa_settings(), log = auth_events(), .
 
 form_html <- function(output) paste(as.character(output$form$html), collapse = "")
 
-# Модуль пользователей через testServer. Модальные окна в mock-сессии не
-# отображаются, поэтому проверяем действия, их результат в базе и события.
+# The users module through testServer. Modal windows are not shown in the mock session,
+# so we check the actions, their result in the database and events.
 
 users_events <- function() {
   log <- new.env()
@@ -44,7 +44,7 @@ users_events <- function() {
   log
 }
 
-# база: два администратора, обычный пользователь, настоящие хеши паролей
+# database: two administrators, an ordinary user, real password hashes
 users_fixture <- function(env = parent.frame()) {
   con <- users_db(env)
   aa_create_user(con, "alsey", "secret123", "admin")
@@ -58,7 +58,7 @@ fake_auth <- function(login = "alsey", role = "admin") {
   list(user = state)
 }
 
-# модуль смены своего пароля через testServer
+# own password change module through testServer
 password_run <- function(con, auth, expr, settings = aa_settings(), log = users_events()) {
   rlang::inject(shiny::testServer(
     aa_password_server,

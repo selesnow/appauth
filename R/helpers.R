@@ -1,29 +1,32 @@
-#' Подключение к базе, которое закрывается вместе с сессией
+#' Database connection closed together with the session
 #'
-#' Открывает подключение к базе и сразу регистрирует его закрытие при завершении
-#' сессии Shiny. Без этого подключение остаётся открытым до остановки процесса R
-#' и держит файл базы (SQLite, DuckDB): на Windows такой файл нельзя переименовать
-#' или удалить, а у серверных баз (MySQL, PostgreSQL) остаются лишние соединения.
+#' Opens a database connection and immediately registers its closing when the
+#' Shiny session ends. Without this the connection stays open until the R
+#' process stops and holds the database file (SQLite, DuckDB): on Windows such a
+#' file cannot be renamed or deleted, and server databases (MySQL, PostgreSQL)
+#' are left with extra connections.
 #'
-#' По умолчанию открывается файл SQLite. Для другой базы передайте `connect`:
-#' функцию без аргументов, которая возвращает подключение DBI.
+#' By default a SQLite file is opened. For another database pass `connect`: a
+#' function without arguments that returns a DBI connection.
 #'
-#' @param db_path Путь к файлу базы SQLite. Не нужен, если задан `connect`.
-#' @param session Сессия Shiny. По умолчанию текущая, поэтому функцию нужно
-#'   вызывать внутри `server`.
-#' @param prepare Подготовить схему базы ([aa_prepare_db()]) сразу после
-#'   подключения.
-#' @param settings Настройки, результат [aa_settings()], нужны для `prepare`.
-#' @param connect Функция без аргументов, возвращающая подключение к базе (SQLite,
-#'   DuckDB, MySQL / MariaDB или PostgreSQL), либо `NULL` для файла SQLite.
+#' @param db_path Path to the SQLite database file. Not needed if `connect` is
+#'   set.
+#' @param session Shiny session. The current one by default, so the function
+#'   must be called inside `server`.
+#' @param prepare Prepare the database schema ([aa_prepare_db()]) right after
+#'   connecting.
+#' @param settings Settings, a result of [aa_settings()], needed for `prepare`.
+#' @param connect A function without arguments that returns a database
+#'   connection (SQLite, DuckDB, MySQL / MariaDB or PostgreSQL), or `NULL` for
+#'   a SQLite file.
 #'
-#' @returns Подключение к базе.
+#' @returns A database connection.
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' server <- function(input, output, session) {
-#'   # SQLite (по умолчанию)
+#'   # SQLite (default)
 #'   conn <- aa_session_connection("app.db", prepare = TRUE)
 #'
 #'   # MySQL / MariaDB
@@ -42,28 +45,28 @@ aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultRea
                                   prepare = FALSE, settings = aa_settings(), connect = NULL) {
   if (is.null(connect) && !aa_is_string(db_path)) {
     rlang::abort(
-      "`db_path` должен быть путём к файлу базы (или передайте `connect`).",
+      "`db_path` must be a path to the database file (or pass `connect`).",
       class = "appauth_error_connection"
     )
   }
 
   if (!is.null(connect) && !is.function(connect)) {
     rlang::abort(
-      "`connect` должен быть функцией без аргументов, возвращающей подключение.",
+      "`connect` must be a function without arguments that returns a connection.",
       class = "appauth_error_connection"
     )
   }
 
   if (is.null(session) || !is.function(session$onSessionEnded)) {
     rlang::abort(
-      "Нужна сессия Shiny: вызывайте функцию внутри `server` или передайте `session`.",
+      "A Shiny session is required: call the function inside `server` or pass `session`.",
       class = "appauth_error_connection"
     )
   }
 
   if (is.null(connect)) {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
-      rlang::abort("Для работы с базой нужен пакет RSQLite.", class = "appauth_error_connection")
+      rlang::abort("The RSQLite package is required to work with the database.", class = "appauth_error_connection")
     }
 
     conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
@@ -84,30 +87,30 @@ aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultRea
   conn
 }
 
-#' Принудительно завершать недействительные сессии
+#' Forcibly end invalid sessions
 #'
-#' Раз в `session_check_seconds` (из [aa_settings()]) проверяет открытую сессию
-#' ([aa_user_session_valid()]). Если пользователя заблокировали, удалили или
-#' сменили ему роль, сессия завершается через `auth$logout()`: хук `on_event`
-#' получает `session_forced_logout` с причиной, токены отзываются. Благодаря
-#' этому блокировка и понижение роли действуют в течение интервала проверки, а не
-#' при следующем входе.
+#' Every `session_check_seconds` (from [aa_settings()]) checks the open session
+#' ([aa_user_session_valid()]). If the user has been blocked, deleted or had
+#' their role changed, the session is ended through `auth$logout()`: the
+#' `on_event` hook receives `session_forced_logout` with the reason, and tokens
+#' are revoked. Thanks to this, blocking and role downgrades take effect within
+#' the check interval rather than at the next sign-in.
 #'
-#' Если базу прочитать не удалось, сессия не завершается.
+#' If the database cannot be read, the session is not ended.
 #'
-#' Токен сессии (`auth$token()`) тоже проверяется: сброс пароля пользователя или
-#' «завершить все сессии» завершают и открытые сессии. Раз в `cleanup_minutes`
-#' сторож заодно удаляет устаревшие попытки входа и токены ([aa_cleanup()]).
+#' The session token (`auth$token()`) is checked too: a password reset of a
+#' user or "end all sessions" also end open sessions. Every `cleanup_minutes`
+#' the guard also deletes outdated sign-in attempts and tokens
+#' ([aa_cleanup()]).
 #'
-#' @param auth Результат [aa_auth_server()].
-#' @param cleanup_minutes Как часто чистить устаревшие записи, в минутах.
-
-#' @param conn Подключение к базе данных.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param reload Перезагружать страницу после выхода, чтобы модули прежнего
-#'   пользователя исчезли. Рекомендуется `TRUE`.
+#' @param auth A result of [aa_auth_server()].
+#' @param cleanup_minutes How often to clean up outdated records, in minutes.
+#' @param conn Database connection.
+#' @param settings Settings, a result of [aa_settings()].
+#' @param reload Reload the page after sign-out so that the modules of the
+#'   previous user disappear. `TRUE` is recommended.
 #'
-#' @returns Невидимо наблюдатель Shiny (его можно остановить через `$destroy()`).
+#' @returns Invisibly a Shiny observer (it can be stopped with `$destroy()`).
 #' @export
 #'
 #' @examples
@@ -131,11 +134,11 @@ aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE
     check <- aa_user_session_valid(conn, usr$login, usr$role, token)
 
     if (!check$valid) {
-      message("appauth: сессия закрыта: ", usr$login, " (", check$reason, ")")
+      message("appauth: session closed: ", usr$login, " (", check$reason, ")")
       auth$logout(reason = check$reason, reload = reload)
     }
 
-    # служба работает месяцами: устаревшие попытки входа и токены чистим по ходу
+    # the service runs for months: clean outdated attempts and tokens as we go
     if (as.numeric(difftime(Sys.time(), last_cleanup, units = "mins")) >= cleanup_minutes) {
       last_cleanup <<- Sys.time()
       try(aa_cleanup(conn, settings), silent = TRUE)
@@ -143,35 +146,35 @@ aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE
   }))
 }
 
-#' Подключить серверную часть модуля, только если есть право
+#' Attach a module server only if the permission is granted
 #'
-#' Вызывает `server()` один раз за сессию, когда вошедший пользователь получает
-#' право `permission`. Для остальных пользователей серверная часть модуля не
-#' регистрируется вообще, а права по-прежнему нужно проверять внутри обработчиков
-#' ([aa_require()]): регистрация это защита от лишней работы, а не от подделанных
-#' запросов.
+#' Calls `server()` once per session, when the signed-in user gets the
+#' `permission` permission. For other users the module server is not registered
+#' at all, and permissions still have to be checked inside handlers
+#' ([aa_require()]): registration protects against unnecessary work, not
+#' against forged requests.
 #'
-#' Зарегистрированные модули нельзя убрать из сессии, поэтому при выходе
-#' используйте `auth$logout(reload = TRUE)`: страница перезагрузится и модули
-#' прежнего пользователя исчезнут.
+#' Registered modules cannot be removed from a session, so on sign-out use
+#' `auth$logout(reload = TRUE)`: the page reloads and the modules of the
+#' previous user disappear.
 #'
-#' @param auth Результат [aa_auth_server()].
-#' @param permission Название права.
-#' @param provider Источник прав, см. [aa_can()].
-#' @param server Функция без аргументов, которая регистрирует модуль, например
-#'   `function() mod_tasks_server("tasks")`.
+#' @param auth A result of [aa_auth_server()].
+#' @param permission Permission name.
+#' @param provider Permission source, see [aa_can()].
+#' @param server A function without arguments that registers the module, for
+#'   example `function() mod_tasks_server("tasks")`.
 #'
-#' @returns Невидимо наблюдатель Shiny.
+#' @returns Invisibly a Shiny observer.
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' provider <- aa_permissions_from_matrix(conf$access_managemet)
+#' provider <- aa_permissions_from_matrix(conf$access_management)
 #' aa_register_module(auth, "Tasks", provider, function() mod_tasks_server("tasks"))
 #' }
 aa_register_module <- function(auth, permission, provider, server) {
   if (!is.function(server)) {
-    rlang::abort("`server` должен быть функцией без аргументов.", class = "appauth_error_permissions")
+    rlang::abort("`server` must be a function without arguments.", class = "appauth_error_permissions")
   }
 
   started <- FALSE

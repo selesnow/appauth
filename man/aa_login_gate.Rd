@@ -2,33 +2,36 @@
 % Please edit documentation in R/protection.R
 \name{aa_login_gate}
 \alias{aa_login_gate}
-\title{Можно ли сейчас пробовать войти под логином}
+\title{Can a login be attempted right now}
 \usage{
 aa_login_gate(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Введённый логин (точный, с учётом регистра).}
+\item{login}{The entered login (exact, case-sensitive).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Список: \code{allowed} (\code{TRUE} или \code{FALSE}), \code{reason} (\code{NA}, \code{"throttled"}
-при общем лимите или \code{"locked"} при блокировке логина), \code{seconds} (сколько
-секунд осталось до конца блокировки логина, иначе 0) и \code{message} (текст для
-показа пользователю на языке настроек, \code{NA}, если вход разрешён).
+A list: \code{allowed} (\code{TRUE} or \code{FALSE}), \code{reason} (\code{NA}, \code{"throttled"}
+for the global limit or \code{"locked"} for a login lockout), \code{seconds} (how many
+seconds are left until the login lockout ends, otherwise 0) and \code{message}
+(text to show to the user in the settings language, \code{NA} if login is
+allowed).
 }
 \description{
-Единая проверка перед проверкой пароля: сначала общий лимит неудач по всем
-логинам, затем блокировка этого логина. Если вход закрыт, пароль проверять
-не нужно, а попытку записывать не нужно (иначе блокировка продлевалась бы).
+A single check before verifying the password: first the global failure limit
+across all logins, then the lockout of this login. If login is closed, there
+is no need to verify the password, and no need to record the attempt
+(otherwise the lockout would be extended).
 }
 \details{
-Функция \strong{не останавливает вход при ошибке}: если таблиц защиты нет или к
-ним не удалось обратиться, вход считается разрешённым (пароль всё равно
-проверяется), а причина пишется в лог приложения. Так недоступность таблицы
-попыток не запирает всех пользователей.
+The function \strong{does not stop login on an error}: if the protection tables
+do not exist or cannot be queried, login is considered allowed (the password
+is still verified) and the reason is written to the app log. This way an
+unavailable attempts table does not lock out all users.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

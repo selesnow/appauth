@@ -1,23 +1,23 @@
-# Вход через Google (OpenID Connect, authorization code flow с PKCE).
+# Sign-in with Google (OpenID Connect, authorization code flow with PKCE).
 #
-# Как это устроено и почему безопасно:
-#  - вход начинается кнопкой: пакет создаёт одноразовые state, nonce и PKCE-проверку и
-#    сохраняет их в таблице oauth_states (state только в виде sha256, срок жизни 10 минут);
-#  - state дополнительно кладётся в короткоживущий cookie браузера: вернувшись от Google,
-#    пакет сверяет state из адреса с cookie, поэтому чужую ссылку со своим кодом в
-#    браузер жертвы подсунуть нельзя (login CSRF);
-#  - код обменивается на токен на стороне сервера (client_secret не покидает сервер);
-#  - id_token проверяется целиком: подпись по ключам Google (только RS256), издатель,
-#    аудитория, срок, nonce, подтверждённый email и домен организации;
-#  - пользователь ищется по email среди уже существующих: автоматически новых не
-#    создаём, роль берётся из базы, заблокированный пользователь не входит;
-#  - пакет ничего не пишет в логи сам: причину отказа получает хук on_event.
+# How it works and why it is safe:
+#  - sign-in starts with a button: the package creates a one-time state, nonce and PKCE verifier and
+#    stores them in the oauth_states table (state only as sha256, lifetime 10 minutes);
+#  - state is additionally put into a short-lived browser cookie: on return from Google
+#    the package compares the state from the address with the cookie, so someone else's link with their own code
+#    cannot be slipped into the victim's browser (login CSRF);
+#  - the code is exchanged for a token on the server side (client_secret never leaves the server);
+#  - the id_token is verified completely: signature against Google keys (RS256 only), issuer,
+#    audience, expiry, nonce, verified email and organization domain;
+#  - the user is looked up by email among existing ones: new users are not
+#    created automatically, the role is taken from the database, a blocked user does not get in;
+#  - the package writes nothing to logs itself: the reason for a refusal goes to the on_event hook.
 
-#' Адреса Google
+#' Google addresses
 #'
-#' Вынесены в функцию, чтобы тесты могли их подменить.
+#' Wrapped in a function so that tests can substitute them.
 #'
-#' @returns Список с адресами и допустимыми издателями токена.
+#' @returns A list with the addresses and the allowed token issuers.
 #' @noRd
 aa_google_urls <- function() {
   list(
@@ -28,21 +28,21 @@ aa_google_urls <- function() {
   )
 }
 
-#' Base64url без заполнения (RFC 4648, раздел 5)
+#' Base64url without padding (RFC 4648, section 5)
 #'
-#' @param raw Вектор `raw`.
+#' @param raw A `raw` vector.
 #'
-#' @returns Строка.
+#' @returns A string.
 #' @noRd
 aa_b64url_encode <- function(raw) {
   chartr("+/", "-_", sub("=+$", "", as.character(openssl::base64_encode(raw))))
 }
 
-#' Расшифровка base64url
+#' Base64url decoding
 #'
-#' @param text Строка base64url.
+#' @param text A base64url string.
 #'
-#' @returns Вектор `raw`.
+#' @returns A `raw` vector.
 #' @noRd
 aa_b64url_decode <- function(text) {
   b64 <- chartr("-_", "+/", text)
@@ -51,35 +51,35 @@ aa_b64url_decode <- function(text) {
   openssl::base64_decode(paste0(b64, strrep("=", pad)))
 }
 
-#' Приведение значения `email_verified` из токена к логическому
+#' Coercing the `email_verified` value from the token to a logical
 #'
-#' Google отдаёт булево значение, но строку `"true"` тоже принимаем.
+#' Google returns a boolean, but the string `"true"` is accepted too.
 #'
-#' @param x Значение из токена.
+#' @param x Value from the token.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @noRd
 aa_google_flag <- function(x) {
   isTRUE(x) || identical(tolower(as.character(x)), "true")
 }
 
-#' Начать вход через Google
+#' Start sign-in with Google
 #'
-#' Создаёт одноразовые `state`, `nonce` и PKCE-проверку, сохраняет их в базе и
-#' возвращает адрес страницы согласия Google.
+#' Creates a one-time `state`, `nonce` and PKCE verifier, stores them in the database and
+#' returns the address of the Google consent page.
 #'
-#' @param conn Подключение к базе данных со схемой [aa_init_db()].
-#' @param settings Настройки, результат [aa_settings()], с `google_enabled = TRUE`.
+#' @param conn Database connection with the [aa_init_db()] schema.
+#' @param settings Settings, the result of [aa_settings()], with `google_enabled = TRUE`.
 #'
-#' @returns Список: `url` (куда отправить браузер) и `state` (его нужно положить в
-#'   cookie браузера, чтобы потом сверить).
+#' @returns A list: `url` (where to send the browser) and `state` (it must be put into the
+#'   browser cookie to compare later).
 #' @noRd
 aa_google_start <- function(conn, settings) {
   if (!isTRUE(settings$google_enabled)) {
-    rlang::abort("Вход через Google выключен.", class = "appauth_error_settings")
+    rlang::abort("Sign-in with Google is disabled.", class = "appauth_error_settings")
   }
 
-  # защита от засорения таблицы: общий лимит запусков в минуту
+  # protection against table flooding: a global limit of starts per minute
   recent <- aa_query(
     conn,
     "SELECT COUNT(*) AS n FROM oauth_states WHERE created_at > ?",
@@ -87,7 +87,7 @@ aa_google_start <- function(conn, settings) {
   )$n
 
   if (recent >= 60) {
-    rlang::abort("Слишком много запусков входа через Google.", class = "appauth_error_throttled")
+    rlang::abort("Too many Google sign-in starts.", class = "appauth_error_throttled")
   }
 
   state    <- aa_b64url_encode(openssl::rand_bytes(32))
@@ -114,7 +114,7 @@ aa_google_start <- function(conn, settings) {
     prompt                = "select_account"
   )
 
-  # подсказка Google, какой домен предложить; настоящая проверка домена идёт по токену
+  # a hint for Google about which domain to offer; the real domain check is done on the token
   if (length(settings$google_domains) == 1) {
     query$hd <- settings$google_domains
   }
@@ -127,15 +127,15 @@ aa_google_start <- function(conn, settings) {
   list(url = paste0(aa_google_urls()$auth, "?", paste(pairs, collapse = "&")), state = state)
 }
 
-#' Забрать сохранённый state (один раз)
+#' Take the stored state (once)
 #'
-#' Гасит запись атомарным запросом: одним и тем же `state` воспользоваться второй раз
-#' нельзя, просроченный `state` не принимается.
+#' Consumes the record with an atomic query: the same `state` cannot be used a second time,
+#' an expired `state` is not accepted.
 #'
-#' @param conn Подключение к базе данных.
-#' @param state Значение `state` из адреса.
+#' @param conn Database connection.
+#' @param state The `state` value from the address.
 #'
-#' @returns Список `nonce` и `code_verifier` или `NULL`.
+#' @returns A list with `nonce` and `code_verifier`, or `NULL`.
 #' @noRd
 aa_google_take_state <- function(conn, state) {
   if (!aa_is_string(state) || nchar(state) > 200) {
@@ -164,13 +164,13 @@ aa_google_take_state <- function(conn, state) {
   if (nrow(row) != 1) NULL else as.list(row)
 }
 
-#' Обменять код на id_token
+#' Exchange the code for an id_token
 #'
-#' @param settings Настройки, результат [aa_settings()].
-#' @param code Код авторизации из адреса.
-#' @param verifier PKCE-проверка, сохранённая при старте входа.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param code Authorization code from the address.
+#' @param verifier PKCE verifier stored at the start of sign-in.
 #'
-#' @returns Строка `id_token` или `NULL`.
+#' @returns An `id_token` string or `NULL`.
 #' @noRd
 aa_google_exchange_code <- function(settings, code, verifier) {
   req <- httr2::request(aa_google_urls()$token)
@@ -191,7 +191,7 @@ aa_google_exchange_code <- function(settings, code, verifier) {
   if (httr2::resp_status(resp) != 200) {
     body <- tryCatch(httr2::resp_body_json(resp), error = function(e) list())
     message(
-      "appauth: Google отклонил обмен кода (HTTP ", httr2::resp_status(resp), "): ",
+      "appauth: Google rejected the code exchange (HTTP ", httr2::resp_status(resp), "): ",
       paste(c(body$error, body$error_description), collapse = ": ")
     )
     return(NULL)
@@ -202,9 +202,9 @@ aa_google_exchange_code <- function(settings, code, verifier) {
   if (aa_is_string(token)) token else NULL
 }
 
-#' Загрузить публичные ключи Google
+#' Load Google public keys
 #'
-#' @returns Список ключей JWK.
+#' @returns A list of JWK keys.
 #' @noRd
 aa_google_fetch_jwks <- function() {
   req <- httr2::req_timeout(httr2::request(aa_google_urls()$jwks), 15)
@@ -214,11 +214,11 @@ aa_google_fetch_jwks <- function() {
 
 aa_google_jwks_cache <- new.env(parent = emptyenv())
 
-#' Публичные ключи Google с кешем на час
+#' Google public keys cached for an hour
 #'
-#' @param refresh Принудительно загрузить заново (ключ с неизвестным `kid`).
+#' @param refresh Force a reload (a key with an unknown `kid`).
 #'
-#' @returns Список ключей JWK.
+#' @returns A list of JWK keys.
 #' @noRd
 aa_google_jwks <- function(refresh = FALSE) {
   now <- as.numeric(Sys.time())
@@ -234,11 +234,11 @@ aa_google_jwks <- function(refresh = FALSE) {
   keys
 }
 
-#' Публичный ключ для токена по `kid`
+#' Public key for a token by `kid`
 #'
-#' @param kid Идентификатор ключа из заголовка токена.
+#' @param kid Key id from the token header.
 #'
-#' @returns Ключ (`openssl`) или `NULL`.
+#' @returns A key (`openssl`) or `NULL`.
 #' @noRd
 aa_google_public_key <- function(kid) {
   for (refresh in c(FALSE, TRUE)) {
@@ -254,15 +254,15 @@ aa_google_public_key <- function(kid) {
   NULL
 }
 
-#' Проверить id_token
+#' Verify the id_token
 #'
-#' @param id_token Строка токена.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param nonce Ожидаемый `nonce`.
-#' @param now Текущее время (для тестов).
+#' @param id_token Token string.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param nonce Expected `nonce`.
+#' @param now Current time (for tests).
 #'
-#' @returns Список: `ok`, `reason` (`bad_token`, `bad_nonce`, `email_unverified`,
-#'   `domain`) и `email` (нормализованный адрес, если он известен).
+#' @returns A list: `ok`, `reason` (`bad_token`, `bad_nonce`, `email_unverified`,
+#'   `domain`) and `email` (the normalized address if known).
 #' @noRd
 aa_google_verify_id_token <- function(id_token, settings, nonce, now = Sys.time()) {
   fail <- function(reason, email = NA_character_) list(ok = FALSE, reason = reason, email = email)
@@ -278,7 +278,7 @@ aa_google_verify_id_token <- function(id_token, settings, nonce, now = Sys.time(
     error = function(e) NULL
   )
 
-  # только RS256: другие алгоритмы (в том числе none) не принимаем
+  # RS256 only: other algorithms (including none) are not accepted
   if (!is.list(header) || !identical(header[["alg"]], "RS256") || !aa_is_string(header[["kid"]])) {
     return(fail("bad_token"))
   }
@@ -318,8 +318,8 @@ aa_google_verify_id_token <- function(id_token, settings, nonce, now = Sys.time(
   domains <- settings$google_domains
 
   if (length(domains) > 0) {
-    # hd это основной домен организации Workspace: у сотрудника со вторичным доменом он
-    # отличается от домена email, поэтому оба значения проверяются по списку отдельно
+    # hd is the primary domain of the Workspace organization: for an employee with a secondary domain it
+    # differs from the email domain, so both values are checked against the list separately
     hd <- tolower(as.character(claims[["hd"]] %||% ""))
     email_domain <- sub("^.*@", "", email)
 
@@ -333,18 +333,18 @@ aa_google_verify_id_token <- function(id_token, settings, nonce, now = Sys.time(
   list(ok = TRUE, reason = "ok", email = email)
 }
 
-#' Завершить вход через Google
+#' Complete sign-in with Google
 #'
-#' Принимает `code` и `state` из адреса возврата, проверяет всё и находит
-#' пользователя по email. Сверка `state` с cookie браузера делается в модуле
-#' [aa_auth_server()], до вызова этой функции.
+#' Takes `code` and `state` from the return address, verifies everything and finds
+#' the user by email. Comparing `state` with the browser cookie is done in the
+#' [aa_auth_server()] module, before this function is called.
 #'
-#' @param conn Подключение к базе данных.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param code,state Параметры из адреса возврата.
+#' @param conn Database connection.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param code,state Parameters from the return address.
 #'
-#' @returns Список: `ok`, `reason`, `email`, `login` и `role` (последние два при
-#'   успехе). Причины отказа: `disabled`, `bad_state`, `bad_code`, `exchange_failed`,
+#' @returns A list: `ok`, `reason`, `email`, `login` and `role` (the last two on
+#'   success). Refusal reasons: `disabled`, `bad_state`, `bad_code`, `exchange_failed`,
 #'   `bad_token`, `bad_nonce`, `email_unverified`, `domain`, `no_user`, `blocked`.
 #' @noRd
 aa_google_complete <- function(conn, settings, code, state) {
@@ -369,7 +369,7 @@ aa_google_complete <- function(conn, settings, code, state) {
   id_token <- tryCatch(
     aa_google_exchange_code(settings, code, saved$code_verifier),
     error = function(e) {
-      message("appauth: не удалось обменять код Google на токен: ", conditionMessage(e))
+      message("appauth: could not exchange the Google code for a token: ", conditionMessage(e))
       NULL
     }
   )
@@ -381,7 +381,7 @@ aa_google_complete <- function(conn, settings, code, state) {
   verified <- tryCatch(
     aa_google_verify_id_token(id_token, settings, saved$nonce),
     error = function(e) {
-      message("appauth: не удалось проверить токен Google: ", conditionMessage(e))
+      message("appauth: could not verify the Google token: ", conditionMessage(e))
       list(ok = FALSE, reason = "bad_token", email = NA_character_)
     }
   )
@@ -407,12 +407,12 @@ aa_google_complete <- function(conn, settings, code, state) {
   list(ok = TRUE, reason = "ok", email = verified$email, login = user$login[1], role = user$role[1])
 }
 
-#' Разобрать адрес на схему, хост и порт
+#' Parse an address into scheme, host and port
 #'
-#' @param url Адрес (`https://host[:port][/путь]`).
+#' @param url Address (`https://host[:port][/path]`).
 #'
-#' @returns Список `scheme`, `host`, `port` (строки, порт по умолчанию подставляется)
-#'   или `NULL`, если адрес не разобрать.
+#' @returns A list with `scheme`, `host`, `port` (strings, the default port is filled in)
+#'   or `NULL` if the address cannot be parsed.
 #' @noRd
 aa_url_origin <- function(url) {
   if (!aa_is_string(url)) {
@@ -431,11 +431,11 @@ aa_url_origin <- function(url) {
   list(scheme = scheme, host = tolower(m[3]), port = port)
 }
 
-#' Адрес сайта (схема, хост, порт) строкой, без порта по умолчанию
+#' Site address (scheme, host, port) as a string, without the default port
 #'
-#' @param origin Результат [aa_url_origin()].
+#' @param origin The result of [aa_url_origin()].
 #'
-#' @returns Строка вида `https://sm.example.com`.
+#' @returns A string like `https://app.example.com`.
 #' @noRd
 aa_origin_string <- function(origin) {
   default <- identical(origin$port, if (identical(origin$scheme, "https")) "443" else "80")
@@ -443,13 +443,13 @@ aa_origin_string <- function(origin) {
   paste0(origin$scheme, "://", origin$host, if (!default) paste0(":", origin$port))
 }
 
-#' С какого адреса открыта страница
+#' Which address the page was opened from
 #'
-#' Вынесено в функцию, чтобы тесты могли подменить адрес: у mock-сессии Shiny его нет.
+#' Wrapped in a function so that tests can substitute the address: the mock Shiny session has none.
 #'
-#' @param session Сессия модуля.
+#' @param session Module session.
 #'
-#' @returns Результат вида [aa_url_origin()] или `NULL`, если браузер ещё не сообщил адрес.
+#' @returns A result like [aa_url_origin()] or `NULL` if the browser has not reported the address yet.
 #' @noRd
 aa_page_origin <- function(session) {
   data <- shiny::isolate(session$clientData)
@@ -464,17 +464,17 @@ aa_page_origin <- function(session) {
   aa_url_origin(paste0(protocol, "//", hostname, if (aa_is_string(as.character(port))) paste0(":", port)))
 }
 
-#' Открыта ли страница на адресе возврата Google
+#' Whether the page is opened at the Google return address
 #'
-#' `state` входа лежит в cookie, а cookie принадлежит адресу сайта (по IP и по домену
-#' они разные). Google возвращает пользователя на `google_redirect_uri`, поэтому вход
-#' нужно начинать на том же адресе. Если адрес страницы неизвестен, считаем, что он
-#' совпадает: лишний переход хуже, чем попытка начать вход на месте.
+#' The sign-in `state` is stored in a cookie, and a cookie belongs to the site address (by IP and by domain
+#' they are different). Google returns the user to `google_redirect_uri`, so sign-in
+#' must start at the same address. If the page address is unknown, we assume it
+#' matches: an extra redirect is worse than an attempt to start sign-in in place.
 #'
-#' @param session Сессия модуля.
-#' @param redirect_uri Адрес возврата из настроек.
+#' @param session Module session.
+#' @param redirect_uri Return address from the settings.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @noRd
 aa_page_matches <- function(session, redirect_uri) {
   page <- aa_page_origin(session)
@@ -487,11 +487,11 @@ aa_page_matches <- function(session, redirect_uri) {
   identical(page, target)
 }
 
-#' Адрес для перехода на адрес возврата с автозапуском входа
+#' Address for jumping to the return address with sign-in auto-start
 #'
-#' @param settings Настройки, результат [aa_settings()].
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Адрес возврата с параметром `google=1`.
+#' @returns The return address with the `google=1` parameter.
 #' @noRd
 aa_google_hop_url <- function(settings) {
   uri <- settings$google_redirect_uri
@@ -499,16 +499,16 @@ aa_google_hop_url <- function(settings) {
   paste0(uri, if (grepl("?", uri, fixed = TRUE)) "&" else "?", "google=1")
 }
 
-#' Отправить браузеру команду перейти на адрес
+#' Send the browser a command to go to an address
 #'
-#' Браузер выполнит переход только на Google или на адрес сайта `origin`, который
-#' передаёт сервер. Вынесено в функцию, чтобы тесты могли перехватить переход.
+#' The browser performs the redirect only to Google or to the site address `origin` that
+#' the server passes. Wrapped in a function so that tests can intercept the redirect.
 #'
-#' @param session Сессия модуля.
-#' @param url Адрес перехода.
-#' @param origin Адрес сайта, на который переход разрешён (кроме Google).
+#' @param session Module session.
+#' @param url Redirect address.
+#' @param origin Site address to which the redirect is allowed (besides Google).
 #'
-#' @returns Невидимо `NULL`.
+#' @returns Invisibly `NULL`.
 #' @noRd
 aa_redirect <- function(session, url, origin) {
   session$sendCustomMessage("appauth_redirect", list(url = url, origin = origin))
@@ -516,11 +516,11 @@ aa_redirect <- function(session, url, origin) {
   invisible(NULL)
 }
 
-#' Ключ текста для причины отказа входа через Google
+#' Text key for a Google sign-in refusal reason
 #'
-#' @param reason Причина из [aa_google_complete()].
+#' @param reason Reason from [aa_google_complete()].
 #'
-#' @returns Ключ в словаре текстов.
+#' @returns A key in the text dictionary.
 #' @noRd
 aa_google_text_key <- function(reason) {
   switch(

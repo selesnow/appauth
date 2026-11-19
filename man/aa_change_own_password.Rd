@@ -2,7 +2,7 @@
 % Please edit documentation in R/users.R
 \name{aa_change_own_password}
 \alias{aa_change_own_password}
-\title{Сменить собственный пароль}
+\title{Change your own password}
 \usage{
 aa_change_own_password(
   conn,
@@ -14,30 +14,33 @@ aa_change_own_password(
 )
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{old_password}{Текущий пароль.}
+\item{old_password}{The current password.}
 
-\item{new_password}{Новый пароль.}
+\item{new_password}{The new password.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{keep_token}{Токен автовхода текущей сессии, который не нужно отзывать.}
+\item{keep_token}{Autologin token of the current session that must not be
+revoked.}
 }
 \value{
-\code{TRUE} (невидимо).
+\code{TRUE} (invisibly).
 }
 \description{
-Для самого пользователя: нужно подтвердить текущий пароль. Новый пароль
-проверяется по правилам из настроек и должен отличаться от текущего. Токены
-автовхода остальных сессий отзываются, токен текущей сессии (\code{keep_token})
-остаётся. Требование сменить пароль (\code{must_change}) снимается.
+For the user themselves: the current password must be confirmed. The new
+password is checked against the rules from the settings and must differ from
+the current one. Autologin tokens of other sessions are revoked; the token of
+the current session (\code{keep_token}) stays. The password change requirement
+(\code{must_change}) is cleared.
 }
 \details{
-Ошибки (неверный текущий пароль, слабый или тот же пароль) имеют класс
-\code{appauth_error_user} и текст на языке настроек.
+Errors (wrong current password, weak or the same password) have class
+\code{appauth_error_user} and text in the settings language.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

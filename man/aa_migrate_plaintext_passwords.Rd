@@ -2,41 +2,42 @@
 % Please edit documentation in R/passwords.R
 \name{aa_migrate_plaintext_passwords}
 \alias{aa_migrate_plaintext_passwords}
-\title{Перенести пароли из открытого вида в хеши}
+\title{Migrate passwords from plain text to hashes}
 \usage{
 aa_migrate_plaintext_passwords(db_path, backup = TRUE, dry_run = FALSE)
 }
 \arguments{
-\item{db_path}{Путь к файлу базы данных SQLite.}
+\item{db_path}{Path to the SQLite database file.}
 
-\item{backup}{\code{TRUE} (по умолчанию) - копия рядом с базой с именем
-\verb{<база>.bak_<дата>}, строка - свой путь для копии, \code{FALSE} - без копии
-(не рекомендуется).}
+\item{backup}{\code{TRUE} (default) - a copy next to the database named
+\verb{<database>.bak_<date>}, a string - your own path for the copy, \code{FALSE} -
+no copy (not recommended).}
 
-\item{dry_run}{Если \code{TRUE}, ничего не менять, только показать, чьи пароли
-были бы перенесены.}
+\item{dry_run}{If \code{TRUE}, change nothing and only show whose passwords would
+be migrated.}
 }
 \value{
-Список (невидимо): \code{migrated} (логины, чьи пароли перенесены или
-были бы перенесены), \code{skipped} (логины, у которых пароль уже хеш),
-\code{backup} (путь к копии или \code{NA}), \code{dry_run}.
+A list (invisibly): \code{migrated} (logins whose passwords were or would
+be migrated), \code{skipped} (logins whose password is already a hash),
+\code{backup} (path to the copy or \code{NA}), \code{dry_run}.
 }
 \description{
-Разовая миграция для приложений со старой самописной авторизацией, где
-пароли в таблице \code{users} хранятся в открытом виде. Все значения колонки
-\code{password}, не являющиеся хешами, заменяются хешами scrypt. Уже
-хешированные пароли пропускаются, поэтому функцию можно запускать повторно.
+A one-time migration for apps with legacy home-grown authentication, where
+passwords in the \code{users} table are stored in plain text. All values of the
+\code{password} column that are not hashes are replaced with scrypt hashes.
+Already hashed passwords are skipped, so the function can be run repeatedly.
 }
 \details{
-Порядок работы: перед изменениями делается резервная копия файла базы (если
-есть что менять и \code{backup} не \code{FALSE}), все изменения выполняются одной
-транзакцией, а каждый новый хеш проверяется по исходному паролю до записи.
-При любой ошибке изменения откатываются. Пароли функция нигде не выводит.
+How it works: before any change a backup copy of the database file is made
+(if there is something to change and \code{backup} is not \code{FALSE}), all changes
+run in a single transaction, and every new hash is verified against the
+original password before being written. On any error the changes are rolled
+back. The function never prints passwords.
 
-\strong{Запускайте функцию при остановленном приложении.} Резервная копия
-содержит пароли в открытом виде: удалите её после проверки (и убедитесь, что
-её нет в синхронизируемых папках и в git). После миграции вход по старым
-паролям работает, так как введённый пароль проверяется по новому хешу.
+\strong{Run the function while the app is stopped.} The backup contains plain-text
+passwords: delete it after checking (and make sure it is not in synchronized
+folders or in git). After the migration, logging in with the old passwords
+still works, because the entered password is verified against the new hash.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {
@@ -46,10 +47,10 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret', 'admin')")
   DBI::dbDisconnect(conn)
 
-  # что будет перенесено
+  # what would be migrated
   aa_migrate_plaintext_passwords(db, dry_run = TRUE)
 
-  # выполнить без резервной копии (в примере; в работе копию оставляйте)
+  # run without a backup (in this example only; keep the backup in real use)
   aa_migrate_plaintext_passwords(db, backup = FALSE)
 }
 }

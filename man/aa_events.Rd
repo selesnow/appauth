@@ -2,24 +2,28 @@
 % Please edit documentation in R/events.R
 \name{aa_events}
 \alias{aa_events}
-\title{Каталог событий авторизации}
+\title{Catalog of authorization events}
 \usage{
-aa_events()
+aa_events(lang = c("en", "ru"))
+}
+\arguments{
+\item{lang}{Language of the \code{description} and \code{value} columns: \code{"en"}
+(default) or \code{"ru"}.}
 }
 \value{
-Таблица с колонками \code{event} (ключ), \code{description} (что произошло) и
-\code{value} (что лежит в поле \code{value}).
+A data frame with columns \code{event} (key), \code{description} (what
+happened) and \code{value} (what is in the \code{value} field).
 }
 \description{
-Пакет сообщает о событиях хуку \code{on_event(event, user, session_id, value)},
-который задаёт приложение (запись в лог, уведомление в Telegram и т.д.).
-Функция возвращает полный список событий, которые пакет может отправить.
+The package reports events to the \code{on_event(event, user, session_id, value)}
+hook defined by the application (writing to a log, a messenger notification,
+etc.). This function returns the full list of events the package can send.
 }
 \details{
-Поле \code{user} в хуке это логин, от имени которого происходит событие (для
-неудачного входа это введённый логин, а если логина нет, то \code{"anonymous"}),
-в \code{value} лежит уточнение из колонки \code{value}. Пароли и токены в события
-не попадают никогда.
+The \code{user} field in the hook is the login on whose behalf the event happens
+(for a failed sign-in it is the entered login, and if there is no login,
+\code{"anonymous"}), and \code{value} holds the detail described in the \code{value}
+column. Passwords and tokens never appear in events.
 }
 \examples{
 aa_events()

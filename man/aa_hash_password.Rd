@@ -2,25 +2,25 @@
 % Please edit documentation in R/passwords.R
 \name{aa_hash_password}
 \alias{aa_hash_password}
-\title{Хешировать пароль}
+\title{Hash a password}
 \usage{
 aa_hash_password(password)
 }
 \arguments{
-\item{password}{Пароль, непустая строка.}
+\item{password}{The password, a non-empty string.}
 }
 \value{
-Строка с хешем, начинающаяся с \verb{$7$}.
+A string with the hash, starting with \verb{$7$}.
 }
 \description{
-Возвращает хеш scrypt (пакет \code{sodium}) для хранения в базе. Хеш содержит
-соль и параметры, поэтому два вызова с одним паролем дают разные строки, а
-проверка выполняется функцией \code{\link[=aa_verify_password]{aa_verify_password()}}. Хеш необратим:
-восстановить пароль из него нельзя.
+Returns a scrypt hash (\code{sodium} package) for storing in the database. The
+hash contains the salt and parameters, so two calls with the same password
+give different strings, and verification is done by \code{\link[=aa_verify_password]{aa_verify_password()}}.
+The hash is irreversible: the password cannot be recovered from it.
 }
 \details{
-Правила длины пароля функция не проверяет, для этого есть
-\code{\link[=aa_validate_password]{aa_validate_password()}}.
+The function does not check password length rules, use
+\code{\link[=aa_validate_password]{aa_validate_password()}} for that.
 }
 \examples{
 hash <- aa_hash_password("secret-password")

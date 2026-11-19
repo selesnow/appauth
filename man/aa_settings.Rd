@@ -2,7 +2,7 @@
 % Please edit documentation in R/settings.R
 \name{aa_settings}
 \alias{aa_settings}
-\title{Настройки авторизации}
+\title{Authorization settings}
 \usage{
 aa_settings(
   max_failed_logins = 5,
@@ -36,159 +36,164 @@ aa_settings(
   google_redirect_uri = NULL,
   google_domains = NULL,
   password_login = TRUE,
-  texts = aa_texts("ru")
+  texts = aa_texts("en")
 )
 }
 \arguments{
-\item{max_failed_logins}{Число неудачных попыток входа до блокировки логина.}
+\item{max_failed_logins}{Number of failed sign-in attempts before the login
+is locked.}
 
-\item{lockout_minutes}{Окно подсчёта неудачных попыток и длительность
-блокировки, минут.}
+\item{lockout_minutes}{Window for counting failed attempts and the duration
+of the lock, in minutes.}
 
-\item{max_failed_logins_per_minute}{Общий лимит неудачных попыток входа по
-всем логинам за минуту.}
+\item{max_failed_logins_per_minute}{Overall limit of failed sign-in attempts
+across all logins per minute.}
 
-\item{password_min, password_max}{Минимальная и максимальная длина нового
-пароля. Ограничение действует только для новых и сбрасываемых паролей,
-существующие пароли не затрагиваются.}
+\item{password_min, password_max}{Minimum and maximum length of a new
+password. The limit applies only to new and reset passwords, existing
+passwords are not affected.}
 
-\item{password_policy}{Что делать со слабыми новыми паролями (из списка
-\code{\link[=aa_common_passwords]{aa_common_passwords()}}, совпадающими с логином без учёта регистра или
-состоящими из одного повторяющегося символа): \code{"off"} ничего не проверять,
-\code{"warn"} (по умолчанию) принять пароль, но показать предупреждение, \code{"reject"}
-отклонить пароль. Существующие пароли не затрагиваются.}
+\item{password_policy}{What to do with weak new passwords (from the
+\code{\link[=aa_common_passwords]{aa_common_passwords()}} list, equal to the login ignoring case, or made of
+a single repeated character): \code{"off"} do not check, \code{"warn"} (default)
+accept the password but show a warning, \code{"reject"} reject the password.
+Existing passwords are not affected.}
 
-\item{login_max}{Максимальная длина логина (логин также приводится к нижнему
-регистру и обрезается по краям при подсчёте попыток).}
+\item{login_max}{Maximum login length (the login is also lowercased and
+trimmed when attempts are counted).}
 
-\item{autologin}{Использовать ли автовход по cookie. Если \code{FALSE}, пользователь
-вводит пароль при каждой загрузке страницы, токены не выдаются.}
+\item{autologin}{Whether to use cookie-based auto sign-in. If \code{FALSE}, the
+user enters the password on every page load and no tokens are issued.}
 
-\item{session_days}{Срок жизни токена автовхода, дней.}
+\item{session_days}{Lifetime of the auto sign-in token, in days.}
 
-\item{session_check_seconds}{Как часто проверять, что открытая сессия ещё
-разрешена (пользователя не заблокировали и не удалили), секунд.}
+\item{session_check_seconds}{How often to check that an open session is
+still allowed (the user has not been blocked or deleted), in seconds.}
 
-\item{attempts_retention_hours}{Сколько часов хранить записи о попытках входа.}
+\item{attempts_retention_hours}{How many hours to keep records of sign-in
+attempts.}
 
-\item{token_retention_days}{Сколько дней хранить просроченные и отозванные
-токены перед удалением.}
+\item{token_retention_days}{How many days to keep expired and revoked tokens
+before deleting them.}
 
-\item{roles}{Допустимые роли пользователей.}
+\item{roles}{Allowed user roles.}
 
-\item{admin_role}{Роль администратора, она должна входить в \code{roles}. Только
-эта роль управляет пользователями, независимо от матрицы прав приложения,
-и именно её получает первый созданный пользователь.}
+\item{admin_role}{Administrator role, it must be one of \code{roles}. Only this
+role manages users, regardless of the application's permission matrix, and
+it is the role given to the first created user.}
 
-\item{must_change_default}{Значение галочки «потребовать смену пароля при
-следующем входе» в окне добавления пользователя и при сбросе пароля.
-\code{TRUE} (по умолчанию): пароль, который задал администратор, временный, и
-администратор снимает галочку, если смена не нужна. \code{FALSE}: галочка
-выключена, администратор включает её сам.}
+\item{must_change_default}{Default state of the "require a password change
+at next sign-in" checkbox in the add-user dialog and when resetting a
+password. \code{TRUE} (default): a password set by an administrator is
+temporary, and the administrator clears the checkbox if a change is not
+needed. \code{FALSE}: the checkbox is off, the administrator turns it on.}
 
-\item{reset_enabled}{Включить восстановление пароля по email: на форме входа
-появляется ссылка «Забыли пароль?». По умолчанию \code{FALSE}. Требует \code{send_reset}
-и \code{reset_base_url}.}
+\item{reset_enabled}{Enable password recovery by email: a "Forgot your
+password?" link appears on the sign-in form. Default \code{FALSE}. Requires
+\code{send_reset} and \code{reset_base_url}.}
 
-\item{send_reset}{Функция отправки письма \verb{function(email, link, login)}:
-отправляет письмо со ссылкой \code{link} на адрес \code{email} (например, через
-\code{emayili}). Ошибка в функции не прерывает запрос и не видна пользователю,
-причина попадает в событие \code{password_reset_requested}.}
+\item{send_reset}{Function that sends the email, \verb{function(email, link, login)}: sends a message with the \code{link} to the \code{email} address (for
+example, using \code{emayili}). An error in the function does not interrupt the
+request and is not visible to the user, the reason goes into the
+\code{password_reset_requested} event.}
 
-\item{reset_base_url}{Адрес приложения, на который ведёт ссылка из письма, например
-\code{"https://apps.example.com/my_app"}. К нему добавляется \verb{?reset=<токен>}.}
+\item{reset_base_url}{Application address the link in the email points to,
+for example \code{"https://apps.example.com/my_app"}. \verb{?reset=<token>} is
+appended to it.}
 
-\item{reset_ttl_minutes}{Срок жизни ссылки для смены пароля, минут.}
+\item{reset_ttl_minutes}{Lifetime of the password change link, in minutes.}
 
-\item{reset_max_per_hour}{Сколько писем для восстановления можно отправить
-одному пользователю за час, остальные запросы молча игнорируются.}
+\item{reset_max_per_hour}{How many recovery emails can be sent to one user
+per hour, further requests are silently ignored.}
 
-\item{reset_max_per_minute}{Общий лимит писем восстановления по всем
-пользователям за минуту (защита от рассылки спама).}
+\item{reset_max_per_minute}{Overall limit of recovery emails across all users
+per minute (protection against spam).}
 
-\item{totp_enabled}{Включить двухфакторную аутентификацию (одноразовые коды
-TOTP из приложения-аутентификатора). По умолчанию \code{FALSE}. Требует \code{totp_key}.
-Двухфакторная защита добровольная: каждый пользователь включает её сам в
-модуле \code{\link[=aa_totp_server]{aa_totp_server()}}, а у кого она включена, тот вводит код при входе по
-паролю.}
+\item{totp_enabled}{Enable two-factor authentication (one-time TOTP codes
+from an authenticator app). Default \code{FALSE}. Requires \code{totp_key}.
+Two-factor protection is voluntary: each user enables it in the
+\code{\link[=aa_totp_server]{aa_totp_server()}} module, and users who have it enabled enter a code when
+signing in with a password.}
 
-\item{totp_key}{Ключ шифрования секретов TOTP в базе, строка не короче 16
-символов (например, из переменной среды). \strong{Хранить вне базы и вне репозитория.}
-Если ключ потерять или заменить, существующие секреты расшифровать не удастся,
-и пользователям придётся подключать 2FA заново (администратор сбрасывает её в
-карточке).}
+\item{totp_key}{Encryption key for TOTP secrets in the database, a string of
+at least 16 characters (for example, from an environment variable).
+\strong{Store it outside the database and outside the repository.} If the key
+is lost or replaced, existing secrets cannot be decrypted and users have
+to set up 2FA again (an administrator resets it in the user card).}
 
-\item{totp_issuer}{Название сервиса, которое покажет приложение-аутентификатор.}
+\item{totp_issuer}{Service name shown by the authenticator app.}
 
-\item{totp_window}{На сколько 30-секундных шагов в обе стороны допускается
-расхождение часов (0 до 5, по умолчанию 1).}
+\item{totp_window}{How many 30-second steps in each direction of clock drift
+are tolerated (0 to 5, default 1).}
 
-\item{google_enabled}{Включить вход через Google (OpenID Connect): на форме входа
-появляется кнопка «Войти через Google». По умолчанию \code{FALSE}. Требует
-\code{google_client_id}, \code{google_client_secret} и \code{google_redirect_uri}. Вход получает
-только пользователь, который уже есть в базе и у которого указан email, равный
-адресу Google-аккаунта: новых пользователей вход не создаёт, роль берётся из базы.
-Двухфакторный код приложения при входе через Google не спрашивается (подтверждение
-делает сам Google).}
+\item{google_enabled}{Enable sign-in with Google (OpenID Connect): a "Sign in
+with Google" button appears on the sign-in form. Default \code{FALSE}. Requires
+\code{google_client_id}, \code{google_client_secret} and \code{google_redirect_uri}. Only
+a user who already exists in the database and whose email equals the
+Google account address can sign in: sign-in never creates new users, the
+role is taken from the database. The application's two-factor code is not
+requested for Google sign-in (Google does the verification itself).}
 
-\item{google_client_id, google_client_secret}{Идентификатор и секрет OAuth-клиента
-(тип «Web application») из Google Cloud Console. \strong{Секрет хранить вне базы и вне
-репозитория} (например, в переменной среды).}
+\item{google_client_id, google_client_secret}{Identifier and secret of the
+OAuth client (type "Web application") from the Google Cloud Console.
+\strong{Store the secret outside the database and outside the repository} (for
+example, in an environment variable).}
 
-\item{google_redirect_uri}{Адрес, на который Google возвращает пользователя: адрес
-приложения как его открывают пользователи, например
-\code{"https://apps.example.com/"}. Он должен в точности совпадать с адресом в списке
-«Authorized redirect URIs» OAuth-клиента. Допускается \verb{https://}, а для разработки
-\verb{http://localhost}.}
+\item{google_redirect_uri}{Address Google returns the user to: the address
+of the application as users open it, for example
+\code{"https://apps.example.com/"}. It must exactly match an address in the
+"Authorized redirect URIs" list of the OAuth client. \verb{https://} is
+allowed, and \verb{http://localhost} for development.}
 
-\item{google_domains}{Допустимые домены организации (вектор, например
-\code{c("example.com", "example.net")}). Если задан, вход принимается только для
-аккаунтов, у которых в подписанном токене Google указан один из этих доменов (\code{hd},
-основной домен организации Workspace) и домен email тоже входит в список. Если у
-организации есть вторичные домены, укажите в списке и основной, и вторичные. Пустое
-значение (\code{NULL}) отключает проверку домена, тогда решает совпадение email с
-пользователем в базе.}
+\item{google_domains}{Allowed organization domains (a vector, for example
+\code{c("example.com", "example.net")}). If set, sign-in is accepted only for
+accounts whose signed Google token contains one of these domains (\code{hd},
+the primary Workspace domain of the organization) and whose email domain
+is also in the list. If the organization has secondary domains, list both
+the primary and the secondary ones. An empty value (\code{NULL}) disables the
+domain check, then only the match of the email with a user in the database
+decides.}
 
-\item{password_login}{Разрешить вход по логину и паролю. По умолчанию \code{TRUE}.
-\code{FALSE} скрывает форму пароля и «Забыли пароль?» и отклоняет такие попытки на
-сервере; возможно только вместе с \code{google_enabled = TRUE}, иначе войти было бы
-нечем. Создание первого администратора на пустой базе остаётся.}
+\item{password_login}{Allow sign-in with a login and password. Default
+\code{TRUE}. \code{FALSE} hides the password form and "Forgot your password?" and
+rejects such attempts on the server; possible only together with
+\code{google_enabled = TRUE}, otherwise there would be no way to sign in.
+Creating the first administrator on an empty database is still available.}
 
-\item{texts}{Тексты интерфейса, результат \code{\link[=aa_texts]{aa_texts()}}.}
+\item{texts}{Interface texts, a result of \code{\link[=aa_texts]{aa_texts()}}.}
 }
 \value{
-Список настроек класса \code{aa_settings}.
+A list of settings of class \code{aa_settings}.
 }
 \description{
-Собирает настройки, от которых зависит поведение пакета: правила пароля,
-защита от подбора, сроки хранения данных, список ролей и язык интерфейса.
-Значения по умолчанию соответствуют приложению Server Manager. Объект
-настроек передаётся в остальные функции и модули пакета, глобальных
-переменных пакет не использует.
+Builds the settings that control the behavior of the package: password
+rules, brute-force protection, data retention periods, the list of roles and
+the interface language. The settings object is passed to the other functions
+and modules of the package; the package does not use global variables.
 }
-\section{Защита от подбора пароля}{
+\section{Brute-force protection}{
 
-Если за \code{lockout_minutes} минут под одним логином накопилось
-\code{max_failed_logins} неудачных попыток, вход под этим логином блокируется на
-\code{lockout_minutes} минут с момента последней неудачной попытки. Попытки во
-время блокировки не записываются и блокировку не продлевают. Кроме того,
-если за последнюю минуту по всем логинам вместе накопилось
-\code{max_failed_logins_per_minute} неудачных попыток, вход временно закрыт для
-всех: это останавливает перебор по многим логинам сразу.
+If \code{max_failed_logins} failed attempts accumulate for one login within
+\code{lockout_minutes} minutes, sign-in for this login is blocked for
+\code{lockout_minutes} minutes starting from the last failed attempt. Attempts
+made during the lock are not recorded and do not extend the lock. In
+addition, if \code{max_failed_logins_per_minute} failed attempts accumulate over
+the last minute across all logins together, sign-in is temporarily closed
+for everyone: this stops password guessing spread over many logins.
 }
 
 \examples{
-# настройки по умолчанию
+# default settings
 settings <- aa_settings()
 
-# восстановление пароля по email
+# password recovery by email
 settings <- aa_settings(
   reset_enabled  = TRUE,
   reset_base_url = "https://apps.example.com/my_app",
-  send_reset     = function(email, link, login) message("Письмо для ", login, ": ", link)
+  send_reset     = function(email, link, login) message("Email for ", login, ": ", link)
 )
 
-# вход через Google (секрет из переменной среды), пароль остаётся запасным
+# sign-in with Google (secret from an environment variable), password stays as a fallback
 settings <- aa_settings(
   google_enabled       = TRUE,
   google_client_id     = "1234-abc.apps.googleusercontent.com",
@@ -197,13 +202,13 @@ settings <- aa_settings(
   google_domains       = c("example.com", "example.net")
 )
 
-# более строгая защита, английский интерфейс и свои роли
+# stricter protection, Russian interface and custom roles
 settings <- aa_settings(
   max_failed_logins = 3,
   lockout_minutes   = 30,
   password_min      = 10,
   roles             = c("admin", "editor", "viewer"),
-  texts             = aa_texts("en")
+  texts             = aa_texts("ru")
 )
 settings$lockout_minutes
 }

@@ -2,28 +2,28 @@
 % Please edit documentation in R/app-head.R
 \name{aa_app_head}
 \alias{aa_app_head}
-\title{Подключить стили и скрипты appauth}
+\title{Attach appauth styles and scripts}
 \usage{
 aa_app_head()
 }
 \value{
-Объект \code{shiny.tag.list}, который подключает зависимость \code{appauth}.
+A \code{shiny.tag.list} object that attaches the \code{appauth} dependency.
 }
 \description{
-Нужно вызвать один раз в интерфейсе приложения (внутри \code{fluidPage()} или
-\code{tagList()}). Добавляет CSS формы входа и вкладки пользователей и JS, который
-читает, пишет и удаляет cookie автовхода.
+Call it once in the application UI (inside \code{fluidPage()} or \code{tagList()}).
+Adds the CSS of the sign-in form and the users tab, and the JS that reads,
+writes and deletes the auto sign-in cookie.
 }
 \details{
-Оформление меняется CSS-переменными \verb{--aa-*} (например \code{--aa-primary}),
-которые нужно переопределить в своём CSS после \code{aa_app_head()}. Светлая тема
-включается классом \code{aa-theme-light} на \verb{<body>} или родительском элементе.
+The look is changed with \verb{--aa-*} CSS variables (for example \code{--aa-primary}),
+which you override in your own CSS after \code{aa_app_head()}. The light theme is
+enabled with the \code{aa-theme-light} class on \verb{<body>} or a parent element.
 
-Cookie пишется с \code{SameSite=Lax}, а на HTTPS ещё и с \code{Secure}.
+The cookie is written with \code{SameSite=Lax}, and on HTTPS also with \code{Secure}.
 }
 \examples{
 ui <- shiny::fluidPage(
   aa_app_head()
-  # ... остальной интерфейс приложения
+  # ... the rest of the application UI
 )
 }

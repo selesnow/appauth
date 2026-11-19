@@ -2,7 +2,7 @@
 % Please edit documentation in R/skills.R
 \name{aa_install_skills}
 \alias{aa_install_skills}
-\title{Установка навыков для ИИ-агентов}
+\title{Install skills for AI agents}
 \usage{
 aa_install_skills(
   path = NULL,
@@ -12,36 +12,35 @@ aa_install_skills(
 )
 }
 \arguments{
-\item{path}{Каталог, куда копировать. По умолчанию рассчитывается по
-\code{agent}.}
+\item{path}{Directory to copy to. Computed from \code{agent} by default.}
 
-\item{agent}{Для какого агента копировать: \code{"claude"} (\code{.claude/skills},
-Claude Code) или \code{"agents"} (\code{.agents/skills}, Codex, Posit Assistant и
-другие). Игнорируется, если задан \code{path}.}
+\item{agent}{Which agent to copy for: \code{"claude"} (\code{.claude/skills}, Claude
+Code) or \code{"agents"} (\code{.agents/skills}, Codex, Posit Assistant and others).
+Ignored if \code{path} is set.}
 
-\item{global}{Копировать в домашний каталог пользователя (\code{~}), а не в
-текущий проект.}
+\item{global}{Copy to the user's home directory (\code{~}) rather than to the
+current project.}
 
-\item{overwrite}{Перезаписывать уже установленные навыки (например, после
-обновления пакета).}
+\item{overwrite}{Overwrite skills that are already installed (for example,
+after a package update).}
 }
 \value{
-Невидимый вектор путей к установленным навыкам.
+An invisible vector of paths to the installed skills.
 }
 \description{
-В пакет входят два навыка для ИИ-агентов (Claude Code, Codex и других) на
-английском языке: \code{appauth} (справочник функций, схема базы, события,
-идентификаторы интерфейса) и \code{appauth-secure-shiny} (внедрение \code{appauth},
-перенос самописной авторизации, аудит безопасности приложения). Функция
-копирует их из установленного пакета в каталог навыков проекта или
-пользователя.
+The package ships two skills for AI agents (Claude Code, Codex and others),
+written in English: \code{appauth} (function reference, database schema, events,
+interface identifiers) and \code{appauth-secure-shiny} (adopting \code{appauth},
+migrating hand-written authentication, security audit of an application).
+The function copies them from the installed package into the skills
+directory of a project or of the user.
 }
 \examples{
 \dontrun{
-# в текущий проект для Claude Code
+# into the current project for Claude Code
 aa_install_skills()
 
-# для Codex и Posit Assistant, с обновлением после апдейта пакета
+# for Codex and Posit Assistant, overwriting after a package update
 aa_install_skills(agent = "agents", overwrite = TRUE)
 }
 }

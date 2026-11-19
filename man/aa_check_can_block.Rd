@@ -2,25 +2,27 @@
 % Please edit documentation in R/users.R
 \name{aa_check_can_block}
 \alias{aa_check_can_block}
-\title{Можно ли заблокировать пользователя}
+\title{Can a user be blocked}
 \usage{
 aa_check_can_block(conn, login, acting_login = NULL, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{acting_login}{Логин того, кто блокирует (текущий администратор), либо
-\code{NULL} (например, при вызове из скрипта).}
+\item{acting_login}{Login of the person blocking (the current administrator),
+or \code{NULL} (for example, when called from a script).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{NULL}, если можно, иначе текст причины отказа (на языке настроек).
+\code{NULL} if allowed, otherwise the reason for refusal (in the
+settings language).
 }
 \description{
-Нельзя заблокировать самого себя и последнего активного администратора.
+You cannot block yourself or the last active administrator.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

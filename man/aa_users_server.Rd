@@ -2,7 +2,7 @@
 % Please edit documentation in R/mod-users.R
 \name{aa_users_server}
 \alias{aa_users_server}
-\title{Модуль пользователей: сервер}
+\title{Users module: server}
 \usage{
 aa_users_server(
   id,
@@ -15,45 +15,45 @@ aa_users_server(
 )
 }
 \arguments{
-\item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_users_ui]{aa_users_ui()}}.}
+\item{id}{Module id, the same as in \code{\link[=aa_users_ui]{aa_users_ui()}}.}
 
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{auth}{Объект авторизации, результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
+\item{auth}{Authentication object, the result of \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Хук событий \verb{function(event, user, session_id, value)} или \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
 
-\item{extra_card_ui, extra_card_server}{Слоты расширения карточки, см. раздел
-«Слоты расширения».}
+\item{extra_card_ui, extra_card_server}{Card extension slots, see the section
+"Extension slots".}
 }
 \value{
-Список с функцией \code{refresh()}, которая перерисовывает таблицу
-(например после изменений, сделанных не через модуль).
+A list with a \code{refresh()} function that redraws the table
+(for example after changes made not through the module).
 }
 \description{
-Управление пользователями для администратора: добавление, смена роли, сброс
-пароля, блокировка и разблокировка, снятие блокировки входа, удаление. Правила
-(нельзя заблокировать или удалить себя, нельзя остаться без активного
-администратора) проверяются на сервере функциями пакета, интерфейс лишь не
-показывает недопустимые кнопки.
+User management for an administrator: adding, role change, password
+reset, blocking and unblocking, clearing the login lock, deletion. The rules
+(one cannot block or delete oneself, one cannot be left without an active
+administrator) are checked on the server by the package functions; the UI merely does not
+show forbidden buttons.
 }
 \details{
-Модуль не зависит от матрицы прав приложения: управлять пользователями может
-только пользователь с ролью \code{settings$admin_role}, которая дополнительно
-сверяется с базой при каждом действии. Цель действия берётся из серверного
-состояния открытой карточки, а не из значения, присланного браузером.
+The module does not depend on the app's permission matrix: only a user with the role
+\code{settings$admin_role} can manage users, and the role is additionally
+checked against the database on every action. The target of an action is taken from the server
+state of the open card, not from a value sent by the browser.
 }
-\section{Слоты расширения}{
+\section{Extension slots}{
 
-Приложение может добавить свой блок в карточку пользователя.
+The app can add its own block to the user card.
 \itemize{
-\item \code{extra_card_ui(login, ns)} возвращает интерфейс блока. Идентификаторы
-элементов нужно оборачивать в \code{ns()}.
-\item \code{extra_card_server(input, output, session, login)} вызывается один раз при
-старте модуля внутри его пространства имён, \code{login} это реактивное значение
-с логином открытой карточки. Здесь регистрируются обработчики блока.
+\item \code{extra_card_ui(login, ns)} returns the block UI. Element ids
+must be wrapped in \code{ns()}.
+\item \code{extra_card_server(input, output, session, login)} is called once on
+module start inside its namespace; \code{login} is a reactive value
+with the login of the open card. Register the block handlers here.
 }
 }
 

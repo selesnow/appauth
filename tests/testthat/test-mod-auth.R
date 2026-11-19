@@ -1,14 +1,14 @@
-# Модуль входа через testServer. Пароли хешируются scrypt, поэтому пользователи
-# создаются только там, где они нужны. Помощники в helper-modules.R.
+# The sign-in module through testServer. Passwords are hashed with scrypt, so users
+# are created only where they are needed. Helpers are in helper-modules.R.
 
-test_that("при наличии пользователей показывается форма входа, после входа она исчезает", {
+test_that("with existing users the sign-in form is shown and disappears after sign-in", {
   con <- auth_db()
 
   run_auth(con, {
     session$flushReact()
     html <- form_html(output)
     expect_match(html, "login_btn", fixed = TRUE)
-    expect_match(html, "Авторизация", fixed = TRUE)
+    expect_match(html, "Authorization", fixed = TRUE)
     expect_false(grepl("setup_btn", html, fixed = TRUE))
     expect_false(logged_in <- session$returned$logged_in())
 
@@ -20,7 +20,7 @@ test_that("при наличии пользователей показывает
   })
 })
 
-test_that("успешный вход выдаёт токен, отправляет cookie и событие", {
+test_that("successful sign-in issues a token, sends a cookie and an event", {
   con <- auth_db()
 
   log <- run_auth(con, {
@@ -33,7 +33,7 @@ test_that("успешный вход выдаёт токен, отправляе
   expect_equal(count_attempts(con), 1)
 })
 
-test_that("логин берётся из базы, а роль не подменить", {
+test_that("the login comes from the database and the role cannot be spoofed", {
   con <- auth_db()
 
   run_auth(con, {
@@ -43,12 +43,12 @@ test_that("логин берётся из базы, а роль не подме�
   })
 })
 
-test_that("неверный пароль: сообщение, событие, попытка записана, вход не выполнен", {
+test_that("wrong password: message, event, attempt recorded, no sign-in", {
   con <- auth_db()
 
   log <- run_auth(con, {
     session$setInputs(login = "ivan", password = "wrong-pass", login_btn = 1)
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, "Incorrect login or password")
     expect_false(session$returned$logged_in())
   })
 
@@ -57,50 +57,50 @@ test_that("неверный пароль: сообщение, событие, п
   expect_equal(count_attempts(con), 1)
 })
 
-test_that("несуществующий логин неотличим от неверного пароля", {
+test_that("a nonexistent login is indistinguishable from a wrong password", {
   con <- auth_db()
 
   run_auth(con, {
     session$setInputs(login = "ghost", password = "secret123", login_btn = 1)
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, "Incorrect login or password")
   })
 })
 
-test_that("пустые поля не вход и не попытка", {
+test_that("empty fields are neither a sign-in nor an attempt", {
   con <- auth_db()
 
   log <- run_auth(con, {
     session$setInputs(login = "", password = "", login_btn = 1)
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, "Incorrect login or password")
   })
 
   expect_length(log$events, 0)
   expect_equal(count_attempts(con), 0)
 })
 
-test_that("после серии неудач логин блокируется, верный пароль тоже не пускает", {
+test_that("after a series of failures the login is locked, the correct password does not let in either", {
   con <- auth_db()
   settings <- aa_settings(max_failed_logins = 3)
 
   log <- run_auth(con, settings = settings, {
     for (i in 1:2) {
       session$setInputs(login = "ivan", password = "bad", login_btn = i)
-      expect_equal(output$message, "Неверный логин или пароль")
+      expect_equal(output$message, "Incorrect login or password")
     }
     session$setInputs(login = "ivan", password = "bad", login_btn = 3)
-    expect_match(output$message, "Слишком много неудачных попыток")
+    expect_match(output$message, "Too many failed sign-in attempts")
 
     session$setInputs(login = "ivan", password = "secret123", login_btn = 4)
-    expect_match(output$message, "Слишком много неудачных попыток")
+    expect_match(output$message, "Too many failed sign-in attempts")
     expect_false(session$returned$logged_in())
   })
 
   expect_equal(log$names(), c("login_failed", "login_failed", "login_locked", "login_locked"))
-  # попытки во время блокировки не записываются и не продлевают её
+  # attempts during a lock are not recorded and do not extend it
   expect_equal(count_attempts(con), 3)
 })
 
-test_that("блокировка одного логина не мешает другому, регистр логина различается", {
+test_that("locking one login does not affect another, login case matters", {
   con <- auth_db()
   raw_user(con, "Ivan", "user")
   aa_set_password(con, "Ivan", "other-pass1")
@@ -109,7 +109,7 @@ test_that("блокировка одного логина не мешает др
   run_auth(con, settings = settings, {
     session$setInputs(login = "ivan", password = "bad", login_btn = 1)
     session$setInputs(login = "ivan", password = "bad", login_btn = 2)
-    expect_match(output$message, "Слишком много")
+    expect_match(output$message, "Too many")
 
     session$setInputs(login = "Ivan", password = "other-pass1", login_btn = 3)
     expect_true(session$returned$logged_in())
@@ -117,7 +117,7 @@ test_that("блокировка одного логина не мешает др
   })
 })
 
-test_that("общий лимит неудач в минуту останавливает вход", {
+test_that("the global failure limit per minute stops sign-in", {
   con <- auth_db()
   settings <- aa_settings(max_failed_logins_per_minute = 2, max_failed_logins = 50)
 
@@ -125,23 +125,23 @@ test_that("общий лимит неудач в минуту останавли
     session$setInputs(login = "a", password = "x", login_btn = 1)
     session$setInputs(login = "b", password = "x", login_btn = 2)
     session$setInputs(login = "ivan", password = "secret123", login_btn = 3)
-    expect_match(output$message, "Слишком много попыток входа")
+    expect_match(output$message, "Too many sign-in attempts")
     expect_false(session$returned$logged_in())
   })
 
   expect_equal(log$names()[3], "login_throttled")
 })
 
-test_that("заблокированный администратором: сообщение только при верном пароле, токена нет", {
+test_that("blocked by an administrator: message only with the correct password, no token", {
   con <- auth_db()
   aa_set_blocked(con, "ivan", TRUE, acting_login = "alsey")
 
   log <- run_auth(con, {
     session$setInputs(login = "ivan", password = "bad-pass", login_btn = 1)
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, "Incorrect login or password")
 
     session$setInputs(login = "ivan", password = "secret123", login_btn = 2)
-    expect_match(output$message, "заблокирована администратором")
+    expect_match(output$message, "blocked by an administrator")
     expect_false(session$returned$logged_in())
   })
 
@@ -149,7 +149,7 @@ test_that("заблокированный администратором: соо
   expect_equal(nrow(rows_of(con, "auth_sessions")), 0)
 })
 
-test_that("успешный вход сбрасывает счётчик неудач", {
+test_that("successful sign-in resets the failure counter", {
   con <- auth_db()
   settings <- aa_settings(max_failed_logins = 3)
 
@@ -163,22 +163,22 @@ test_that("успешный вход сбрасывает счётчик неу�
   expect_equal(aa_login_lock_remaining(con, "ivan", settings), 0)
 })
 
-test_that("пустая база: форма создания администратора, проверки и создание", {
+test_that("empty database: administrator creation form, checks and creation", {
   con <- users_db()
 
   log <- run_auth(con, {
     session$flushReact()
     html <- form_html(output)
     expect_match(html, "setup_btn", fixed = TRUE)
-    expect_match(html, "Создание администратора", fixed = TRUE)
+    expect_match(html, "Create administrator", fixed = TRUE)
     expect_false(grepl("login_btn", html, fixed = TRUE))
 
     session$setInputs(setup_login = "boss", setup_password = "secret123", setup_confirm = "other", setup_btn = 1)
-    expect_equal(output$message, "Пароли не совпадают")
+    expect_equal(output$message, "Passwords do not match")
     expect_equal(count_users(con), 0)
 
     session$setInputs(setup_login = "boss", setup_password = "123", setup_confirm = "123", setup_btn = 2)
-    expect_match(output$message, "Пароль")
+    expect_match(output$message, "Password")
     expect_equal(count_users(con), 0)
 
     session$setInputs(setup_login = "boss", setup_password = "secret123", setup_confirm = "secret123", setup_btn = 3)
@@ -191,7 +191,7 @@ test_that("пустая база: форма создания администр
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
-test_that("создание администратора не срабатывает, если пользователь уже появился", {
+test_that("administrator creation does not work if a user has appeared already", {
   con <- users_db()
 
   run_auth(con, {
@@ -204,7 +204,7 @@ test_that("создание администратора не срабатыва
   expect_equal(count_users(con), 1)
 })
 
-test_that("автовход по cookie работает, токен не перевыдаётся", {
+test_that("auto-login by cookie works, the token is not reissued", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
@@ -219,7 +219,7 @@ test_that("автовход по cookie работает, токен не пер
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
-test_that("чужой, отозванный и принадлежащий заблокированному токен не пускает", {
+test_that("a foreign, revoked and blocked user's token does not let in", {
   con <- auth_db()
   revoked <- aa_issue_token(con, "ivan")
   aa_revoke_token(con, revoked)
@@ -235,7 +235,7 @@ test_that("чужой, отозванный и принадлежащий заб
   }
 })
 
-test_that("при выключенном автовходе cookie игнорируется, токены не выдаются", {
+test_that("with auto-login off the cookie is ignored, tokens are not issued", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
@@ -250,7 +250,7 @@ test_that("при выключенном автовходе cookie игнори�
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
-test_that("выход отзывает токен, сбрасывает пользователя и шлёт logout", {
+test_that("sign-out revokes the token, resets the user and sends logout", {
   con <- auth_db()
 
   log <- run_auth(con, {
@@ -266,7 +266,7 @@ test_that("выход отзывает токен, сбрасывает поль
   expect_equal(rows_of(con, "auth_sessions")$revoked, 1)
 })
 
-test_that("принудительный выход шлёт session_forced_logout с причиной", {
+test_that("forced sign-out sends session_forced_logout with the reason", {
   con <- auth_db()
 
   log <- run_auth(con, {
@@ -278,7 +278,7 @@ test_that("принудительный выход шлёт session_forced_logou
   expect_equal(log$events[[2]]$value, "role_changed")
 })
 
-test_that("после выхода cookie больше не работает", {
+test_that("after sign-out the cookie no longer works", {
   con <- auth_db()
   token <- NULL
 
@@ -291,23 +291,23 @@ test_that("после выхода cookie больше не работает", {
   expect_equal(rows_of(con, "auth_sessions")$revoked, 1)
 })
 
-test_that("заголовок и тексты берутся из настроек, логотип и английский язык", {
+test_that("title and texts come from the settings, logo and Russian language", {
   con <- auth_db()
 
-  run_auth(con, settings = aa_settings(texts = aa_texts("en")), title = "My App", logo = "logo.png", {
+  run_auth(con, settings = aa_settings(texts = aa_texts("ru")), title = "My App", logo = "logo.png", {
     session$flushReact()
     html <- form_html(output)
     expect_match(html, "My App", fixed = TRUE)
     expect_match(html, "logo.png", fixed = TRUE)
-    expect_match(html, "Sign in", fixed = TRUE)
-    expect_false(grepl("Авторизация", html, fixed = TRUE))
+    expect_match(html, aa_text(aa_texts("ru"), "login_button"), fixed = TRUE)
+    expect_false(grepl("Sign in", html, fixed = TRUE))
   })
 })
 
-test_that("сбой хука событий не мешает входу", {
+test_that("an event hook failure does not prevent sign-in", {
   con <- auth_db()
   log <- auth_events()
-  log$hook <- function(event, user, session_id, value) stop("лог недоступен")
+  log$hook <- function(event, user, session_id, value) stop("log unavailable")
 
   suppressMessages(run_auth(con, log = log, {
     session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
@@ -315,7 +315,7 @@ test_that("сбой хука событий не мешает входу", {
   }))
 })
 
-test_that("выход на всех устройствах отзывает все токены пользователя, шлёт событие и выходит", {
+test_that("sign-out on all devices revokes all of the user's tokens, sends an event and signs out", {
   con <- auth_db()
   other_device <- aa_issue_token(con, "ivan")
   other_user <- aa_issue_token(con, "alsey")
@@ -338,7 +338,7 @@ test_that("выход на всех устройствах отзывает вс
   expect_equal(log$events[[2]]$value, "ivan")
 })
 
-test_that("выход на всех устройствах без входа ничего не делает", {
+test_that("sign-out on all devices without sign-in does nothing", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
@@ -350,7 +350,7 @@ test_that("выход на всех устройствах без входа н�
   expect_false(is.null(aa_find_session_user(con, token)))
 })
 
-test_that("после выхода на всех устройствах cookie открытой сессии больше не работает", {
+test_that("after sign-out on all devices the cookie of the open session no longer works", {
   con <- auth_db()
 
   run_auth(con, {

@@ -1,170 +1,7 @@
-# Словари текстов интерфейса и сообщений пакета.
-# Ключи в обоих словарях должны совпадать (это проверяет тест).
-
-aa_texts_ru <- list(
-  # форма входа
-  login_title              = "Авторизация",
-  login_label              = "Логин",
-  password_label           = "Пароль",
-  login_button             = "Войти",
-  # окно создания первого администратора
-  setup_title              = "Создание администратора",
-  setup_hint               = "В приложении ещё нет пользователей. Первый созданный пользователь получает роль %s.",
-  password_confirm_label   = "Подтвердите пароль",
-  setup_button             = "Создать администратора",
-  # сообщения при входе
-  bad_credentials          = "Неверный логин или пароль",
-  locked                   = "Слишком много неудачных попыток входа. Повторите через %d мин.",
-  throttled                = "Слишком много попыток входа. Повторите через минуту.",
-  blocked_user             = "Учётная запись заблокирована администратором. Обратитесь к администратору.",
-  # проверка логина и пароля
-  passwords_mismatch       = "Пароли не совпадают",
-  password_empty           = "Пароль не может быть пустым",
-  password_too_short       = "Пароль должен содержать минимум %d символов",
-  password_too_long        = "Пароль должен содержать максимум %d символов",
-  password_common          = "Пароль входит в список распространённых слабых паролей",
-  password_equals_login    = "Пароль совпадает с логином",
-  password_repeated        = "Пароль состоит из одного повторяющегося символа",
-  weak_password_notice     = "Пароль принят, но он слабый: %s. Лучше сменить его на более надёжный.",
-  login_empty              = "Логин не может быть пустым",
-  login_whitespace         = "Логин не должен начинаться или заканчиваться пробелом",
-  login_too_long           = "Логин должен содержать максимум %d символов",
-  # статусы пользователей в таблице
-  status_blocked           = "Заблокирован администратором",
-  status_locked            = "Вход заблокирован после неудачных попыток (ещё %d мин.)",
-  # управление пользователями
-  user_not_specified       = "Пользователь не указан",
-  user_not_found           = "Пользователь не найден",
-  user_exists              = "Пользователь уже существует",
-  user_exists_case         = "Пользователь с таким логином уже существует (логины различаются только регистром)",
-  invalid_role             = "Недопустимая роль",
-  cannot_block_self        = "Нельзя заблокировать самого себя",
-  cannot_block_last_admin  = "Нельзя заблокировать последнего активного администратора",
-  cannot_delete_self       = "Нельзя удалить самого себя",
-  cannot_delete_last_admin = "Нельзя удалить последнего активного администратора",
-  cannot_change_last_admin_role = "Нельзя снять роль администратора у последнего активного администратора",
-  # вкладка пользователей
-  users_title              = "Список пользователей",
-  users_add                = "Добавить пользователя",
-  users_hint               = "Двойной клик по строке открывает карточку пользователя. «Автовходов» это число устройств, на которых вход запомнен",
-  col_login                = "Логин",
-  col_role                 = "Роль",
-  col_status               = "Статус",
-  col_created              = "Создан",
-  col_last_login           = "Последний вход",
-  col_email                = "Email",
-  col_totp                 = "2FA",
-  col_autologins           = "Автовходов",
-  copy_button              = "Копировать",
-  copy_done                = "Скопировано",
-  date_unknown             = "неизвестно",
-  date_never               = "не входил",
-  card_title               = "Карточка пользователя: %s",
-  card_account             = "Учётная запись",
-  card_active              = "активна",
-  card_blocked             = "заблокирована администратором",
-  card_signin              = "Вход",
-  card_signin_ok           = "не заблокирован",
-  card_signin_locked       = "заблокирован ещё %d мин.",
-  button_block             = "Заблокировать",
-  button_unblock           = "Разблокировать",
-  button_unlock            = "Снять блокировку",
-  button_close             = "Закрыть",
-  role_section             = "Изменить роль",
-  role_label               = "Роль",
-  role_button              = "Изменить роль",
-  reset_section            = "Сброс пароля",
-  reset_new_label          = "Новый пароль",
-  reset_button             = "Сбросить пароль",
-  delete_section           = "Удалить пользователя",
-  delete_warning           = "Внимание: это действие необратимо!",
-  delete_button            = "Удалить аккаунт",
-  delete_confirm_title     = "Удалить пользователя?",
-  delete_confirm_text      = "Пользователь %s будет удалён вместе с его сессиями. Это действие нельзя отменить.",
-  delete_confirm_button    = "Да, удалить",
-  button_cancel            = "Отмена",
-  delete_unavailable       = "Удаление этого пользователя недоступно: %s.",
-  add_title                = "Новый пользователь",
-  add_button               = "Добавить",
-  done_user_added          = "Пользователь %s добавлен",
-  done_role_changed        = "Роль пользователя %s изменена",
-  done_password_reset      = "Пароль пользователя %s изменён",
-  done_blocked             = "Пользователь %s заблокирован",
-  done_unblocked           = "Пользователь %s разблокирован",
-  done_unlocked            = "Блокировка входа снята: %s",
-  done_deleted             = "Пользователь %s удалён",
-  # смена пароля
-  password_old_label       = "Текущий пароль",
-  password_new_label       = "Новый пароль",
-  password_change_title    = "Смена пароля",
-  password_change_button   = "Сменить пароль",
-  password_wrong           = "Неверный текущий пароль",
-  password_same            = "Новый пароль должен отличаться от текущего",
-  done_password_changed    = "Пароль изменён",
-  must_change_title        = "Смените пароль",
-  must_change_hint         = "Пароль задан администратором. Задайте свой пароль, чтобы войти.",
-  must_change_label        = "Потребовать смену пароля при следующем входе",
-  # восстановление пароля по email
-  forgot_link              = "Забыли пароль?",
-  forgot_title             = "Восстановление пароля",
-  forgot_hint              = "Введите логин или email. Если пользователь найден и у него указан email, мы отправим письмо со ссылкой для смены пароля.",
-  forgot_identifier_label  = "Логин или email",
-  forgot_button            = "Отправить ссылку",
-  forgot_done              = "Если пользователь найден и у него указан email, письмо со ссылкой отправлено. Ссылка действует %d мин.",
-  back_to_login            = "Вернуться ко входу",
-  reset_title              = "Новый пароль",
-  reset_hint               = "Задайте новый пароль для входа.",
-  reset_save_button        = "Сохранить пароль",
-  reset_link_invalid       = "Ссылка недействительна или устарела. Запросите восстановление пароля заново.",
-  reset_done               = "Пароль изменён. Войдите с новым паролем.",
-  # вход через Google
-  google_button            = "Войти через Google",
-  google_or                = "или",
-  google_failed            = "Не удалось войти через Google. Попробуйте ещё раз.",
-  google_cancelled         = "Вход через Google отменён.",
-  google_no_user           = "Для этого аккаунта Google доступ не предоставлен. Обратитесь к администратору.",
-  google_domain            = "Этот аккаунт Google не относится к разрешённым доменам организации.",
-  password_login_disabled  = "Вход по паролю отключён. Используйте вход через Google.",
-  # email пользователя
-  email_section            = "Email для восстановления пароля",
-  email_label              = "Email",
-  email_button             = "Сохранить email",
-  email_not_set            = "не указан",
-  email_invalid            = "Некорректный адрес email",
-  email_exists             = "Этот email уже указан у другого пользователя",
-  done_email_saved         = "Email пользователя %s сохранён",
-  done_email_cleared       = "Email пользователя %s удалён",
-  # двухфакторная аутентификация
-  totp_title               = "Подтверждение входа",
-  totp_hint                = "Введите код из приложения-аутентификатора или резервный код.",
-  totp_code_label          = "Код",
-  totp_button              = "Подтвердить",
-  totp_wrong               = "Неверный код",
-  totp_already_enabled     = "Двухфакторная аутентификация уже включена",
-  totp_section             = "Двухфакторная аутентификация",
-  totp_status_on           = "включена",
-  totp_status_off          = "выключена",
-  totp_enable_button       = "Включить",
-  totp_setup_hint          = "Отсканируйте QR-код приложением-аутентификатором (Google Authenticator, Microsoft Authenticator, 2FAS) или введите ключ вручную, затем введите код из приложения.",
-  totp_secret_label        = "Ключ для ручного ввода",
-  totp_confirm_button      = "Подтвердить и включить",
-  totp_recovery_title      = "Резервные коды",
-  totp_recovery_hint       = "Сохраните эти коды в надёжном месте. Каждый подходит один раз, повторно они не показываются.",
-  totp_recovery_left       = "Осталось резервных кодов: %d",
-  totp_disable_title       = "Выключить двухфакторную аутентификацию",
-  totp_disable_button      = "Выключить",
-  totp_disable_wrong       = "Неверный пароль или код",
-  totp_reset_button        = "Сбросить 2FA",
-  card_totp                = "2FA",
-  done_totp_enabled        = "Двухфакторная аутентификация включена",
-  done_totp_disabled       = "Двухфакторная аутентификация выключена",
-  done_totp_reset          = "2FA пользователя %s сброшена",
-  # сессии
-  button_revoke            = "Завершить все сессии",
-  done_sessions_revoked    = "Сессии пользователя %s завершены",
-  # права доступа
-  access_denied            = "Недостаточно прав для этого действия"
-)
+# Interface and message text sets of the package.
+# The English set lives here; the Russian set (aa_texts_ru) is generated into
+# R/texts-ru.R by dev/build-texts-ru.R with all non-ASCII characters escaped.
+# Keys of both sets must match (checked by a test).
 
 aa_texts_en <- list(
   # login form
@@ -331,29 +168,32 @@ aa_texts_en <- list(
   access_denied            = "You do not have permission to perform this action"
 )
 
-#' Тексты интерфейса и сообщений
+#' Interface and message texts
 #'
-#' Возвращает набор текстов для выбранного языка. Любую строку можно заменить
-#' своей, указав её название и новое значение. Тексты с подстановкой значений
-#' содержат маркеры `%d` (число) и `%s` (строка), значения подставляет
-#' [aa_text()].
+#' Returns the set of texts for the chosen language. Any string can be replaced
+#' with your own by passing its key and the new value. Texts with substituted
+#' values contain `%d` (number) and `%s` (string) placeholders, the values are
+#' filled in by [aa_text()].
 #'
-#' Доступные ключи можно посмотреть через [aa_text_keys()].
+#' Available keys are listed by [aa_text_keys()].
 #'
-#' @param lang Язык текстов: `"ru"` (по умолчанию) или `"en"`.
-#' @param ... Свои тексты в виде `ключ = "строка"`, заменяют стандартные.
+#' @param lang Language of the texts: `"en"` (default) or `"ru"`.
+#' @param ... Your own texts as `key = "string"`, they replace the default ones.
 #'
-#' @returns Именованный список строк класса `aa_texts`.
+#' @returns A named list of strings of class `aa_texts`.
 #' @export
 #'
 #' @examples
-#' # английские тексты
-#' texts <- aa_texts("en")
+#' # English texts (default)
+#' texts <- aa_texts()
 #'
-#' # русские тексты со своим названием кнопки входа
-#' texts <- aa_texts("ru", login_button = "Войти в систему")
+#' # English texts with a custom sign-in button label
+#' texts <- aa_texts("en", login_button = "Log in")
 #' texts$login_button
-aa_texts <- function(lang = c("ru", "en"), ...) {
+#'
+#' # Russian texts
+#' texts <- aa_texts("ru")
+aa_texts <- function(lang = c("en", "ru"), ...) {
   lang <- rlang::arg_match(lang)
   base <- if (lang == "ru") aa_texts_ru else aa_texts_en
 
@@ -364,7 +204,7 @@ aa_texts <- function(lang = c("ru", "en"), ...) {
 
     if (is.null(nms) || any(is.na(nms) | !nzchar(nms))) {
       rlang::abort(
-        "Свои тексты нужно передавать с названиями: `aa_texts(login_button = \"...\")`.",
+        "Custom texts must be named: `aa_texts(login_button = \"...\")`.",
         class = "appauth_error_texts"
       )
     }
@@ -373,8 +213,8 @@ aa_texts <- function(lang = c("ru", "en"), ...) {
     if (length(unknown) > 0) {
       rlang::abort(
         paste0(
-          "Неизвестные ключи текстов: ", paste(unknown, collapse = ", "),
-          ". Список доступных ключей возвращает `aa_text_keys()`."
+          "Unknown text keys: ", paste(unknown, collapse = ", "),
+          ". The list of available keys is returned by `aa_text_keys()`."
         ),
         class = "appauth_error_texts"
       )
@@ -384,7 +224,7 @@ aa_texts <- function(lang = c("ru", "en"), ...) {
     if (any(not_string)) {
       rlang::abort(
         paste0(
-          "Значения текстов должны быть непустыми строками, проверьте: ",
+          "Text values must be non-empty strings, check: ",
           paste(nms[not_string], collapse = ", "), "."
         ),
         class = "appauth_error_texts"
@@ -397,32 +237,32 @@ aa_texts <- function(lang = c("ru", "en"), ...) {
   structure(base, class = "aa_texts", lang = lang)
 }
 
-#' Ключи текстов интерфейса
+#' Interface text keys
 #'
-#' @returns Вектор названий ключей, которые можно переопределить в [aa_texts()].
+#' @returns A vector of key names that can be overridden in [aa_texts()].
 #' @export
 #'
 #' @examples
 #' aa_text_keys()
 aa_text_keys <- function() {
-  names(aa_texts_ru)
+  names(aa_texts_en)
 }
 
-#' Получить текст по ключу
+#' Get a text by key
 #'
-#' Возвращает строку из набора текстов. Если передать значения, они
-#' подставляются в строку по правилам [sprintf()].
+#' Returns a string from a set of texts. If values are passed, they are
+#' substituted into the string following the rules of [sprintf()].
 #'
-#' @param x Набор текстов (результат [aa_texts()]) или настройки (результат
+#' @param x A set of texts (result of [aa_texts()]) or settings (result of
 #'   [aa_settings()]).
-#' @param key Ключ текста, см. [aa_text_keys()].
-#' @param ... Значения для подстановки в маркеры `%d` и `%s`.
+#' @param key Text key, see [aa_text_keys()].
+#' @param ... Values for the `%d` and `%s` placeholders.
 #'
-#' @returns Строка.
+#' @returns A string.
 #' @export
 #'
 #' @examples
-#' texts <- aa_texts("ru")
+#' texts <- aa_texts("en")
 #' aa_text(texts, "login_button")
 #' aa_text(texts, "locked", 15)
 aa_text <- function(x, key, ...) {
@@ -432,7 +272,7 @@ aa_text <- function(x, key, ...) {
 
   if (!inherits(x, "aa_texts")) {
     rlang::abort(
-      "Первым аргументом должен быть результат `aa_texts()` или `aa_settings()`.",
+      "The first argument must be a result of `aa_texts()` or `aa_settings()`.",
       class = "appauth_error_texts"
     )
   }
@@ -440,8 +280,8 @@ aa_text <- function(x, key, ...) {
   if (!aa_is_string(key) || !key %in% names(x)) {
     rlang::abort(
       paste0(
-        "Неизвестный ключ текста: ", paste(key, collapse = ", "),
-        ". Список доступных ключей возвращает `aa_text_keys()`."
+        "Unknown text key: ", paste(key, collapse = ", "),
+        ". The list of available keys is returned by `aa_text_keys()`."
       ),
       class = "appauth_error_texts"
     )
@@ -460,7 +300,7 @@ aa_text <- function(x, key, ...) {
 #' @export
 print.aa_texts <- function(x, ...) {
   lang <- attr(x, "lang")
-  cat("Тексты appauth, язык: ", if (is.null(lang)) "не указан" else lang,
-      ", строк: ", length(x), "\n", sep = "")
+  cat("appauth texts, language: ", if (is.null(lang)) "not set" else lang,
+      ", strings: ", length(x), "\n", sep = "")
   invisible(x)
 }

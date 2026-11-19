@@ -1,6 +1,6 @@
-# ---- чтение ---------------------------------------------------------------------
+# ---- reading ---------------------------------------------------------------------
 
-test_that("aa_get_user и aa_list_users не возвращают пароль, логин сравнивается точно", {
+test_that("aa_get_user and aa_list_users do not return the password, the login is compared exactly", {
   con <- users_db()
   raw_user(con, "alsey", "admin")
   raw_user(con, "Ida", "viewer", blocked = 1)
@@ -29,16 +29,16 @@ test_that("aa_users_exist", {
   expect_true(aa_users_exist(con))
 })
 
-test_that("функции пользователей отклоняют не SQLite подключение", {
+test_that("user functions reject a non-supported connection", {
   expect_error(aa_get_user(list(), "a"), class = "appauth_error_connection")
   expect_error(aa_list_users(list()), class = "appauth_error_connection")
   expect_error(aa_create_user(list(), "a", "password1", "user"), class = "appauth_error_connection")
   expect_error(aa_authenticate(list(), "a", "b"), class = "appauth_error_connection")
 })
 
-# ---- создание ---------------------------------------------------------------------
+# ---- creation ---------------------------------------------------------------------
 
-test_that("aa_create_user создаёт пользователя с хешем пароля и без блокировки", {
+test_that("aa_create_user creates a user with a password hash and not blocked", {
   con <- users_db()
 
   res <- withVisible(aa_create_user(con, "worker", "worker-password", "user"))
@@ -53,7 +53,7 @@ test_that("aa_create_user создаёт пользователя с хешем 
   expect_true(aa_verify_password("worker-password", stored_password(con, "worker")))
 })
 
-test_that("aa_create_user отклоняет некорректные данные с причиной и текстом, ничего не создавая", {
+test_that("aa_create_user rejects invalid data with a reason and a text, creating nothing", {
   con <- users_db()
 
   cases <- list(
@@ -75,21 +75,21 @@ test_that("aa_create_user отклоняет некорректные данны
   expect_identical(count_users(con), 0L)
 
   err <- expect_error(aa_create_user(con, "worker", "short", "user"), class = "appauth_error_user")
-  expect_identical(conditionMessage(err), "Пароль должен содержать минимум 6 символов")
+  expect_identical(conditionMessage(err), "Password must be at least 6 characters long")
 })
 
-test_that("тексты ошибок создания на английском", {
+test_that("creation error texts in Russian", {
   con <- users_db()
-  s <- aa_settings(texts = aa_texts("en"))
+  s <- aa_settings(texts = aa_texts("ru"))
 
   err <- expect_error(aa_create_user(con, "worker", "x", "user", s), class = "appauth_error_user")
-  expect_identical(conditionMessage(err), "Password must be at least 6 characters long")
+  expect_identical(conditionMessage(err), aa_text(s, "password_too_short", 6))
 
   err <- expect_error(aa_create_user(con, "worker", "worker-password", "boss", s), class = "appauth_error_user")
-  expect_identical(conditionMessage(err), "Invalid role")
+  expect_identical(conditionMessage(err), aa_text(s, "invalid_role"))
 })
 
-test_that("роль проверяется по списку из настроек", {
+test_that("the role is checked against the list from the settings", {
   con <- users_db()
   s <- aa_settings(roles = c("boss", "editor"), admin_role = "boss")
 
@@ -98,17 +98,17 @@ test_that("роль проверяется по списку из настрое
   expect_identical(aa_get_user(con, "a")$role, "editor")
 })
 
-test_that("занятый логин отклоняется: точное совпадение и отличие только регистром (в том числе кириллица)", {
+test_that("a taken login is rejected: an exact match and a difference only in case (including Cyrillic)", {
   con <- users_db()
   aa_create_user(con, "Worker", "worker-password", "user")
-  aa_create_user(con, "Иван", "ivan-password", "user")
+  aa_create_user(con, "\u0418\u0432\u0430\u043d", "ivan-password", "user")
 
   expect_identical(
     expect_error(aa_create_user(con, "Worker", "other-password", "user"), class = "appauth_error_user")$reason,
     "user_exists"
   )
 
-  for (login in c("worker", "WORKER", "wOrKeR", "иван", "ИВАН")) {
+  for (login in c("worker", "WORKER", "wOrKeR", "\u0438\u0432\u0430\u043d", "\u0418\u0412\u0410\u041d")) {
     err <- expect_error(aa_create_user(con, login, "other-password", "user"), class = "appauth_error_user", info = login)
     expect_identical(err$reason, "user_exists_case", info = login)
   }
@@ -117,11 +117,11 @@ test_that("занятый логин отклоняется: точное сов
 
   expect_identical(
     conditionMessage(expect_error(aa_create_user(con, "worker", "other-password", "user"), class = "appauth_error_user")),
-    "Пользователь с таким логином уже существует (логины различаются только регистром)"
+    "A user with this login already exists (logins differ only in letter case)"
   )
 })
 
-test_that("существующие пары логинов, различающиеся регистром, сохраняются и работают как разные пользователи", {
+test_that("existing login pairs that differ in case are kept and work as different users", {
   con <- users_db()
 
   texec(con, "INSERT INTO users (login, password, role) VALUES (?, ?, 'user')",
@@ -135,25 +135,25 @@ test_that("существующие пары логинов, различающ�
   expect_null(aa_authenticate(con, "kiruka", "password-two"))
   expect_null(aa_authenticate(con, "KIRUKA", "password-one"))
 
-  # третий вариант написания создать нельзя
+  # a third spelling cannot be created
   expect_error(aa_create_user(con, "KIRUKA", "password-three", "user"), class = "appauth_error_user")
 })
 
-test_that("aa_validate_new_user возвращает текст проблемы и ничего не создаёт", {
+test_that("aa_validate_new_user returns the problem text and creates nothing", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
 
   expect_null(aa_validate_new_user(con, "other", "other-password", "user"))
   expect_identical(aa_validate_new_user(con, "Worker", "other-password", "user"),
-                   "Пользователь с таким логином уже существует (логины различаются только регистром)")
-  expect_identical(aa_validate_new_user(con, "other", "x", "user"), "Пароль должен содержать минимум 6 символов")
-  expect_identical(aa_validate_new_user(con, "other", "other-password", "boss"), "Недопустимая роль")
+                   "A user with this login already exists (logins differ only in letter case)")
+  expect_identical(aa_validate_new_user(con, "other", "x", "user"), "Password must be at least 6 characters long")
+  expect_identical(aa_validate_new_user(con, "other", "other-password", "boss"), "Invalid role")
   expect_identical(count_users(con), 1L)
 })
 
-# ---- первый администратор -------------------------------------------------------
+# ---- first administrator --------------------------------------------------------
 
-test_that("первый администратор создаётся с ролью администратора только на пустой таблице", {
+test_that("the first administrator is created with the administrator role only on an empty table", {
   con <- users_db()
 
   expect_true(aa_create_first_admin(con, "boss", "boss-password"))
@@ -168,7 +168,7 @@ test_that("первый администратор создаётся с рол�
   expect_null(aa_get_user(con, "second"))
 })
 
-test_that("первый администратор не создаётся, если пользователи уже есть (в том числе созданные иначе)", {
+test_that("the first administrator is not created if users already exist (including ones created otherwise)", {
   con <- users_db()
   raw_user(con, "existing")
 
@@ -176,7 +176,7 @@ test_that("первый администратор не создаётся, ес
   expect_identical(count_users(con), 1L)
 })
 
-test_that("для первого администратора роль берётся из настроек, данные проверяются", {
+test_that("for the first administrator the role comes from the settings, data is validated", {
   con <- users_db()
   s <- aa_settings(roles = c("owner", "user"), admin_role = "owner")
 
@@ -189,9 +189,9 @@ test_that("для первого администратора роль берё�
   expect_identical(aa_get_user(con, "boss")$role, "owner")
 })
 
-# ---- вход ------------------------------------------------------------------------
+# ---- sign-in ---------------------------------------------------------------------
 
-test_that("aa_authenticate: верный пароль даёт login, role и blocked без пароля", {
+test_that("aa_authenticate: the correct password gives login, role and blocked without the password", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
 
@@ -204,7 +204,7 @@ test_that("aa_authenticate: верный пароль даёт login, role и bl
   expect_identical(nrow(res), 1L)
 })
 
-test_that("aa_authenticate: неверные данные дают NULL, логин сравнивается точно", {
+test_that("aa_authenticate: wrong data gives NULL, the login is compared exactly", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
 
@@ -219,7 +219,7 @@ test_that("aa_authenticate: неверные данные дают NULL, лог�
   }
 })
 
-test_that("aa_authenticate: SQL-инъекции не работают", {
+test_that("aa_authenticate: SQL injections do not work", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
 
@@ -233,7 +233,7 @@ test_that("aa_authenticate: SQL-инъекции не работают", {
   expect_true("users" %in% DBI::dbListTables(con))
 })
 
-test_that("aa_authenticate: заблокированный пользователь с верным паролем возвращается с blocked = 1, с неверным NULL", {
+test_that("aa_authenticate: a blocked user with the correct password is returned with blocked = 1, with a wrong one NULL", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
   texec(con, "UPDATE users SET blocked = 1 WHERE login = 'worker'")
@@ -244,18 +244,18 @@ test_that("aa_authenticate: заблокированный пользовате�
   expect_null(aa_authenticate(con, "worker", "wrong"))
 })
 
-test_that("aa_authenticate: пароль в открытом виде в базе никогда не принимается", {
+test_that("aa_authenticate: a plain-text password in the database is never accepted", {
   con <- users_db()
   raw_user(con, "legacy", password = "secret12")
 
   expect_null(aa_authenticate(con, "legacy", "secret12"))
 
-  # и хеш в качестве пароля не принимается
+  # and a hash is not accepted as a password either
   aa_create_user(con, "worker", "worker-password", "user")
   expect_null(aa_authenticate(con, "worker", stored_password(con, "worker")))
 })
 
-test_that("aa_authenticate: проверка выполняется и для несуществующего логина (на фиктивном хеше)", {
+test_that("aa_authenticate: the check is performed for a nonexistent login too (against a dummy hash)", {
   con <- users_db()
   aa_create_user(con, "worker", "worker-password", "user")
 
@@ -278,7 +278,7 @@ test_that("aa_authenticate: проверка выполняется и для н
   expect_identical(calls, worker_hash)
 })
 
-test_that("aa_authenticate работает и без колонки blocked (старая схема)", {
+test_that("aa_authenticate also works without the blocked column (old schema)", {
   testthat::skip_if_not_installed("RSQLite")
   con <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
   withr::defer(DBI::dbDisconnect(con))
@@ -294,9 +294,9 @@ test_that("aa_authenticate работает и без колонки blocked (с
   expect_null(aa_authenticate(con, "old", "wrong"))
 })
 
-# ---- смена пароля --------------------------------------------------------------
+# ---- password change -----------------------------------------------------------
 
-test_that("aa_set_password меняет пароль и отзывает токены только этого пользователя", {
+test_that("aa_set_password changes the password and revokes tokens of this user only", {
   con <- users_db()
   aa_create_user(con, "worker", "old-password", "user")
   aa_create_user(con, "other", "other-password", "user")
@@ -312,7 +312,7 @@ test_that("aa_set_password меняет пароль и отзывает ток�
   expect_identical(aa_authenticate(con, "other", "other-password")$login, "other")
 })
 
-test_that("aa_set_password: слабый пароль отклоняется, ничего не меняется", {
+test_that("aa_set_password: a weak password is rejected, nothing changes", {
   con <- users_db()
   aa_create_user(con, "worker", "old-password", "user")
   raw_token(con, "worker", "t1")
@@ -325,7 +325,7 @@ test_that("aa_set_password: слабый пароль отклоняется, н
   expect_identical(revoked_of(con, "t1"), 0L)
 })
 
-test_that("aa_set_password для несуществующего логина возвращает 0 и ничего не делает", {
+test_that("aa_set_password for a nonexistent login returns 0 and does nothing", {
   con <- users_db()
   raw_token(con, "ghost", "t1")
 
@@ -334,9 +334,9 @@ test_that("aa_set_password для несуществующего логина в
   expect_identical(revoked_of(con, "t1"), 0L)
 })
 
-# ---- смена роли -----------------------------------------------------------------
+# ---- role change -----------------------------------------------------------------
 
-test_that("aa_set_role меняет роль на допустимую", {
+test_that("aa_set_role changes the role to a valid one", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user")
 
@@ -345,7 +345,7 @@ test_that("aa_set_role меняет роль на допустимую", {
   expect_null(aa_check_can_change_role(con, "worker", "admin"))
 })
 
-test_that("aa_set_role: недопустимая роль, неизвестный и пустой пользователь отклоняются", {
+test_that("aa_set_role: an invalid role, an unknown and an empty user are rejected", {
   con <- users_db()
   raw_user(con, "worker", "user")
 
@@ -355,7 +355,7 @@ test_that("aa_set_role: недопустимая роль, неизвестны�
   expect_identical(aa_get_user(con, "worker")$role, "user")
 })
 
-test_that("нельзя снять роль администратора у последнего активного администратора", {
+test_that("the administrator role cannot be removed from the last active administrator", {
   con <- users_db()
   raw_user(con, "boss", "admin")
   raw_user(con, "second", "admin", blocked = 1)
@@ -364,19 +364,19 @@ test_that("нельзя снять роль администратора у по
   err <- expect_error(aa_set_role(con, "boss", "user"), class = "appauth_error_user")
 
   expect_identical(err$reason, "cannot_change_last_admin_role")
-  expect_identical(conditionMessage(err), "Нельзя снять роль администратора у последнего активного администратора")
+  expect_identical(conditionMessage(err), "You cannot remove the administrator role from the last active administrator")
   expect_identical(aa_get_user(con, "boss")$role, "admin")
 
-  # если есть другой активный администратор, роль снять можно
+  # if there is another active administrator, the role can be removed
   raw_user(con, "third", "admin")
   expect_identical(aa_set_role(con, "boss", "user"), 1L)
   expect_identical(aa_get_user(con, "boss")$role, "user")
 
-  # а того, кто остался единственным, снова нельзя
+  # and the one who remained the only one cannot be changed again
   expect_error(aa_set_role(con, "third", "viewer"), class = "appauth_error_user")
 })
 
-test_that("смена роли администратора на администратора и обычного пользователя на любую допустима", {
+test_that("changing an administrator to administrator and an ordinary user to any role is allowed", {
   con <- users_db()
   raw_user(con, "boss", "admin")
 
@@ -384,13 +384,13 @@ test_that("смена роли администратора на админис�
   expect_null(aa_check_can_change_role(con, "boss", "admin"))
   expect_identical(
     aa_check_can_change_role(con, "boss", "user"),
-    "Нельзя снять роль администратора у последнего активного администратора"
+    "You cannot remove the administrator role from the last active administrator"
   )
 })
 
-# ---- блокировка -----------------------------------------------------------------
+# ---- blocking -----------------------------------------------------------------
 
-test_that("aa_set_blocked блокирует, отзывает токены и разблокирует", {
+test_that("aa_set_blocked blocks, revokes tokens and unblocks", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user"); raw_user(con, "other", "user")
   raw_token(con, "worker", "t1"); raw_token(con, "other", "t2")
@@ -403,11 +403,11 @@ test_that("aa_set_blocked блокирует, отзывает токены и �
 
   expect_identical(aa_set_blocked(con, "worker", FALSE), 1L)
   expect_identical(aa_get_user(con, "worker")$blocked, 0L)
-  # отозванные при блокировке токены не восстанавливаются
+  # tokens revoked on blocking are not restored
   expect_identical(revoked_of(con, "t1"), 1L)
 })
 
-test_that("нельзя заблокировать себя и последнего активного администратора", {
+test_that("one cannot block oneself and the last active administrator", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "second", "admin"); raw_user(con, "worker", "user")
 
@@ -422,11 +422,11 @@ test_that("нельзя заблокировать себя и последне�
   expect_identical(err$reason, "cannot_block_last_admin")
   expect_identical(aa_get_user(con, "boss")$blocked, 0L)
 
-  # без acting_login (вызов из скрипта) правило последнего администратора всё равно действует
+  # without acting_login (a call from a script) the last administrator rule still applies
   expect_error(aa_set_blocked(con, "boss", TRUE), class = "appauth_error_user")
 })
 
-test_that("aa_set_blocked: неизвестный пользователь при блокировке ошибка, при разблокировке 0", {
+test_that("aa_set_blocked: an unknown user is an error on blocking, 0 on unblocking", {
   con <- users_db()
   raw_user(con, "boss", "admin")
 
@@ -438,38 +438,38 @@ test_that("aa_set_blocked: неизвестный пользователь пр�
   expect_error(aa_set_blocked(con, "boss", NA), class = "appauth_error_settings")
 })
 
-test_that("aa_check_can_block и aa_check_can_delete возвращают понятные тексты", {
+test_that("aa_check_can_block and aa_check_can_delete return clear texts", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user")
 
   expect_null(aa_check_can_block(con, "worker", "boss"))
   expect_null(aa_check_can_delete(con, "worker", "boss"))
-  expect_identical(aa_check_can_block(con, "boss", "boss"), "Нельзя заблокировать самого себя")
-  expect_identical(aa_check_can_delete(con, "boss", "boss"), "Нельзя удалить самого себя")
-  expect_identical(aa_check_can_block(con, "boss", "worker"), "Нельзя заблокировать последнего активного администратора")
-  expect_identical(aa_check_can_delete(con, "boss", "worker"), "Нельзя удалить последнего активного администратора")
-  expect_identical(aa_check_can_block(con, "ghost", "boss"), "Пользователь не найден")
-  expect_identical(aa_check_can_delete(con, "", "boss"), "Пользователь не указан")
-  expect_identical(aa_check_can_delete(con, NULL, "boss"), "Пользователь не указан")
+  expect_identical(aa_check_can_block(con, "boss", "boss"), "You cannot block yourself")
+  expect_identical(aa_check_can_delete(con, "boss", "boss"), "You cannot delete yourself")
+  expect_identical(aa_check_can_block(con, "boss", "worker"), "You cannot block the last active administrator")
+  expect_identical(aa_check_can_delete(con, "boss", "worker"), "You cannot delete the last active administrator")
+  expect_identical(aa_check_can_block(con, "ghost", "boss"), "User not found")
+  expect_identical(aa_check_can_delete(con, "", "boss"), "User is not specified")
+  expect_identical(aa_check_can_delete(con, NULL, "boss"), "User is not specified")
 
-  en <- aa_settings(texts = aa_texts("en"))
-  expect_identical(aa_check_can_block(con, "boss", "boss", en), "You cannot block yourself")
-  expect_identical(aa_check_can_delete(con, "boss", "worker", en), "You cannot delete the last active administrator")
+  ru <- aa_settings(texts = aa_texts("ru"))
+  expect_identical(aa_check_can_block(con, "boss", "boss", ru), aa_text(ru, "cannot_block_self"))
+  expect_identical(aa_check_can_delete(con, "boss", "worker", ru), aa_text(ru, "cannot_delete_last_admin"))
 })
 
-test_that("заблокированный администратор не считается активным", {
+test_that("a blocked administrator is not considered active", {
   con <- users_db()
   raw_user(con, "boss", "admin")
   raw_user(con, "blocked_admin", "admin", blocked = 1)
 
-  expect_identical(aa_check_can_block(con, "boss", "x"), "Нельзя заблокировать последнего активного администратора")
-  # заблокированного администратора удалить можно, пока есть активный
+  expect_identical(aa_check_can_block(con, "boss", "x"), "You cannot block the last active administrator")
+  # a blocked administrator can be deleted while an active one exists
   expect_null(aa_check_can_delete(con, "blocked_admin", "boss"))
 })
 
-# ---- удаление -------------------------------------------------------------------
+# ---- deletion -------------------------------------------------------------------
 
-test_that("aa_delete_user удаляет пользователя, его токены и неудачные попытки входа", {
+test_that("aa_delete_user deletes the user, their tokens and failed login attempts", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user"); raw_user(con, "other", "user")
   raw_token(con, "worker", "t1"); raw_token(con, "worker", "t2", revoked = 1); raw_token(con, "other", "t3")
@@ -480,13 +480,13 @@ test_that("aa_delete_user удаляет пользователя, его ток
   expect_null(aa_get_user(con, "worker"))
   expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'worker'")$n, 0L)
   expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'worker'")$n, 0L)
-  # данные других пользователей не затронуты
+  # data of other users is not affected
   expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = 'other'")$n, 1L)
   expect_identical(tquery(con, "SELECT COUNT(*) AS n FROM login_attempts WHERE login = 'other'")$n, 1L)
   expect_identical(count_users(con), 2L)
 })
 
-test_that("нельзя удалить себя и последнего активного администратора", {
+test_that("one cannot delete oneself and the last active administrator", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user")
 
@@ -502,7 +502,7 @@ test_that("нельзя удалить себя и последнего акти
   expect_identical(count_users(con), 2L)
 })
 
-test_that("удаление администратора допустимо, если остаётся другой активный", {
+test_that("deleting an administrator is allowed if another active one remains", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "second", "admin")
 
@@ -510,7 +510,7 @@ test_that("удаление администратора допустимо, е�
   expect_identical(aa_list_users(con)$login, "boss")
 })
 
-test_that("aa_delete_user: неизвестный и пустой пользователь отклоняются", {
+test_that("aa_delete_user: an unknown and an empty user are rejected", {
   con <- users_db()
   raw_user(con, "boss", "admin")
 
@@ -518,7 +518,7 @@ test_that("aa_delete_user: неизвестный и пустой пользов
   expect_identical(expect_error(aa_delete_user(con, NA_character_), class = "appauth_error_user")$reason, "user_not_specified")
 })
 
-test_that("удаление работает, даже если таблицы попыток входа нет", {
+test_that("deletion works even if the login attempts table is missing", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user")
   texec(con, "DROP TABLE login_attempts")

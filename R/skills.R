@@ -1,31 +1,30 @@
-#' Установка навыков для ИИ-агентов
+#' Install skills for AI agents
 #'
-#' В пакет входят два навыка для ИИ-агентов (Claude Code, Codex и других) на
-#' английском языке: `appauth` (справочник функций, схема базы, события,
-#' идентификаторы интерфейса) и `appauth-secure-shiny` (внедрение `appauth`,
-#' перенос самописной авторизации, аудит безопасности приложения). Функция
-#' копирует их из установленного пакета в каталог навыков проекта или
-#' пользователя.
+#' The package ships two skills for AI agents (Claude Code, Codex and others),
+#' written in English: `appauth` (function reference, database schema, events,
+#' interface identifiers) and `appauth-secure-shiny` (adopting `appauth`,
+#' migrating hand-written authentication, security audit of an application).
+#' The function copies them from the installed package into the skills
+#' directory of a project or of the user.
 #'
-#' @param path Каталог, куда копировать. По умолчанию рассчитывается по
-#'   `agent`.
-#' @param agent Для какого агента копировать: `"claude"` (`.claude/skills`,
-#'   Claude Code) или `"agents"` (`.agents/skills`, Codex, Posit Assistant и
-#'   другие). Игнорируется, если задан `path`.
-#' @param global Копировать в домашний каталог пользователя (`~`), а не в
-#'   текущий проект.
-#' @param overwrite Перезаписывать уже установленные навыки (например, после
-#'   обновления пакета).
+#' @param path Directory to copy to. Computed from `agent` by default.
+#' @param agent Which agent to copy for: `"claude"` (`.claude/skills`, Claude
+#'   Code) or `"agents"` (`.agents/skills`, Codex, Posit Assistant and others).
+#'   Ignored if `path` is set.
+#' @param global Copy to the user's home directory (`~`) rather than to the
+#'   current project.
+#' @param overwrite Overwrite skills that are already installed (for example,
+#'   after a package update).
 #'
-#' @returns Невидимый вектор путей к установленным навыкам.
+#' @returns An invisible vector of paths to the installed skills.
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' # в текущий проект для Claude Code
+#' # into the current project for Claude Code
 #' aa_install_skills()
 #'
-#' # для Codex и Posit Assistant, с обновлением после апдейта пакета
+#' # for Codex and Posit Assistant, overwriting after a package update
 #' aa_install_skills(agent = "agents", overwrite = TRUE)
 #' }
 aa_install_skills <- function(
@@ -43,7 +42,7 @@ aa_install_skills <- function(
     path <- file.path(base, if (agent == "claude") ".claude" else ".agents", "skills")
   } else if (!(is.character(path) && length(path) == 1 && !is.na(path) && nzchar(path))) {
     rlang::abort(
-      "Параметр `path` должен быть строкой с путём к каталогу.",
+      "`path` must be a string with a directory path.",
       class = "appauth_error_settings"
     )
   }
@@ -53,7 +52,7 @@ aa_install_skills <- function(
 
   if (!nzchar(source_dir) || length(skills) == 0) {
     rlang::abort(
-      "В установленном пакете не найдены навыки (`inst/skills`).",
+      "No skills found in the installed package (`inst/skills`).",
       class = "appauth_error_settings"
     )
   }
@@ -67,10 +66,10 @@ aa_install_skills <- function(
     rlang::abort(
       c(
         paste0(
-          "Навык уже установлен: ",
+          "Skill already installed: ",
           paste0("`", targets[exists], "`", collapse = ", "), "."
         ),
-        i = "Передайте `overwrite = TRUE`, чтобы заменить его."
+        i = "Pass `overwrite = TRUE` to replace it."
       ),
       class = "appauth_error_settings"
     )
@@ -81,12 +80,12 @@ aa_install_skills <- function(
   ok <- file.copy(skills, path, recursive = TRUE)
   if (!all(ok)) {
     rlang::abort(
-      paste0("Не удалось скопировать навыки в `", path, "`."),
+      paste0("Could not copy the skills to `", path, "`."),
       class = "appauth_error_settings"
     )
   }
 
-  cli_msg <- paste0("Установлены навыки: ", paste(basename(skills), collapse = ", "), " -> ", path)
+  cli_msg <- paste0("Skills installed: ", paste(basename(skills), collapse = ", "), " -> ", path)
   rlang::inform(cli_msg)
 
   invisible(targets)

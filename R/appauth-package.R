@@ -1,15 +1,15 @@
-#' appauth: безопасная авторизация и управление пользователями для Shiny
+#' appauth: Secure Authentication and User Management for Shiny
 #'
-#' Пакет объединяет то, что обязано быть одинаковым во всех Shiny приложениях:
-#' хранение паролей в виде хешей, защиту от подбора пароля, блокировку и удаление
-#' пользователей, токены автовхода, серверные проверки прав и версионные
-#' миграции схемы базы данных (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL). Всё,
-#' что отличается от приложения к
-#' приложению (матрица ролей и прав, переключатели логов, состав вкладки
-#' доступа), остаётся за приложением и подключается через точки расширения.
+#' The package combines what must be the same in every Shiny application:
+#' password storage as hashes, brute-force protection, blocking and deletion of
+#' users, auto sign-in tokens, server-side permission checks and versioned
+#' migrations of the database schema (SQLite, DuckDB, MySQL / MariaDB,
+#' PostgreSQL). Everything that differs from application to application (the
+#' matrix of roles and permissions, log switches, the contents of the access
+#' tab) stays with the application and is attached through extension points.
 #'
-#' Подробнее об устройстве и модели угроз смотрите в виньетке
-#' `architecture-and-security`.
+#' See the `architecture-and-security` vignette for details on the design and
+#' the threat model.
 #'
 #' @keywords internal
 "_PACKAGE"

@@ -2,29 +2,29 @@
 % Please edit documentation in R/passwords.R
 \name{aa_verify_password}
 \alias{aa_verify_password}
-\title{Проверить пароль по хешу}
+\title{Verify a password against a hash}
 \usage{
 aa_verify_password(password, stored)
 }
 \arguments{
-\item{password}{Введённый пароль.}
+\item{password}{The entered password.}
 
-\item{stored}{Значение из колонки \code{password} таблицы \code{users}.}
+\item{stored}{The value from the \code{password} column of the \code{users} table.}
 }
 \value{
-\code{TRUE} или \code{FALSE}.
+\code{TRUE} or \code{FALSE}.
 }
 \description{
-Сравнивает введённый пароль с сохранённым хешем. Если сохранённое значение
-не является хешем (например, пароль в открытом виде), результат всегда
-\code{FALSE}: открытые пароли не сравниваются. Повреждённый хеш и некорректные
-аргументы тоже дают \code{FALSE}, ошибки функция не бросает.
+Compares the entered password with the stored hash. If the stored value is
+not a hash (for example, a plain-text password), the result is always
+\code{FALSE}: plain-text passwords are not compared. A corrupted hash and invalid
+arguments also give \code{FALSE}; the function does not throw errors.
 }
 \examples{
 hash <- aa_hash_password("secret")
 aa_verify_password("secret", hash)
 aa_verify_password("other", hash)
 
-# пароль в открытом виде не проходит проверку, даже если совпадает
+# a plain-text password does not pass verification, even if it matches
 aa_verify_password("root", "root")
 }

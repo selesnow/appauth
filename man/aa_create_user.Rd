@@ -2,7 +2,7 @@
 % Please edit documentation in R/users.R
 \name{aa_create_user}
 \alias{aa_create_user}
-\title{Создать пользователя}
+\title{Create a user}
 \usage{
 aa_create_user(
   conn,
@@ -15,31 +15,33 @@ aa_create_user(
 )
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{password}{Пароль в открытом виде (в базу попадёт только хеш).}
+\item{password}{The password in plain text (only the hash goes to the
+database).}
 
-\item{role}{Роль из списка \code{roles} настроек.}
+\item{role}{A role from the \code{roles} list of the settings.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{must_change}{Потребовать смену пароля при первом входе (разумно, если
-пароль задал администратор).}
+\item{must_change}{Require a password change at the first login (sensible if
+the password was set by an administrator).}
 
-\item{email}{Адрес для восстановления пароля или \code{NULL} (адрес можно указать
-позже через \code{\link[=aa_set_email]{aa_set_email()}}). Проверяется формат и уникальность.}
+\item{email}{Address for password recovery or \code{NULL} (the address can be set
+later with \code{\link[=aa_set_email]{aa_set_email()}}). The format and uniqueness are checked.}
 }
 \value{
-\code{TRUE} (невидимо).
+\code{TRUE} (invisibly).
 }
 \description{
-Создаёт пользователя с хешем пароля. Перед созданием проверяются логин,
-пароль, роль (должна быть в \code{roles} из настроек) и уникальность логина.
-При нарушении правил функция прерывается ошибкой класса \code{appauth_error_user}
-с текстом на языке настроек (в поле \code{reason} ключ причины), который можно
-показать пользователю.
+Creates a user with a password hash. Before creation the login, password,
+role (must be in \code{roles} from the settings) and login uniqueness are
+checked. On a rule violation the function aborts with an error of class
+\code{appauth_error_user} with text in the settings language (the \code{reason} field
+holds the reason key) that can be shown to the user.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {
@@ -48,7 +50,7 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   aa_create_user(conn, "worker", "worker-password", "user")
   aa_list_users(conn)
 
-  # ошибку можно показать пользователю
+  # the error can be shown to the user
   tryCatch(
     aa_create_user(conn, "worker", "another-password", "user"),
     appauth_error_user = function(e) conditionMessage(e)

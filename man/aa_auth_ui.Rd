@@ -2,20 +2,20 @@
 % Please edit documentation in R/mod-auth.R
 \name{aa_auth_ui}
 \alias{aa_auth_ui}
-\title{Модуль входа: интерфейс}
+\title{Sign-in module: UI}
 \usage{
 aa_auth_ui(id)
 }
 \arguments{
-\item{id}{Идентификатор модуля.}
+\item{id}{Module id.}
 }
 \value{
-Элемент интерфейса Shiny.
+A Shiny UI element.
 }
 \description{
-Форма входа (или создания первого администратора, если пользователей ещё
-нет). Когда пользователь вошёл, модуль ничего не показывает. Стили подключаются
-через \code{\link[=aa_app_head]{aa_app_head()}}.
+The sign-in form (or the creation of the first administrator if there are
+no users yet). When the user is signed in, the module shows nothing. Styles are attached
+through \code{\link[=aa_app_head]{aa_app_head()}}.
 }
 \examples{
 ui <- shiny::fluidPage(aa_app_head(), aa_auth_ui("auth"))

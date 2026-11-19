@@ -1,16 +1,16 @@
-# Нестандартные настройки: свои роли, своя роль администратора, свои тексты,
-# и регрессионные проверки безопасности на уровне модулей.
+# Non-default settings: custom roles, a custom administrator role, custom texts,
+# and module-level security regression checks.
 
 owner_settings <- aa_settings(roles = c("owner", "editor", "viewer"), admin_role = "owner")
 
-test_that("свои роли: первый администратор получает роль администратора из настроек", {
+test_that("custom roles: the first administrator gets the administrator role from the settings", {
   con <- users_db()
 
   expect_true(aa_create_first_admin(con, "boss", "secret123", owner_settings))
   expect_equal(aa_get_user(con, "boss")$role, "owner")
 })
 
-test_that("свои роли: создание, смена и отказ для чужих ролей", {
+test_that("custom roles: creation, change and refusal for foreign roles", {
   con <- users_db()
   aa_create_first_admin(con, "boss", "secret123", owner_settings)
 
@@ -24,7 +24,7 @@ test_that("свои роли: создание, смена и отказ для 
   expect_error(aa_set_role(con, "ann", "admin", owner_settings), class = "appauth_error_user")
 })
 
-test_that("своя роль администратора: правило последнего администратора работает для неё", {
+test_that("custom administrator role: the last administrator rule works for it", {
   con <- users_db()
   aa_create_first_admin(con, "boss", "secret123", owner_settings)
   aa_create_user(con, "ann", "secret123", "editor", owner_settings)
@@ -34,7 +34,7 @@ test_that("своя роль администратора: правило пос
   expect_error(aa_set_blocked(con, "boss", TRUE, "ann", owner_settings), class = "appauth_error_user")
 })
 
-test_that("модуль входа со своей ролью администратора создаёт owner", {
+test_that("the login module with a custom administrator role creates owner", {
   con <- users_db()
 
   run_auth(con, settings = owner_settings, {
@@ -43,7 +43,7 @@ test_that("модуль входа со своей ролью администр
   })
 })
 
-test_that("модуль пользователей: управляет только владелец, роль admin при таких настройках ничего не значит", {
+test_that("users module: only the owner manages, the admin role means nothing with these settings", {
   con <- users_db()
   aa_create_first_admin(con, "boss", "secret123", owner_settings)
   aa_create_user(con, "ann", "secret123", "editor", owner_settings)
@@ -62,7 +62,7 @@ test_that("модуль пользователей: управляет толь�
   expect_equal(blocked_of(con, "ann"), 1)
 })
 
-test_that("права по матрице работают со своими ролями", {
+test_that("matrix permissions work with custom roles", {
   provider <- aa_permissions_from_matrix(list(Edit = c("owner", "editor"), Admin = "owner"))
 
   expect_true(aa_can(list(login = "a", role = "editor"), "Edit", provider))
@@ -70,20 +70,20 @@ test_that("права по матрице работают со своими р�
   expect_false(aa_can(list(login = "a", role = "admin"), "Admin", provider))
 })
 
-test_that("переопределённый текст кнопки входа попадает в форму", {
+test_that("an overridden login button text appears in the form", {
   con <- users_db()
   aa_create_user(con, "ivan", "secret123", "user")
-  settings <- aa_settings(texts = aa_texts("ru", login_button = "Войти в систему", login_title = "Вход для команды"))
+  settings <- aa_settings(texts = aa_texts("en", login_button = "Enter the system", login_title = "Team sign-in"))
 
   run_auth(con, settings = settings, {
     session$flushReact()
     html <- form_html(output)
-    expect_match(html, "Войти в систему", fixed = TRUE)
-    expect_match(html, "Вход для команды", fixed = TRUE)
+    expect_match(html, "Enter the system", fixed = TRUE)
+    expect_match(html, "Team sign-in", fixed = TRUE)
   })
 })
 
-test_that("SQL-инъекция в логине и пароле не даёт войти и не ломает базу", {
+test_that("SQL injection in the login and password does not let in and does not break the database", {
   con <- users_db()
   aa_create_user(con, "ivan", "secret123", "user")
 
@@ -102,14 +102,14 @@ test_that("SQL-инъекция в логине и пароле не даёт в
   expect_equal(count_users(con), 1)
 })
 
-test_that("огромный логин и пароль не роняют вход и не раздувают базу попыток", {
+test_that("a huge login and password do not crash login or bloat the attempts table", {
   con <- users_db()
   aa_create_user(con, "ivan", "secret123", "user")
   huge <- strrep("a", 50000)
 
   run_auth(con, {
     session$setInputs(login = huge, password = huge, login_btn = 1)
-    expect_equal(output$message, "Неверный логин или пароль")
+    expect_equal(output$message, aa_text(aa_settings(), "bad_credentials"))
     expect_false(session$returned$logged_in())
   })
 
@@ -117,7 +117,7 @@ test_that("огромный логин и пароль не роняют вхо�
   expect_lte(stored, aa_settings()$login_max)
 })
 
-test_that("пароль, похожий на хеш из базы, не принимается как пароль", {
+test_that("a password equal to the hash from the database is not accepted as a password", {
   con <- users_db()
   aa_create_user(con, "ivan", "secret123", "user")
   hash <- stored_password(con, "ivan")
@@ -128,10 +128,10 @@ test_that("пароль, похожий на хеш из базы, не прин
   })
 })
 
-test_that("каждое событие каталога реально отправляется кодом пакета", {
+test_that("every event of the catalog is really sent by the package code", {
   files <- list.files(testthat::test_path("..", "..", "R"), pattern = "\\.R$", full.names = TRUE)
   files <- files[basename(files) != "events.R"]
-  skip_if(length(files) == 0, "исходники недоступны (установленный пакет)")
+  skip_if(length(files) == 0, "sources unavailable (installed package)")
 
   code <- paste(unlist(lapply(files, readLines, encoding = "UTF-8")), collapse = "\n")
 

@@ -2,37 +2,38 @@
 % Please edit documentation in R/reset.R
 \name{aa_request_password_reset}
 \alias{aa_request_password_reset}
-\title{Запросить восстановление пароля}
+\title{Request password recovery}
 \usage{
 aa_request_password_reset(conn, identifier, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{identifier}{Логин или email, который ввёл пользователь.}
+\item{identifier}{The login or email the user entered.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} с \code{reset_enabled = TRUE}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{reset_enabled = TRUE}.}
 }
 \value{
-Список (невидимо): \code{sent} (\code{TRUE}, если письмо отправлено), \code{reason}
+A list (invisibly): \code{sent} (\code{TRUE} if the email was sent), \code{reason}
 (\code{"sent"}, \code{"disabled"}, \code{"no_user"}, \code{"no_email"}, \code{"blocked"},
-\code{"throttled"} или \code{"send_failed"}) и \code{login} (найденный логин или \code{NA}).
+\code{"throttled"} or \code{"send_failed"}) and \code{login} (the found login or \code{NA}).
 }
 \description{
-Находит пользователя по логину или email, создаёт одноразовый токен и вызывает
-\code{settings$send_reset(email, link, login)}, чтобы отправить письмо со ссылкой.
-В базе остаётся только хеш токена. Предыдущие неиспользованные ссылки этого
-пользователя перестают работать.
+Finds a user by login or email, creates a one-time token and calls
+\code{settings$send_reset(email, link, login)} to send an email with the link.
+Only the token hash stays in the database. The user's previous unused links
+stop working.
 }
 \details{
-Письмо не отправляется, если пользователя нет, у него не указан email, он
-заблокирован администратором или превышен лимит (\code{reset_max_per_hour} на
-пользователя, \code{reset_max_per_minute} общий). Результат функции предназначен
-для журнала: пользователю нужно показывать один и тот же ответ в любом из
-случаев, чтобы нельзя было узнать, какие логины и адреса существуют.
+No email is sent if the user does not exist, has no email, is
+blocked by an administrator, or a limit is exceeded (\code{reset_max_per_hour} per
+user, \code{reset_max_per_minute} overall). The function result is meant
+for the journal: the user should be shown the same answer in every
+case, so that it is impossible to find out which logins and addresses exist.
 
-Ошибка в \code{send_reset} не прерывает функцию, а возвращается как \code{send_failed}:
-токен при этом гасится.
+An error in \code{send_reset} does not abort the function but is returned as \code{send_failed}:
+the token is consumed in that case.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {
@@ -44,7 +45,7 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   settings <- aa_settings(
     reset_enabled  = TRUE,
     reset_base_url = "https://apps.example.com/my_app",
-    send_reset     = function(email, link, login) message("Ссылка для ", login, ": ", link)
+    send_reset     = function(email, link, login) message("Link for ", login, ": ", link)
   )
   aa_request_password_reset(conn, "boss", settings)$reason
   aa_request_password_reset(conn, "nobody", settings)$reason

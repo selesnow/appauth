@@ -1,5 +1,5 @@
-# Восстановление пароля по email: email пользователей, запрос ссылки, смена
-# пароля по токену и интерфейс модуля входа. Письма перехватывает ящик mailbox().
+# Password recovery by email: user emails, link request, password change
+# by token and the sign-in module UI. Emails are intercepted by the mailbox() box.
 
 mailbox <- function() {
   box <- new.env()
@@ -22,7 +22,7 @@ reset_settings <- function(box, ...) {
   )
 }
 
-# база: пользователь ann с адресом, bob без адреса
+# database: user ann with an address, bob without an address
 reset_db <- function(env = parent.frame()) {
   con <- users_db(env)
   raw_user(con, "ann", password = aa_hash_password("old-password"))
@@ -31,7 +31,7 @@ reset_db <- function(env = parent.frame()) {
   con
 }
 
-# подменяет адресную строку страницы: у mock-сессии Shiny она не настраивается
+# replaces the page address bar: the mock Shiny session has no configurable one
 with_url <- function(search, env = parent.frame()) {
   testthat::local_mocked_bindings(aa_url_search = function(session) search, .package = "appauth", .env = env)
 }
@@ -40,9 +40,9 @@ reset_tokens_of <- function(con, login) {
   tquery(con, "SELECT * FROM password_resets WHERE user_login = ? ORDER BY id", params = list(login))
 }
 
-# --- email пользователей ------------------------------------------------------
+# --- user emails --------------------------------------------------------------
 
-test_that("aa_set_email хранит адрес в нижнем регистре и удаляет пустым значением", {
+test_that("aa_set_email stores the address in lower case and removes it with an empty value", {
   con <- reset_db()
 
   expect_identical(aa_get_email(con, "ann"), "ann@example.com")
@@ -60,7 +60,7 @@ test_that("aa_set_email хранит адрес в нижнем регистре
   expect_true(is.na(aa_get_email(con, "bob")))
 })
 
-test_that("aa_set_email отклоняет неверный формат, занятый адрес и неизвестного пользователя", {
+test_that("aa_set_email rejects a bad format, a taken address and an unknown user", {
   con <- reset_db()
 
   for (bad in c("no-at-sign", "a@b", "a b@example.com", "@example.com", "a@@example.com", "a@example.")) {
@@ -71,7 +71,7 @@ test_that("aa_set_email отклоняет неверный формат, зан
   expect_s3_class(err, "appauth_error_user")
   expect_identical(err$reason, "email_exists")
 
-  # свой собственный адрес занятым не считается
+  # one's own address is not considered taken
   expect_true(aa_set_email(con, "ann", "ann@example.com"))
 
   err <- tryCatch(aa_set_email(con, "nobody", "x@example.com"), appauth_error_user = identity)
@@ -80,7 +80,7 @@ test_that("aa_set_email отклоняет неверный формат, зан
   expect_true(is.na(aa_get_email(con, "bob")))
 })
 
-test_that("aa_create_user принимает email и проверяет его до создания пользователя", {
+test_that("aa_create_user accepts an email and checks it before creating the user", {
   con <- reset_db()
 
   aa_create_user(con, "carl", "secret123", "user", email = "Carl@Example.com")
@@ -94,9 +94,9 @@ test_that("aa_create_user принимает email и проверяет его 
   expect_true(is.na(aa_get_email(con, "erik")))
 })
 
-# --- настройки ------------------------------------------------------------------
+# --- settings -------------------------------------------------------------------
 
-test_that("настройки восстановления: по умолчанию выключено, включение требует функцию и адрес", {
+test_that("recovery settings: off by default, enabling requires a function and an address", {
   s <- aa_settings()
   expect_false(s$reset_enabled)
   expect_null(s$send_reset)
@@ -113,19 +113,19 @@ test_that("настройки восстановления: по умолчан�
 
   ok <- reset_settings(mailbox())
   expect_true(ok$reset_enabled)
-  expect_output(print(ok), "Восстановление пароля по email: включено")
-  expect_output(print(s), "Восстановление пароля по email: выключено")
+  expect_output(print(ok), "Password recovery by email: enabled")
+  expect_output(print(s), "Password recovery by email: disabled")
 })
 
-test_that("aa_settings_from_list понимает настройки восстановления", {
+test_that("aa_settings_from_list understands recovery settings", {
   s <- aa_settings_from_list(list(reset_ttl_minutes = 15, reset_max_per_hour = 1))
   expect_equal(s$reset_ttl_minutes, 15)
   expect_equal(s$reset_max_per_hour, 1)
 })
 
-# --- запрос ссылки --------------------------------------------------------------
+# --- link request ---------------------------------------------------------------
 
-test_that("запрос по логину и по email отправляет письмо со ссылкой и хранит только хеш", {
+test_that("a request by login and by email sends an email with a link and stores only the hash", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -146,14 +146,14 @@ test_that("запрос по логину и по email отправляет п�
   expect_identical(rows$token_hash, aa_token_hash(box$token()))
   expect_equal(rows$used, 0)
 
-  # адрес вводится в любом регистре и с пробелами
+  # the address is entered in any case and with spaces
   res <- aa_request_password_reset(con, "  ANN@example.com ", settings)
   expect_true(res$sent)
   expect_identical(res$login, "ann")
   expect_length(box$sent, 2)
 })
 
-test_that("ссылка строится от адреса приложения с завершающим слэшем и с параметрами", {
+test_that("the link is built from the app address with a trailing slash and with parameters", {
   con <- reset_db()
   box <- mailbox()
 
@@ -168,7 +168,7 @@ test_that("ссылка строится от адреса приложения 
   expect_match(box$sent[[2]]$link, "^https://apps\\.example\\.com/\\?app=1&reset=")
 })
 
-test_that("письмо не уходит, если пользователя нет, нет адреса, пользователь заблокирован или функция выключена", {
+test_that("no email is sent if the user does not exist, has no address, is blocked or the feature is off", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -188,7 +188,7 @@ test_that("письмо не уходит, если пользователя н�
   expect_equal(nrow(reset_tokens_of(con, "ann")), 0)
 })
 
-test_that("новый запрос гасит предыдущую ссылку", {
+test_that("a new request consumes the previous link", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -200,7 +200,7 @@ test_that("новый запрос гасит предыдущую ссылку"
   expect_identical(aa_reset_token_login(con, box$token(2)), "ann")
 })
 
-test_that("лимиты: на пользователя в час и общий в минуту", {
+test_that("limits: per user per hour and overall per minute", {
   con <- reset_db()
   box <- mailbox()
 
@@ -212,11 +212,11 @@ test_that("лимиты: на пользователя в час и общий �
   expect_identical(res$reason, "throttled")
   expect_length(box$sent, 2)
 
-  # запросы старше часа в лимит не входят
+  # requests older than an hour do not count toward the limit
   texec(con, "UPDATE password_resets SET created_at = datetime('now', '-2 hours')")
   expect_true(aa_request_password_reset(con, "ann", settings)$sent)
 
-  # общий лимит по всем пользователям
+  # overall limit across all users
   con <- reset_db()
   aa_set_email(con, "bob", "bob@example.com")
   box <- mailbox()
@@ -225,7 +225,7 @@ test_that("лимиты: на пользователя в час и общий �
   expect_identical(aa_request_password_reset(con, "bob", settings)$reason, "throttled")
 })
 
-test_that("ошибка отправки письма не прерывает запрос и гасит токен", {
+test_that("an email sending error does not abort the request and consumes the token", {
   con <- reset_db()
   settings <- aa_settings(
     reset_enabled = TRUE, reset_base_url = "https://x.test",
@@ -238,9 +238,9 @@ test_that("ошибка отправки письма не прерывает з
   expect_equal(reset_tokens_of(con, "ann")$used, 1)
 })
 
-# --- смена пароля по ссылке -----------------------------------------------------
+# --- password change by link ----------------------------------------------------
 
-test_that("смена пароля по ссылке: пароль меняется, вход работает, токен одноразовый", {
+test_that("password change by link: the password changes, sign-in works, the token is one-time", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -259,7 +259,7 @@ test_that("смена пароля по ссылке: пароль меняет�
   expect_null(aa_authenticate(con, "ann", "another-pass-1"))
 })
 
-test_that("после смены по ссылке отзываются сессии, гасятся другие ссылки, снимаются блокировка и must_change", {
+test_that("after a change by link sessions are revoked, other links consumed, the lock and must_change cleared", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -270,7 +270,7 @@ test_that("после смены по ссылке отзываются сесс
   expect_gt(aa_login_lock_remaining(con, "ann", settings), 0)
 
   aa_request_password_reset(con, "ann", settings)
-  # вторая ссылка гасит первую, поэтому имитируем две живые ссылки вручную
+  # the second link consumes the first, so we simulate two live links manually
   texec(
     con, "INSERT INTO password_resets (user_login, token_hash, expires_at) VALUES ('ann', 'other', datetime('now', '+1 hours'))"
   )
@@ -283,7 +283,7 @@ test_that("после смены по ссылке отзываются сесс
   expect_equal(aa_authenticate(con, "ann", "brand-new-pass")$must_change, 0)
 })
 
-test_that("неверный, просроченный и чужой токен не меняют пароль", {
+test_that("a wrong, expired and foreign token does not change the password", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -302,7 +302,7 @@ test_that("неверный, просроченный и чужой токен �
   expect_equal(aa_authenticate(con, "ann", "old-password")$login, "ann")
 })
 
-test_that("слабый пароль отклоняется без траты токена", {
+test_that("a weak password is rejected without spending the token", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box, password_policy = "reject")
@@ -316,7 +316,7 @@ test_that("слабый пароль отклоняется без траты т
   expect_identical(aa_reset_password_with_token(con, token, "brand-new-pass", settings), "ann")
 })
 
-test_that("токен заблокированного или удалённого пользователя не работает", {
+test_that("the token of a blocked or deleted user does not work", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -335,7 +335,7 @@ test_that("токен заблокированного или удалённог
   expect_null(aa_reset_token_login(con, token))
 })
 
-test_that("сброс пароля администратором и смена пароля гасят ссылки восстановления", {
+test_that("an administrator's password reset and a password change consume recovery links", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -345,7 +345,7 @@ test_that("сброс пароля администратором и смена 
   expect_null(aa_reset_token_login(con, box$token()))
 })
 
-test_that("aa_cleanup удаляет старые токены восстановления и оставляет свежие", {
+test_that("aa_cleanup deletes old recovery tokens and keeps fresh ones", {
   con <- reset_db()
   texec(con, "
     INSERT INTO password_resets (user_login, token_hash, created_at, expires_at, used) VALUES
@@ -360,10 +360,10 @@ test_that("aa_cleanup удаляет старые токены восстано�
   expect_identical(sort(reset_tokens_of(con, "ann")$token_hash), c("fresh", "fresh_used"))
 })
 
-test_that("миграция 7 достраивает старую базу и не трогает пользователей", {
+test_that("migration 7 completes an old database and does not touch users", {
   skip_if_not_sqlite()
   con <- new_db()
-  fixture_server_manager_prod(con)
+  fixture_legacy_full(con)
   before <- rows_of(con, "users")
 
   res <- aa_init_db(con)
@@ -374,11 +374,11 @@ test_that("миграция 7 достраивает старую базу и н
   expect_identical(rows_of(con, "users")[, names(before)], before)
   expect_true(all(is.na(rows_of(con, "users")$email)))
 
-  # повторный запуск ничего не меняет
+  # a repeated run changes nothing
   expect_identical(aa_init_db(con)$applied, integer())
 })
 
-test_that("на уровне базы адрес уникален, но у многих пользователей может не быть адреса", {
+test_that("at the database level the address is unique, but many users may have no address", {
   con <- reset_db()
   raw_user(con, "carl")
 
@@ -386,9 +386,9 @@ test_that("на уровне базы адрес уникален, но у мн�
   expect_no_error(texec(con, "UPDATE users SET email = NULL"))
 })
 
-# --- модуль входа ----------------------------------------------------------------
+# --- sign-in module --------------------------------------------------------------
 
-test_that("ссылка «Забыли пароль?» есть только при включённом восстановлении", {
+test_that("the \"Forgot password?\" link exists only when recovery is enabled", {
   con <- reset_db()
 
   run_auth(con, {
@@ -403,7 +403,7 @@ test_that("ссылка «Забыли пароль?» есть только п�
   })
 })
 
-test_that("модуль: запрос ссылки показывает один ответ для найденного и ненайденного пользователя", {
+test_that("module: a link request shows one answer for a found and a not found user", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -421,7 +421,7 @@ test_that("модуль: запрос ссылки показывает один
     missing <- output$message
 
     expect_identical(found, missing)
-    expect_match(found, "60 мин")
+    expect_match(found, "60 min")
 
     session$setInputs(forgot_identifier = "bob", forgot_btn = 3)
     expect_identical(output$message, found)
@@ -436,7 +436,7 @@ test_that("модуль: запрос ссылки показывает один
   expect_true(all(log$names() == "password_reset_requested"))
 })
 
-test_that("модуль: ссылка из письма открывает форму нового пароля, пароль меняется, токен сгорает", {
+test_that("module: the link from the email opens the new password form, the password changes, the token is consumed", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -467,7 +467,7 @@ test_that("модуль: ссылка из письма открывает фо�
   expect_identical(log$names(), "password_reset_done")
 })
 
-test_that("модуль: неверная ссылка показывает сообщение и форму входа", {
+test_that("module: a wrong link shows a message and the sign-in form", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box)
@@ -484,7 +484,7 @@ test_that("модуль: неверная ссылка показывает со
   expect_identical(log$names(), "password_reset_failed")
 })
 
-test_that("модуль: параметр reset игнорируется, если восстановление выключено", {
+test_that("module: the reset parameter is ignored if recovery is off", {
   con <- reset_db()
   log <- auth_events()
 
@@ -497,7 +497,7 @@ test_that("модуль: параметр reset игнорируется, есл
   expect_length(log$events, 0)
 })
 
-test_that("модуль: слабый пароль в режиме reject не тратит ссылку", {
+test_that("module: a weak password in reject mode does not spend the link", {
   con <- reset_db()
   box <- mailbox()
   settings <- reset_settings(box, password_policy = "reject")
@@ -515,9 +515,9 @@ test_that("модуль: слабый пароль в режиме reject не �
   })
 })
 
-# --- модуль пользователей ---------------------------------------------------------
+# --- users module -----------------------------------------------------------------
 
-test_that("модуль пользователей: администратор указывает и удаляет email, события и проверки", {
+test_that("users module: an administrator sets and removes an email, events and checks", {
   con <- users_fixture()
   log <- users_events()
 
@@ -540,7 +540,7 @@ test_that("модуль пользователей: администратор �
   expect_identical(log$names(), c("email_changed", "email_changed"))
 })
 
-test_that("модуль пользователей: не администратор не может менять email", {
+test_that("users module: a non-administrator cannot change an email", {
   con <- users_fixture()
   log <- users_events()
 
@@ -556,7 +556,7 @@ test_that("модуль пользователей: не администрат�
   expect_true(is.na(aa_get_email(con, "boss")))
 })
 
-test_that("каталог событий и тексты содержат новые ключи восстановления", {
+test_that("the event catalog and texts contain the new recovery keys", {
   expect_true(all(c(
     "password_reset_requested", "password_reset_done", "password_reset_failed", "email_changed"
   ) %in% aa_events()$event))

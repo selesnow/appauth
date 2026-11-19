@@ -1,8 +1,8 @@
 ---
-title: "Точки расширения appauth"
+title: "Extension points"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Точки расширения appauth}
+  %\VignetteIndexEntry{Extension points}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -12,23 +12,23 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(appauth)
 ```
 
-Пакет содержит то, что обязано быть одинаковым во всех приложениях: пароли, защиту входа, сессии, блокировки, проверку прав. Всё, что у приложений разное, подключается через точки расширения. Этот документ описывает каждую из них.
+The package contains what must be identical across all applications: passwords, login protection, sessions, blocking, and permission checks. Everything that differs between applications is plugged in through extension points. This document describes each of them.
 
-| Точка | Для чего | Где |
+| Point | Purpose | Where |
 | --- | --- | --- |
-| Источник прав | Как приложение определяет, что можно роли или пользователю | `aa_can()`, `aa_require()`, `aa_register_module()` |
-| Роли | Какие роли есть и какая из них администратор | `aa_settings(roles, admin_role)` |
-| Хук событий | Куда писать лог, что уведомлять | `on_event` во всех модулях |
-| Слоты карточки | Свой блок в карточке пользователя | `aa_users_server(extra_card_ui, extra_card_server)` |
-| Тексты | Язык и формулировки | `aa_texts()` |
-| Оформление | Цвета, светлая тема, заголовок, логотип | `aa_app_head()`, `aa_auth_server(title, logo)` |
-| Параметры безопасности | Сроки, лимиты, автовход | `aa_settings()` |
+| Permission source | How the application decides what a role or user may do | `aa_can()`, `aa_require()`, `aa_register_module()` |
+| Roles | Which roles exist and which one is the administrator | `aa_settings(roles, admin_role)` |
+| Event hook | Where to write the log, what to notify about | `on_event` in all modules |
+| Card slots | A custom block in the user card | `aa_users_server(extra_card_ui, extra_card_server)` |
+| Texts | Language and wording | `aa_texts()` |
+| Appearance | Colors, light theme, title, logo | `aa_app_head()`, `aa_auth_server(title, logo)` |
+| Security parameters | Timeouts, limits, auto-login | `aa_settings()` |
 
-# Права
+# Permissions
 
-## Матрица «право -> роли»
+## The "permission -> roles" matrix
 
-Формат как в `config.yaml` Server Manager: имя права и роли, которым оно доступно (вектор или одна строка).
+The format follows a typical application config: a permission name and the roles it is available to (a vector or a single string).
 
 ```{r}
 provider <- aa_permissions_from_matrix(list(
@@ -42,24 +42,24 @@ aa_can(list(login = "ivan", role = "user"), "Run", provider)
 aa_can(list(login = "ivan", role = "user"), "Access", provider)
 ```
 
-Права называйте как угодно: `"Задачи"`, `"Run"`, `"export"`. Пакет их не знает. Роль администратора прав сама по себе **не** получает: если нужно, перечислите её в матрице.
+Name permissions however you like: `"Tasks"`, `"Run"`, `"export"`. The package does not know them. The administrator role does **not** get permissions by itself: if needed, list it in the matrix.
 
-### Матрица, которая меняется на ходу
+### A matrix that changes on the fly
 
-Если в приложении есть редактор прав и матрица меняется без перезапуска, передайте функцию. Она читается при каждой проверке:
+If the application has a permission editor and the matrix changes without a restart, pass a function. It is read on every check:
 
 ```{r, eval = FALSE}
 provider <- aa_permissions_from_matrix(function() conf_rv()$access_matrix)
 ```
 
-## Свой источник прав
+## A custom permission source
 
-Любая функция `function(user)`, которая возвращает вектор названий прав пользователя, подходит. Так делаются права на каждого пользователя из базы, по группам, из внешней системы:
+Any `function(user)` that returns a vector of the user's permission names will do. This is how you implement per-user permissions from a database, by group, or from an external system:
 
 ```{r, eval = FALSE}
 provider <- function(user) {
   if (identical(user$role, "owner")) {
-    return(c("reports", "export", "users"))     # владелец может всё
+    return(c("reports", "export", "users"))     # the owner can do everything
   }
 
   DBI::dbGetQuery(
@@ -69,15 +69,15 @@ provider <- function(user) {
 }
 ```
 
-`aa_can()` закрыт по умолчанию: если функция упала, вернула не строки или `NA`, права нет. Рабочий пример лежит в `examples/custom-permissions-app`.
+`aa_can()` is closed by default: if the function fails, returns non-strings, or returns `NA`, the permission is denied. A working example is in `examples/custom-permissions-app`.
 
-## Где проверять право
+## Where to check a permission
 
-* **В интерфейсе**: `aa_can(user, "Run", provider)` решает, показывать ли кнопку или вкладку. Это удобство, а не защита.
-* **На сервере в каждом обработчике**: `aa_require(auth, "Run", provider, on_event = ...)` первой строкой. Без права обработчик тихо останавливается, пользователь видит уведомление, хук получает `access_denied`.
-* **При регистрации модулей**: `aa_register_module(auth, "Access", provider, function() mod_server(...))` подключает серверную часть вкладки только тем, у кого есть право.
+* **In the UI**: `aa_can(user, "Run", provider)` decides whether to show a button or a tab. This is a convenience, not protection.
+* **On the server in every handler**: `aa_require(auth, "Run", provider, on_event = ...)` as the first line. Without the permission the handler stops silently, the user sees a notification, and the hook receives `access_denied`.
+* **When registering modules**: `aa_register_module(auth, "Access", provider, function() mod_server(...))` attaches the server part of a tab only for those who have the permission.
 
-# Роли
+# Roles
 
 ```{r}
 settings <- aa_settings(
@@ -87,11 +87,11 @@ settings <- aa_settings(
 settings$roles
 ```
 
-`admin_role` обязана входить в `roles`. Только эта роль управляет пользователями (модуль `aa_users_server()` проверяет её на сервере и сверяет с базой при каждом действии, независимо от вашей матрицы). Её же получает первый созданный администратор.
+`admin_role` must be one of `roles`. Only this role manages users (the `aa_users_server()` module checks it on the server and verifies it against the database on every action, regardless of your matrix). The first administrator created also gets this role.
 
-# События
+# Events
 
-Пакет ничего не пишет в логи приложения: о каждом событии он вызывает функцию `on_event(event, user, session_id, value)`, одну на все модули.
+The package writes nothing to the application logs: for each event it calls the function `on_event(event, user, session_id, value)`, one for all modules.
 
 ```{r, eval = FALSE}
 log_event <- function(event, user, session_id, value) {
@@ -103,67 +103,67 @@ aa_users_server("users", conn, auth, settings, on_event = log_event)
 aa_require(auth, "Run", provider, on_event = log_event)
 ```
 
-Хук получает:
+The hook receives:
 
-* `event` — ключ события из каталога;
-* `user` — логин, от имени которого событие (для неудачного входа это введённый логин, а если логина нет, `"anonymous"`);
-* `session_id` — идентификатор сессии Shiny;
-* `value` — уточнение (см. каталог), всегда строка. Пароли и токены в события не попадают.
+* `event`: the event key from the catalog;
+* `user`: the login the event is attributed to (for a failed login this is the entered login, or `"anonymous"` if there is no login);
+* `session_id`: the Shiny session identifier;
+* `value`: a detail (see the catalog), always a string. Passwords and tokens never appear in events.
 
-Ошибка внутри хука никогда не прерывает действие пакета: она выводится сообщением.
+An error inside the hook never interrupts a package action: it is printed as a message, for example `appauth: session closed: ann (token_revoked)`.
 
-Каталог событий (его возвращает `aa_events()`):
+The event catalog (returned by `aa_events()`):
 
 ```{r}
 knitr::kable(aa_events())
 ```
 
-Хук можно использовать не только для лога: например, отправлять уведомление в Telegram при `login_locked` или `user_blocked`. События самого приложения хук тоже может получать от вашего кода, пакет названия не проверяет.
+The hook can be used for more than logging: for example, to send a Telegram notification on `login_locked` or `user_blocked`. The hook can also receive the application's own events from your code; the package does not validate the names.
 
-## Готовый обработчик для журнала
+## A ready-made handler for the log
 
-Чтобы не писать хук вручную, соберите его функцией `aa_event_logger()`: вы задаёте только функцию записи `writer(action, user, session_id, value)`, а отбор событий, названия действий вашего журнала, включение записи и преобразование значения пакет делает сам.
+To avoid writing the hook by hand, build it with `aa_event_logger()`: you supply only the writer function `writer(action, user, session_id, value)`, while event filtering, the action names of your log, enabling of logging, and value conversion are handled by the package.
 
 ```{r, eval = FALSE}
 write_log <- function(action, user, session_id, value) {
-  # запись в вашу таблицу, файл или Telegram
+  # write to your table, file, or Telegram
 }
 
 log_event <- aa_event_logger(
   write_log,
-  # какие события писать и под какими названиями (без actions пишутся все события под ключами)
+  # which events to write and under which names (without actions, all events are written under their keys)
   actions = c(login_failed = "Login failed", user_added = "User add", user_removed = "User delete"),
-  # переключатель из конфига: функция вызывается при каждом событии, изменения действуют сразу
+  # a switch from the config: the function is called on every event, changes take effect immediately
   enabled = function(event) isTRUE(conf_rv()$logging$action_log),
-  # например, в старых журналах в value хранился только логин
+  # for example, older logs stored only the login in value
   format_value = function(event, user, value) sub(" \\(.*\\)$", "", value)
 )
 
 auth <- aa_auth_server("auth", conn, settings, on_event = log_event)
 ```
 
-Названия событий проверяются сразу: опечатка в `actions` или `events` даст ошибку при создании обработчика, а не молчаливо пропущенное событие. Сбой в `writer` не прерывает действие пакета, он выводится сообщением.
+Event names are validated immediately: a typo in `actions` or `events` raises an error when the handler is created instead of silently skipping the event. A failure in `writer` does not interrupt a package action; it is printed as a message.
 
-# Слоты карточки пользователя
+# User card slots
 
-Карточка пользователя (двойной клик по строке) показывает стандартные действия. Свой блок добавляется двумя функциями:
+The user card (double-click on a row) shows the standard actions. A custom block is added with two functions:
 
-* `extra_card_ui(login, ns)` возвращает интерфейс блока; идентификаторы оборачивайте в `ns()`;
-* `extra_card_server(input, output, session, login)` вызывается **один раз** при старте модуля, внутри его пространства имён; `login` это реактивное значение с логином открытой карточки.
+* `extra_card_ui(login, ns)` returns the block's UI; wrap identifiers in `ns()`;
+* `extra_card_server(input, output, session, login)` is called **once** when the module starts, inside its namespace; `login` is a reactive value with the login of the open card.
 
 ```{r, eval = FALSE}
 card_ui <- function(login, ns) {
   div(
     class = "aa-card-section",
-    h5("Права"),
+    h5("Permissions"),
     checkboxGroupInput(ns("permissions"), NULL, choices = c("reports", "export")),
-    actionButton(ns("save_permissions"), "Сохранить")
+    actionButton(ns("save_permissions"), "Save")
   )
 }
 
 card_server <- function(input, output, session, login) {
   observeEvent(input$save_permissions, {
-    # роль берём из серверного состояния, а не из input
+    # take the role from server state, not from input
     req(identical(isolate(auth$user())$role, "owner"), login())
     save_permissions(login(), input$permissions)
   })
@@ -173,44 +173,44 @@ aa_users_server("users", conn, auth, settings,
                 extra_card_ui = card_ui, extra_card_server = card_server)
 ```
 
-Обработчик слота должен сам проверять право на действие: слот это ваш код, пакет за него не отвечает. Класс `aa-card-section` даёт блоку стандартное оформление.
+The slot handler must check the permission for the action itself: the slot is your code, and the package is not responsible for it. The `aa-card-section` class gives the block the standard styling.
 
-Остальное содержимое вкладки «Доступ» (редактор прав ролей, переключатели логов) собирайте сами:
+Build the rest of the "Access" tab content (the role permission editor, log switches) yourself:
 
 ```{r, eval = FALSE}
-tabPanel("Доступ", aa_users_ui("users"), my_permissions_editor(), my_log_switches())
+tabPanel("Access", aa_users_ui("users"), my_permissions_editor(), my_log_switches())
 ```
 
-# Личный кабинет: кнопки рядом с плашкой пользователя
+# Account area: buttons next to the user badge
 
-Смена своего пароля и выход на всех устройствах это обычные кнопки приложения, подключённые к функциям пакета. Их удобно держать рядом с плашкой пользователя и кнопкой «Выйти»:
+Changing your own password and signing out on all devices are ordinary application buttons connected to package functions. It is convenient to keep them next to the user badge and the "Sign out" button:
 
 ```{r, eval = FALSE}
-# сервер: модуль смены пароля подключается один раз
+# server: the password change module is attached once
 pw <- aa_password_server("password", conn, auth, settings, on_event = log_event)
 
-# интерфейс: плашка пользователя и кнопки
+# UI: the user badge and buttons
 div(
   span(icon("user"), user$login, paste0(" (", user$role, ")")),
-  actionButton("change_password", "Сменить пароль"),
-  actionButton("logout_all", "Выйти на всех устройствах"),
-  actionButton("logout", "Выйти")
+  actionButton("change_password", "Change password"),
+  actionButton("logout_all", "Sign out on all devices"),
+  actionButton("logout", "Sign out")
 )
 
-# смена пароля: форма модуля в окне, после успешной смены окно закрывается
+# password change: the module form in a dialog, closed after a successful change
 observeEvent(input$change_password, {
-  showModal(modalDialog(aa_password_ui("password"), title = "Смена пароля",
-                        easyClose = TRUE, footer = modalButton("Закрыть")))
+  showModal(modalDialog(aa_password_ui("password"), title = "Change password",
+                        easyClose = TRUE, footer = modalButton("Close")))
 })
 observeEvent(pw$changed(), removeModal(), ignoreInit = TRUE)
 
-# выход везде только после подтверждения: кнопка выбросит и с других устройств
+# sign out everywhere only after confirmation: the button also kicks out other devices
 observeEvent(input$logout_all, {
   showModal(modalDialog(
-    "Все ваши сессии на всех устройствах будут завершены.",
-    title = "Выйти на всех устройствах?", easyClose = TRUE,
-    footer = tagList(modalButton("Отмена"),
-                     actionButton("logout_all_confirm", "Выйти везде", class = "btn-danger"))
+    "All your sessions on all devices will be ended.",
+    title = "Sign out on all devices?", easyClose = TRUE,
+    footer = tagList(modalButton("Cancel"),
+                     actionButton("logout_all_confirm", "Sign out everywhere", class = "btn-danger"))
   ))
 })
 observeEvent(input$logout_all_confirm, {
@@ -221,112 +221,112 @@ observeEvent(input$logout_all_confirm, {
 observeEvent(input$logout, auth$logout(reload = TRUE))
 ```
 
-Что происходит:
+What happens:
 
-* `aa_password_server()` проверяет текущий пароль, не принимает тот же самый и слабый, отзывает токены остальных сессий и оставляет текущую; событие `password_changed`.
-* `auth$logout_all()` отзывает все токены пользователя и сразу выходит; событие `sessions_revoked` (значение это логин) и `logout`. Открытые сессии на других устройствах закроет `aa_session_guard()` при ближайшей проверке (по умолчанию в течение 30 секунд), поэтому сторож должен быть подключён.
-* Если автовход выключен (`autologin = FALSE`), у сессий нет токенов: «выйти везде» закроет только текущую сессию. Для такой схемы понадобится своё хранение сессий.
+* `aa_password_server()` checks the current password, rejects the same and weak passwords, revokes the tokens of the other sessions and keeps the current one; event `password_changed`.
+* `auth$logout_all()` revokes all of the user's tokens and signs out immediately; events `sessions_revoked` (the value is the login) and `logout`. Open sessions on other devices are closed by `aa_session_guard()` at its next check (within 30 seconds by default), so the guard must be attached.
+* If auto-login is disabled (`autologin = FALSE`), sessions have no tokens: "sign out everywhere" closes only the current session. Such a setup needs your own session storage.
 
-Рабочий пример: `examples/minimal-app`.
+A working example: `examples/minimal-app`.
 
-# Восстановление пароля по email
+# Password recovery by email
 
-По умолчанию выключено. Чтобы включить, нужны три вещи: функция отправки письма, адрес приложения для ссылки и адреса пользователей.
+Disabled by default. Enabling it takes three things: a function that sends the email, the application address for the link, and user email addresses.
 
 ```{r, eval = FALSE}
 library(emayili)
 
-# функция отправки: пакет сам письма не шлёт, он только отдаёт адрес и ссылку
+# sending function: the package does not send emails itself, it only supplies the address and the link
 send_reset <- function(email, link, login) {
   msg <- envelope() %>%
-    from("Netpeak Analytics Dept. <bi@netpeak.net>") %>%
+    from("My App <noreply@example.com>") %>%
     to(email) %>%
-    subject("Восстановление пароля") %>%
+    subject("Password recovery") %>%
     html(paste0(
-      "<p>Здравствуйте, ", htmltools::htmlEscape(login), "!</p>",
-      "<p>Чтобы задать новый пароль, перейдите по <a href='", link, "'>ссылке</a>. ",
-      "Она действует 60 минут и работает один раз.</p>",
-      "<p>Если вы не запрашивали восстановление, просто проигнорируйте письмо.</p>"
+      "<p>Hello, ", htmltools::htmlEscape(login), "!</p>",
+      "<p>To set a new password, follow this <a href='", link, "'>link</a>. ",
+      "It is valid for 60 minutes and works only once.</p>",
+      "<p>If you did not request recovery, just ignore this email.</p>"
     ))
 
-  smtp <- gmail(Sys.getenv("DEPT_EMAIL"), Sys.getenv("DEPT_EMAIL_PWD"))
+  smtp <- gmail(Sys.getenv("APP_EMAIL"), Sys.getenv("APP_EMAIL_PWD"))
   smtp(msg)
 }
 
 settings <- aa_settings(
   reset_enabled  = TRUE,
   send_reset     = send_reset,
-  reset_base_url = "https://apps.example.com/my_app"   # адрес приложения, как его видят пользователи
+  reset_base_url = "https://apps.example.com/my_app"   # the application address as users see it
 )
 ```
 
-Дальше ничего подключать не нужно: `aa_auth_server()` сам показывает ссылку «Забыли пароль?», читает параметр `reset` из адреса, показывает форму нового пароля и сообщает события `password_reset_requested`, `password_reset_done` и `password_reset_failed`.
+Nothing else needs to be attached: `aa_auth_server()` shows the "Forgot your password?" link itself, reads the `reset` parameter from the address, shows the new password form, and reports the events `password_reset_requested`, `password_reset_done`, and `password_reset_failed`.
 
-* **Адреса пользователей** администратор указывает в карточке пользователя (блок «Email для восстановления пароля») или при добавлении пользователя; программно это `aa_set_email()` и аргумент `email` у `aa_create_user()`. Без адреса письмо не уходит, пользователю остаётся сброс пароля администратором.
-* **Ответ пользователю всегда один и тот же**: найден ли пользователь, есть ли у него адрес и не превышен ли лимит, видно только в событии `password_reset_requested` (в `value` лежит причина: `sent`, `no_user`, `no_email`, `blocked`, `throttled`, `send_failed`).
-* **`reset_base_url`** должен вести на приложение так, как его открывают пользователи, вместе с префиксом nginx и по HTTPS. К нему добавляется `/?reset=<токен>`.
-* **Функция `send_reset`** выполняется в сессии пользователя, поэтому долгая отправка задержит ответ. Если ошибка выбросится, пользователь её не увидит, а причина (`send_failed`) попадёт в событие и в лог приложения.
-* **Лимиты**: `reset_max_per_hour` писем на пользователя и `reset_max_per_minute` на всё приложение; лишние запросы молча игнорируются.
-* **Свой интерфейс**: логика доступна без модуля, это `aa_request_password_reset()`, `aa_reset_token_login()` и `aa_reset_password_with_token()`.
+* **User addresses** are set by the administrator in the user card (the "Email for password recovery" block) or when adding a user; programmatically this is `aa_set_email()` and the `email` argument of `aa_create_user()`. Without an address no email is sent, and the user is left with a password reset by the administrator.
+* **The response to the user is always the same**: whether the user was found, whether they have an address, and whether the limit was exceeded is visible only in the `password_reset_requested` event (`value` holds the reason: `sent`, `no_user`, `no_email`, `blocked`, `throttled`, `send_failed`).
+* **`reset_base_url`** must point to the application the way users open it, including the nginx prefix and over HTTPS. `/?reset=<token>` is appended to it.
+* **The `send_reset` function** runs in the user's session, so a slow send delays the response. If an error is thrown, the user will not see it, but the reason (`send_failed`) goes to the event and the application log.
+* **Limits**: `reset_max_per_hour` emails per user and `reset_max_per_minute` for the whole application; excess requests are silently ignored.
+* **Custom UI**: the logic is available without the module as `aa_request_password_reset()`, `aa_reset_token_login()`, and `aa_reset_password_with_token()`.
 
-Тексты формы меняются ключами `forgot_*`, `reset_*` и `email_*` (`aa_text_keys()`).
+The form texts are changed with the `forgot_*`, `reset_*`, and `email_*` keys (`aa_text_keys()`).
 
-# Двухфакторная аутентификация (TOTP)
+# Two-factor authentication (TOTP)
 
-По умолчанию выключена и **добровольная**: пользователь сам включает защиту, у кого она включена, тот вводит код при входе. Нужны ключ шифрования секретов и блок личного кабинета:
+Disabled by default and **voluntary**: users enable protection themselves, and those who have it enabled enter a code at login. You need a secret encryption key and an account area block:
 
 ```{r, eval = FALSE}
 settings <- aa_settings(
   totp_enabled = TRUE,
-  totp_key     = Sys.getenv("APP_TOTP_KEY"),   # строка не короче 16 символов, вне базы и вне репозитория
-  totp_issuer  = "Reports portal"              # название, которое покажет приложение-аутентификатор
+  totp_key     = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters, kept outside the database and the repository
+  totp_issuer  = "Reports portal"              # the name the authenticator app will show
 )
 
-# сервер: модуль подключается один раз (как и смена пароля)
+# server: the module is attached once (like password change)
 aa_totp_server("totp", conn, auth, settings, on_event = log_event)
 
-# интерфейс: блок в профиле
-tabPanel("Профиль", aa_password_ui("password"), hr(), aa_totp_ui("totp"))
+# UI: a block in the profile
+tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"))
 ```
 
-Больше ничего подключать не нужно: `aa_auth_server()` сам спросит код после верного пароля, если у пользователя включена защита.
+Nothing else needs to be attached: `aa_auth_server()` asks for the code itself after a correct password if the user has protection enabled.
 
-* **Подключение**: кнопка «Включить» показывает QR-код (если установлен необязательный пакет `qrcode`) и ключ для ручного ввода, после верного кода защита включается, а пользователю один раз показываются 10 резервных кодов. Остальные сессии пользователя при этом завершаются.
-* **Вход**: код из приложения (6 цифр) или резервный код. Код из приложения принимается один раз; неверные коды считаются неудачными попытками входа и блокируют логин так же, как перебор пароля. Вход по cookie автовхода код не спрашивает.
-* **Выключение** требует пароль и код. **Потеря телефона**: резервный код или сброс 2FA администратором в карточке пользователя (событие `totp_reset`).
-* **Ключ `totp_key`** шифрует секреты в базе. Если его потерять или заменить, секреты станут нечитаемыми, и пользователям придётся подключать 2FA заново (сбрасывает администратор). Храните ключ отдельно от базы и резервных копий.
-* **События**: `totp_enabled`, `totp_disabled`, `totp_failed`, `totp_reset`, `recovery_code_used`.
-* **Своя логика без модулей**: `aa_totp_setup()`, `aa_totp_enable()`, `aa_verify_second_factor()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_recovery_codes_left()`. Перед `aa_verify_second_factor()` вызывайте `aa_login_gate()`, а после неверного кода `aa_record_attempt()`, иначе код можно подбирать.
-* **Тесты**: код текущего шага считает `aa_totp_code(секрет)`; повтор уже принятого кода отклоняется, поэтому в тесте для второго входа берите код следующего шага (`aa_totp_code(секрет, Sys.time() + 30)`).
+* **Setup**: the "Enable" button shows a QR code (if the optional `qrcode` package is installed) and a key for manual entry; after a correct code the protection is enabled, and the user is shown 10 recovery codes once. The user's other sessions are ended at that point.
+* **Login**: a code from the app (6 digits) or a recovery code. A code from the app is accepted once; wrong codes count as failed login attempts and lock the login just like password guessing. Auto-login by cookie does not ask for a code.
+* **Disabling** requires the password and a code. **Lost phone**: a recovery code or a 2FA reset by the administrator in the user card (event `totp_reset`).
+* **The `totp_key` key** encrypts secrets in the database. If it is lost or replaced, the secrets become unreadable, and users will have to set up 2FA again (reset by the administrator). Store the key separately from the database and backups.
+* **Events**: `totp_enabled`, `totp_disabled`, `totp_failed`, `totp_reset`, `recovery_code_used`.
+* **Custom logic without modules**: `aa_totp_setup()`, `aa_totp_enable()`, `aa_verify_second_factor()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_recovery_codes_left()`. Call `aa_login_gate()` before `aa_verify_second_factor()`, and `aa_record_attempt()` after a wrong code, otherwise the code can be guessed.
+* **Tests**: the code for the current step is computed by `aa_totp_code(secret)`; a repeat of an already accepted code is rejected, so in a test for a second login take the code of the next step (`aa_totp_code(secret, Sys.time() + 30)`).
 
-Тексты формы меняются ключами `totp_*` и `card_totp` (`aa_text_keys()`).
+The form texts are changed with the `totp_*` keys and `card_totp` (`aa_text_keys()`).
 
-# Вход через Google
+# Sign-in with Google
 
-Вход через Google (OpenID Connect) включается настройками и ничего не создаёт сам: войти может только пользователь, который уже есть в базе и у которого указан email, равный адресу Google-аккаунта. Роль берётся из базы, заблокированный пользователь не входит, двухфакторный код приложения не спрашивается.
+Sign-in with Google (OpenID Connect) is enabled through settings and creates nothing by itself: only a user who already exists in the database and has an email equal to the Google account address can sign in. The role comes from the database, a blocked user cannot sign in, and the application's two-factor code is not requested.
 
-**Что нужно в Google.** В Google Cloud Console (проект в вашей организации Workspace) на экране согласия выбрать тип **Internal**, затем создать OAuth-клиент типа **Web application** и в «Authorized redirect URIs» указать адрес приложения в точности как его открывают пользователи, например `https://apps.example.com/`. Адрес должен быть на домене с HTTPS: для IP-адресов Google возврат не разрешает. Тип Internal пускает только аккаунты вашей организации Workspace, для аккаунтов из других организаций нужен тип External (тогда ограничивает список `google_domains` и наличие пользователя в базе).
+**What is needed in Google.** In the Google Cloud Console (a project in your Workspace organization), choose the **Internal** type on the consent screen, then create an OAuth client of type **Web application** and set the application address in "Authorized redirect URIs" exactly as users open it, for example `https://apps.example.com/`. The address must be on a domain with HTTPS: Google does not allow redirects to IP addresses. The Internal type admits only accounts of your Workspace organization; for accounts from other organizations the External type is needed (then the `google_domains` list and the user's presence in the database act as the restriction).
 
 ```r
 settings <- aa_settings(
   google_enabled       = TRUE,
   google_client_id     = Sys.getenv("GOOGLE_OAUTH_CLIENT_ID"),
-  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),   # секрет хранить вне репозитория
+  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),   # keep the secret outside the repository
   google_redirect_uri  = "https://apps.example.com/",
-  google_domains       = c("example.com", "example.net"),            # допустимые домены организации
-  password_login       = TRUE                                        # FALSE: только Google (нужен google_enabled)
+  google_domains       = c("example.com", "example.net"),            # allowed organization domains
+  password_login       = TRUE                                        # FALSE: Google only (requires google_enabled)
 )
 ```
 
-Дальше приложение ничего не меняет: `aa_auth_ui()` и `aa_auth_server()` сами показывают кнопку и обрабатывают возврат от Google.
+After that the application changes nothing: `aa_auth_ui()` and `aa_auth_server()` show the button and handle the return from Google themselves.
 
-**Приложение открывается по нескольким адресам** (например, и по IP, и по домену). Google возвращает пользователя только на `google_redirect_uri`, а `state` входа лежит в cookie адреса, с которого вход начат (cookie по IP и по домену разные). Поэтому на странице с другим адресом кнопка «Войти через Google» переводит на адрес возврата, и вход там запускается сам (параметр `?google=1`, второй клик не нужен). Вход по паролю и автовход по cookie на каждом адресе работают независимо, ничего настраивать не нужно. Событие `login_success` приходит со значением `google`, отказы приходят событием `google_login_failed` (причина и email в `value`: `no_user`, `blocked`, `domain`, `bad_browser` и другие), пользователю показывается общий текст. Для входа у пользователя должен быть указан email (`aa_set_email()` или карточка пользователя).
+**The application is opened at several addresses** (for example, both by IP and by domain). Google returns the user only to `google_redirect_uri`, while the sign-in `state` is stored in the cookie of the address where sign-in was started (cookies for an IP and for a domain are different). Therefore, on a page with a different address the "Sign in with Google" button redirects to the return address, and sign-in starts there on its own (the `?google=1` parameter, no second click needed). Password login and cookie auto-login work independently on each address, and nothing needs to be configured. The `login_success` event arrives with the value `google`, and failures arrive as the `google_login_failed` event (the reason and email in `value`: `no_user`, `blocked`, `domain`, `bad_browser`, and others), while the user is shown a generic text. For sign-in the user must have an email set (`aa_set_email()` or the user card).
 
-`password_login = FALSE` скрывает форму пароля и ссылку «Забыли пароль?», а попытки входа по паролю отклоняются на сервере. Прежде чем отключать пароль, проверьте, что хотя бы у одного администратора указан email и вход через Google у него работает: иначе после отключения войти будет нечем.
+`password_login = FALSE` hides the password form and the "Forgot your password?" link, and password login attempts are rejected on the server. Before disabling the password, make sure at least one administrator has an email set and Google sign-in works for them: otherwise there will be no way to sign in after disabling.
 
-# Другая база данных
+# A different database
 
-По умолчанию приложение открывает файл SQLite. Для DuckDB, MySQL / MariaDB или PostgreSQL передайте в `aa_session_connection()` функцию, которая открывает подключение (`db_path` тогда не нужен); подключение закроется вместе с сессией:
+By default the application opens a SQLite file. For DuckDB, MySQL / MariaDB, or PostgreSQL, pass `aa_session_connection()` a function that opens the connection (`db_path` is then not needed); the connection is closed together with the session:
 
 ```r
 conn <- aa_session_connection(
@@ -339,29 +339,32 @@ conn <- aa_session_connection(
 )
 ```
 
-Остальной код приложения (`aa_auth_server()`, `aa_users_server()`, `aa_can()`) не меняется. Драйвер ставится отдельно: `RMariaDB`, `RPostgres` или `duckdb`. Другие базы (в том числе BigQuery) отклоняются ошибкой `appauth_error_connection`. Если подключение открывает само приложение, передайте его в функции пакета как есть: пакет определяет базу по классу подключения.
+The rest of the application code (`aa_auth_server()`, `aa_users_server()`, `aa_can()`) does not change. The driver is installed separately: `RMariaDB`, `RPostgres`, or `duckdb`. Other databases (including BigQuery) are rejected with the `appauth_error_connection` error. If the application opens the connection itself, pass it to the package functions as is: the package identifies the database by the connection class.
 
-# Тексты
+# Texts
 
-Все тексты интерфейса и сообщений на русском и английском; любую строку можно заменить.
+All interface texts and messages are available in English and Russian (English is the default); any string can be replaced.
 
 ```{r}
 length(aa_text_keys())
-texts <- aa_texts("ru", login_button = "Войти в систему", login_title = "Вход для команды")
+texts <- aa_texts(login_button = "Log in", login_title = "Team sign-in")
 texts$login_button
 
-aa_text(texts, "locked", 15)          # подстановка значений: %d, %s
+aa_text(texts, "locked", 15)          # value substitution: %d, %s
 ```
 
 ```{r, eval = FALSE}
-settings <- aa_settings(texts = aa_texts("en", login_title = "Reports portal"))
+settings <- aa_settings(texts = aa_texts(login_title = "Reports portal"))
+
+# Russian interface: aa_texts("ru")
+settings_ru <- aa_settings(texts = aa_texts("ru"))
 ```
 
-Список ключей: `aa_text_keys()`. Неизвестный ключ или пустое значение дадут ошибку сразу, а не незаметную пустую надпись в интерфейсе.
+The list of keys: `aa_text_keys()`. An unknown key or an empty value raises an error immediately instead of a silently empty label in the interface.
 
-# Оформление
+# Appearance
 
-`aa_app_head()` подключает стили и скрипт. Цвета меняются CSS-переменными, которые нужно переопределить **после** `aa_app_head()`:
+`aa_app_head()` attaches the styles and the script. Colors are changed with CSS variables, which must be overridden **after** `aa_app_head()`:
 
 ```{r, eval = FALSE}
 ui <- fluidPage(
@@ -371,52 +374,52 @@ ui <- fluidPage(
 )
 ```
 
-| Переменная | Что красит |
+| Variable | What it colors |
 | --- | --- |
-| `--aa-primary`, `--aa-primary-hover` | Кнопка входа, фокус полей |
-| `--aa-danger`, `--aa-warning` | Ошибки, подсветка заблокированных и временно заблокированных строк |
-| `--aa-bg`, `--aa-card-bg`, `--aa-card-border` | Фон страницы входа и карточки |
-| `--aa-text`, `--aa-muted` | Цвета текста |
-| `--aa-input-bg`, `--aa-input-border` | Поля ввода |
+| `--aa-primary`, `--aa-primary-hover` | The sign-in button, field focus |
+| `--aa-danger`, `--aa-warning` | Errors, highlighting of blocked and temporarily blocked rows |
+| `--aa-bg`, `--aa-card-bg`, `--aa-card-border` | The background of the sign-in page and the card |
+| `--aa-text`, `--aa-muted` | Text colors |
+| `--aa-input-bg`, `--aa-input-border` | Input fields |
 
-Светлая тема включается классом `aa-theme-light` на `<body>` или на родителе. Подсветка строк таблицы задана с `!important`, так как темы приложений часто задают фон ячеек с ним.
+The light theme is enabled with the `aa-theme-light` class on `<body>` or on a parent. Table row highlighting is set with `!important`, since application themes often set the cell background with it.
 
-Заголовок и логотип формы входа: `aa_auth_server("auth", conn, title = "Мой сервис", logo = "logo.png")`, картинка из папки `www`.
+The title and logo of the sign-in form: `aa_auth_server("auth", conn, title = "My service", logo = "logo.png")`, with the image from the `www` folder.
 
-# Параметры безопасности
+# Security parameters
 
-| Параметр `aa_settings()` | Значение по умолчанию | Смысл |
+| `aa_settings()` parameter | Default | Meaning |
 | --- | --- | --- |
-| `max_failed_logins` | 5 | неудач до блокировки логина |
-| `lockout_minutes` | 15 | окно подсчёта и срок блокировки |
-| `max_failed_logins_per_minute` | 30 | общий лимит неудач по всем логинам |
-| `password_min`, `password_max` | 6, 128 | длина нового пароля |
-| `password_policy` | `"warn"` | слабые пароли: `"off"` не проверять, `"warn"` принять с предупреждением, `"reject"` отклонить |
-| `login_max` | 64 | длина логина |
-| `autologin` | `TRUE` | автовход по cookie |
-| `session_days` | 30 | срок токена |
-| `session_check_seconds` | 30 | как часто проверять открытую сессию |
-| `attempts_retention_hours`, `token_retention_days` | 24, 30 | сколько хранить попытки и просроченные токены |
-| `roles`, `admin_role` | `admin`, `user`, `viewer` / `admin` | роли |
-| `must_change_default` | `TRUE` | пароль от администратора по умолчанию временный |
-| `reset_enabled` | `FALSE` | восстановление пароля по email (нужны `send_reset` и `reset_base_url`) |
-| `reset_ttl_minutes` | 60 | срок жизни ссылки из письма |
-| `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | лимит писем на пользователя за час и общий за минуту |
-| `totp_enabled` | `FALSE` | двухфакторная аутентификация (TOTP), добровольная; нужен `totp_key` |
-| `totp_key` | `NULL` | ключ шифрования секретов TOTP (строка не короче 16 символов), хранить вне базы |
-| `totp_issuer`, `totp_window` | `"appauth"`, 1 | название в приложении-аутентификаторе, допустимое расхождение часов в шагах по 30 секунд |
+| `max_failed_logins` | 5 | failures before a login is locked |
+| `lockout_minutes` | 15 | counting window and lock duration |
+| `max_failed_logins_per_minute` | 30 | overall limit of failures across all logins |
+| `password_min`, `password_max` | 6, 128 | length of a new password |
+| `password_policy` | `"warn"` | weak passwords: `"off"` do not check, `"warn"` accept with a warning, `"reject"` reject |
+| `login_max` | 64 | login length |
+| `autologin` | `TRUE` | auto-login by cookie |
+| `session_days` | 30 | token lifetime |
+| `session_check_seconds` | 30 | how often to check an open session |
+| `attempts_retention_hours`, `token_retention_days` | 24, 30 | how long to keep attempts and expired tokens |
+| `roles`, `admin_role` | `admin`, `user`, `viewer` / `admin` | roles |
+| `must_change_default` | `TRUE` | the default administrator password is temporary |
+| `reset_enabled` | `FALSE` | password recovery by email (requires `send_reset` and `reset_base_url`) |
+| `reset_ttl_minutes` | 60 | lifetime of the link from the email |
+| `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | email limit per user per hour and overall per minute |
+| `totp_enabled` | `FALSE` | two-factor authentication (TOTP), voluntary; requires `totp_key` |
+| `totp_key` | `NULL` | TOTP secret encryption key (a string of at least 16 characters), keep outside the database |
+| `totp_issuer`, `totp_window` | `"appauth"`, 1 | name in the authenticator app, allowed clock drift in steps of 30 seconds |
 
-Настройки удобно держать в `config.yaml` и читать через `aa_settings_from_list()`: лишние ключи в списке игнорируются, а язык и тексты задаются отдельным аргументом.
+It is convenient to keep settings in `config.yaml` and read them with `aa_settings_from_list()`: extra keys in the list are ignored, and the language and texts are set by a separate argument.
 
-Имя cookie автовхода задаёт `aa_auth_server(cookie_name = ...)`. Приложениям на одном хосте нужны разные имена: cookie не изолируются по порту.
+The auto-login cookie name is set by `aa_auth_server(cookie_name = ...)`. Applications on the same host need different names: cookies are not isolated by port.
 
-# Что остаётся за приложением
+# What remains with the application
 
-Пакет намеренно не берёт на себя:
+The package deliberately does not take on:
 
-* матрицу прав и её редактор;
-* переключатели логов и сам лог;
-* состав вкладок и прикладные проверки (имена задач, пути, команды);
-* дополнительные поля пользователя (отдел, проекты): они живут в таблицах приложения рядом с таблицами пакета, а в карточке показываются через слот.
+* the permission matrix and its editor;
+* log switches and the log itself;
+* the set of tabs and application-specific checks (task names, paths, commands);
+* additional user fields (department, projects): they live in the application's tables next to the package tables, and are shown in the card through a slot.
 
-Если одна и та же доработка понадобилась в трёх приложениях, это повод перенести её в пакет.
+If the same enhancement was needed in three applications, that is a reason to move it into the package.

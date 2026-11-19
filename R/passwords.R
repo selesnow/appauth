@@ -1,23 +1,23 @@
-# Пароли: хеширование, проверка, правила, перенос из открытого вида.
+# Passwords: hashing, verification, rules, migration from plain text.
 #
-# Пароли хранятся только в виде хеша scrypt (пакет sodium). Хеш содержит соль и
-# параметры и начинается с префикса "$7$". Значение в колонке password, не
-# являющееся хешем, никогда не проходит проверку: открытые пароли не
-# сравниваются.
+# Passwords are stored only as a scrypt hash (sodium package). The hash contains
+# the salt and parameters and starts with the "$7$" prefix. A value in the
+# password column that is not a hash never passes verification: plain-text
+# passwords are not compared.
 
-#' Хешировать пароль
+#' Hash a password
 #'
-#' Возвращает хеш scrypt (пакет `sodium`) для хранения в базе. Хеш содержит
-#' соль и параметры, поэтому два вызова с одним паролем дают разные строки, а
-#' проверка выполняется функцией [aa_verify_password()]. Хеш необратим:
-#' восстановить пароль из него нельзя.
+#' Returns a scrypt hash (`sodium` package) for storing in the database. The
+#' hash contains the salt and parameters, so two calls with the same password
+#' give different strings, and verification is done by [aa_verify_password()].
+#' The hash is irreversible: the password cannot be recovered from it.
 #'
-#' Правила длины пароля функция не проверяет, для этого есть
-#' [aa_validate_password()].
+#' The function does not check password length rules, use
+#' [aa_validate_password()] for that.
 #'
-#' @param password Пароль, непустая строка.
+#' @param password The password, a non-empty string.
 #'
-#' @returns Строка с хешем, начинающаяся с `$7$`.
+#' @returns A string with the hash, starting with `$7$`.
 #' @export
 #'
 #' @examples
@@ -27,7 +27,7 @@
 aa_hash_password <- function(password) {
   if (!aa_is_string(password)) {
     rlang::abort(
-      "Пароль должен быть непустой строкой.",
+      "The password must be a non-empty string.",
       class = "appauth_error_password"
     )
   }
@@ -35,14 +35,15 @@ aa_hash_password <- function(password) {
   sodium::password_store(password)
 }
 
-#' Является ли значение хешем пароля
+#' Is the value a password hash
 #'
-#' Отличает хеш, созданный [aa_hash_password()], от пароля в открытом виде.
-#' Функция векторизована, `NA` не считается хешем.
+#' Distinguishes a hash created by [aa_hash_password()] from a plain-text
+#' password. The function is vectorized; `NA` is not considered a hash.
 #'
-#' @param x Вектор строк, например колонка `password` таблицы `users`.
+#' @param x A character vector, for example the `password` column of the
+#'   `users` table.
 #'
-#' @returns Логический вектор той же длины.
+#' @returns A logical vector of the same length.
 #' @export
 #'
 #' @examples
@@ -51,17 +52,17 @@ aa_is_password_hash <- function(x) {
   !is.na(x) & grepl("^\\$7\\$", x)
 }
 
-#' Проверить пароль по хешу
+#' Verify a password against a hash
 #'
-#' Сравнивает введённый пароль с сохранённым хешем. Если сохранённое значение
-#' не является хешем (например, пароль в открытом виде), результат всегда
-#' `FALSE`: открытые пароли не сравниваются. Повреждённый хеш и некорректные
-#' аргументы тоже дают `FALSE`, ошибки функция не бросает.
+#' Compares the entered password with the stored hash. If the stored value is
+#' not a hash (for example, a plain-text password), the result is always
+#' `FALSE`: plain-text passwords are not compared. A corrupted hash and invalid
+#' arguments also give `FALSE`; the function does not throw errors.
 #'
-#' @param password Введённый пароль.
-#' @param stored Значение из колонки `password` таблицы `users`.
+#' @param password The entered password.
+#' @param stored The value from the `password` column of the `users` table.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @export
 #'
 #' @examples
@@ -69,7 +70,7 @@ aa_is_password_hash <- function(x) {
 #' aa_verify_password("secret", hash)
 #' aa_verify_password("other", hash)
 #'
-#' # пароль в открытом виде не проходит проверку, даже если совпадает
+#' # a plain-text password does not pass verification, even if it matches
 #' aa_verify_password("root", "root")
 aa_verify_password <- function(password, stored) {
   if (!aa_is_string(password)) {
@@ -83,15 +84,15 @@ aa_verify_password <- function(password, stored) {
   isTRUE(tryCatch(sodium::password_verify(stored, password), error = function(e) FALSE))
 }
 
-# Хеш-заглушка для выравнивания времени проверки, когда пользователя не
-# существует: проверка по нему занимает столько же, сколько по настоящему
-# хешу, и по времени ответа нельзя понять, есть ли такой логин. Создаётся один
-# раз за сессию R.
+# Dummy hash that equalizes verification time when the user does not exist:
+# verifying against it takes as long as against a real hash, so the response
+# time does not reveal whether such a login exists. Created once per R
+# session.
 .aa_dummy <- new.env(parent = emptyenv())
 
-#' Хеш-заглушка для выравнивания времени проверки
+#' Dummy hash for equalizing verification time
 #'
-#' @returns Строка с хешем (одна и та же в течение сессии R).
+#' @returns A string with the hash (the same during an R session).
 #' @noRd
 aa_dummy_hash <- function() {
   if (is.null(.aa_dummy$hash)) {
@@ -101,17 +102,17 @@ aa_dummy_hash <- function() {
   .aa_dummy$hash
 }
 
-#' Найти слабое место в пароле
+#' Find a weakness in a password
 #'
-#' Проверяет пароль, который уже прошёл правила длины: входит ли он в список
-#' распространённых слабых паролей, совпадает ли с логином (без учёта регистра)
-#' и не состоит ли из одного повторяющегося символа.
+#' Checks a password that has already passed the length rules: whether it is in
+#' the list of common weak passwords, whether it equals the login
+#' (case-insensitive) and whether it consists of one repeated character.
 #'
-#' @param password Проверяемый пароль.
-#' @param login Логин пользователя или `NULL`, если он неизвестен.
+#' @param password The password to check.
+#' @param login User login or `NULL` if unknown.
 #'
-#' @returns Ключ текста (`password_common`, `password_equals_login`,
-#'   `password_repeated`) или `NULL`, если слабых мест не найдено.
+#' @returns A text key (`password_common`, `password_equals_login`,
+#'   `password_repeated`) or `NULL` if no weaknesses were found.
 #' @noRd
 aa_password_weakness <- function(password, login = NULL) {
   if (!aa_is_string(password)) {
@@ -136,16 +137,16 @@ aa_password_weakness <- function(password, login = NULL) {
   NULL
 }
 
-#' Найти проблему в новом пароле
+#' Find a problem in a new password
 #'
-#' @param password Проверяемый пароль.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param login Логин пользователя для проверки совпадения пароля с логином
-#'   (необязательно). Слабые пароли отклоняются, только если
-#'   `settings$password_policy` равна `"reject"`.
+#' @param password The password to check.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param login User login for checking whether the password equals the login
+#'   (optional). Weak passwords are rejected only if
+#'   `settings$password_policy` is `"reject"`.
 #'
-#' @returns `NULL`, если пароль подходит, иначе список `reason` (ключ текста) и
-#'   `args` (значения для подстановки в текст).
+#' @returns `NULL` if the password is fine, otherwise a list with `reason` (a
+#'   text key) and `args` (values to substitute into the text).
 #' @noRd
 aa_password_problem <- function(password, settings, login = NULL) {
   if (!aa_is_string(password)) {
@@ -172,14 +173,15 @@ aa_password_problem <- function(password, settings, login = NULL) {
   NULL
 }
 
-#' Предупреждение о слабом пароле (режим `password_policy = "warn"`)
+#' Weak password warning (`password_policy = "warn"` mode)
 #'
-#' @param password Пароль, который только что приняли.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param login Логин пользователя или `NULL`.
+#' @param password The password that was just accepted.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param login User login or `NULL`.
 #'
-#' @returns Список `reason` (ключ причины) и `text` (готовое сообщение) либо
-#'   `NULL`, если режим не `"warn"` или слабых мест нет.
+#' @returns A list with `reason` (the reason key) and `text` (the ready
+#'   message), or `NULL` if the mode is not `"warn"` or there are no
+#'   weaknesses.
 #' @noRd
 aa_password_warning <- function(password, settings, login = NULL) {
   if (!identical(settings$password_policy, "warn")) {
@@ -197,19 +199,20 @@ aa_password_warning <- function(password, settings, login = NULL) {
   )
 }
 
-#' Найти проблему в логине нового пользователя
+#' Find a problem in a new user's login
 #'
-#' @param login Проверяемый логин.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param login The login to check.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `NULL`, если логин подходит, иначе список `reason` и `args`.
+#' @returns `NULL` if the login is fine, otherwise a list with `reason` and
+#'   `args`.
 #' @noRd
 aa_login_problem <- function(login, settings) {
   if (!(is.character(login) && length(login) == 1 && !is.na(login) && nzchar(trimws(login)))) {
     return(list(reason = "login_empty", args = list()))
   }
 
-  # вход сравнивает логин точно, поэтому пробелы по краям создавали бы путаницу
+  # login compares the login exactly, so edge whitespace would cause confusion
   if (!identical(login, trimws(login))) {
     return(list(reason = "login_whitespace", args = list()))
   }
@@ -221,12 +224,12 @@ aa_login_problem <- function(login, settings) {
   NULL
 }
 
-#' Текст проблемы на языке настроек
+#' Problem text in the settings language
 #'
-#' @param settings Настройки, результат [aa_settings()].
-#' @param problem Результат `aa_password_problem()` или `aa_login_problem()`.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param problem The result of `aa_password_problem()` or `aa_login_problem()`.
 #'
-#' @returns Строка либо `NULL`, если проблемы нет.
+#' @returns A string, or `NULL` if there is no problem.
 #' @noRd
 aa_problem_text <- function(settings, problem) {
   if (is.null(problem)) {
@@ -236,49 +239,50 @@ aa_problem_text <- function(settings, problem) {
   do.call(aa_text, c(list(settings, problem$reason), problem$args))
 }
 
-#' Проверить новый пароль по правилам
+#' Validate a new password against the rules
 #'
-#' Проверяет пароль, который задаётся пользователю (при создании или сбросе).
-#' Правила берутся из настроек: минимальная и максимальная длина считаются в
-#' символах, а не в байтах. Ограничения действуют только для новых паролей,
-#' уже существующие пароли не затрагиваются.
+#' Checks a password being set for a user (on creation or reset). The rules come
+#' from the settings: minimum and maximum length are counted in characters, not
+#' bytes. The limits apply only to new passwords; existing passwords are not
+#' affected.
 #'
-#' Если в настройках `password_policy = "reject"`, слабые пароли (из списка
-#' [aa_common_passwords()], совпадающие с логином, из одного повторяющегося
-#' символа) тоже считаются ошибкой. Режим `"warn"` пароль не отклоняет: о
-#' слабом пароле сообщает [aa_weak_password_warning()].
+#' If the settings have `password_policy = "reject"`, weak passwords (from the
+#' [aa_common_passwords()] list, equal to the login, one repeated character)
+#' are also an error. The `"warn"` mode does not reject the password: a weak
+#' password is reported by [aa_weak_password_warning()].
 #'
-#' @param password Проверяемый пароль.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param login Логин пользователя, нужен для проверки совпадения пароля с
-#'   логином (необязательно).
+#' @param password The password to check.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param login User login, needed to check whether the password equals the
+#'   login (optional).
 #'
-#' @returns `NULL`, если пароль подходит, иначе текст ошибки (на языке настроек).
+#' @returns `NULL` if the password is fine, otherwise the error text (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
 #' aa_validate_password("abc")
 #' aa_validate_password("long-enough-password")
-#' aa_validate_password("abc", aa_settings(texts = aa_texts("en")))
+#' aa_validate_password("long-enough-password", aa_settings(password_min = 30))
 aa_validate_password <- function(password, settings = aa_settings(), login = NULL) {
   aa_problem_text(settings, aa_password_problem(password, settings, login))
 }
 
-#' Предупреждение о слабом пароле
+#' Weak password warning
 #'
-#' В режиме `password_policy = "warn"` (по умолчанию) слабый пароль принимается,
-#' но пользователю нужно сообщить, что лучше выбрать надёжнее: встроенные модули
-#' показывают это уведомлением после успешной смены пароля. Функция нужна
-#' приложениям со своим интерфейсом. Слабым считается пароль из списка
-#' [aa_common_passwords()], совпадающий с логином (без учёта регистра) или
-#' состоящий из одного повторяющегося символа.
+#' In the `password_policy = "warn"` mode (the default) a weak password is
+#' accepted, but the user should be told to choose a stronger one: the built-in
+#' modules show this as a notification after a successful password change. The
+#' function is for apps with their own interface. A password is weak if it is
+#' in the [aa_common_passwords()] list, equals the login (case-insensitive) or
+#' consists of one repeated character.
 #'
-#' @param password Принятый пароль.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param login Логин пользователя (необязательно).
+#' @param password The accepted password.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param login User login (optional).
 #'
-#' @returns Текст предупреждения (на языке настроек) либо `NULL`, если режим не
-#'   `"warn"` или слабых мест нет.
+#' @returns The warning text (in the settings language), or `NULL` if the mode
+#'   is not `"warn"` or there are no weaknesses.
 #' @export
 #'
 #' @examples
@@ -289,17 +293,18 @@ aa_weak_password_warning <- function(password, settings = aa_settings(), login =
   aa_password_warning(password, settings, login)$text
 }
 
-#' Проверить логин нового пользователя
+#' Validate a new user's login
 #'
-#' Логин не должен быть пустым, не должен начинаться или заканчиваться
-#' пробелом (вход сравнивает логин точно, поэтому такие логины создавали бы
-#' путаницу; поле ввода в интерфейсе пакета обрезает пробелы по краям само) и не
-#' должен быть длиннее `login_max` символов из настроек.
+#' The login must not be empty, must not start or end with whitespace (login
+#' compares the login exactly, so such logins would cause confusion; the input
+#' field in the package UI trims edge whitespace itself) and must not be longer
+#' than `login_max` characters from the settings.
 #'
-#' @param login Проверяемый логин.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param login The login to check.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `NULL`, если логин подходит, иначе текст ошибки (на языке настроек).
+#' @returns `NULL` if the login is fine, otherwise the error text (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
@@ -310,33 +315,34 @@ aa_validate_login <- function(login, settings = aa_settings()) {
   aa_problem_text(settings, aa_login_problem(login, settings))
 }
 
-#' Перенести пароли из открытого вида в хеши
+#' Migrate passwords from plain text to hashes
 #'
-#' Разовая миграция для приложений со старой самописной авторизацией, где
-#' пароли в таблице `users` хранятся в открытом виде. Все значения колонки
-#' `password`, не являющиеся хешами, заменяются хешами scrypt. Уже
-#' хешированные пароли пропускаются, поэтому функцию можно запускать повторно.
+#' A one-time migration for apps with legacy home-grown authentication, where
+#' passwords in the `users` table are stored in plain text. All values of the
+#' `password` column that are not hashes are replaced with scrypt hashes.
+#' Already hashed passwords are skipped, so the function can be run repeatedly.
 #'
-#' Порядок работы: перед изменениями делается резервная копия файла базы (если
-#' есть что менять и `backup` не `FALSE`), все изменения выполняются одной
-#' транзакцией, а каждый новый хеш проверяется по исходному паролю до записи.
-#' При любой ошибке изменения откатываются. Пароли функция нигде не выводит.
+#' How it works: before any change a backup copy of the database file is made
+#' (if there is something to change and `backup` is not `FALSE`), all changes
+#' run in a single transaction, and every new hash is verified against the
+#' original password before being written. On any error the changes are rolled
+#' back. The function never prints passwords.
 #'
-#' **Запускайте функцию при остановленном приложении.** Резервная копия
-#' содержит пароли в открытом виде: удалите её после проверки (и убедитесь, что
-#' её нет в синхронизируемых папках и в git). После миграции вход по старым
-#' паролям работает, так как введённый пароль проверяется по новому хешу.
+#' **Run the function while the app is stopped.** The backup contains plain-text
+#' passwords: delete it after checking (and make sure it is not in synchronized
+#' folders or in git). After the migration, logging in with the old passwords
+#' still works, because the entered password is verified against the new hash.
 #'
-#' @param db_path Путь к файлу базы данных SQLite.
-#' @param backup `TRUE` (по умолчанию) - копия рядом с базой с именем
-#'   `<база>.bak_<дата>`, строка - свой путь для копии, `FALSE` - без копии
-#'   (не рекомендуется).
-#' @param dry_run Если `TRUE`, ничего не менять, только показать, чьи пароли
-#'   были бы перенесены.
+#' @param db_path Path to the SQLite database file.
+#' @param backup `TRUE` (default) - a copy next to the database named
+#'   `<database>.bak_<date>`, a string - your own path for the copy, `FALSE` -
+#'   no copy (not recommended).
+#' @param dry_run If `TRUE`, change nothing and only show whose passwords would
+#'   be migrated.
 #'
-#' @returns Список (невидимо): `migrated` (логины, чьи пароли перенесены или
-#'   были бы перенесены), `skipped` (логины, у которых пароль уже хеш),
-#'   `backup` (путь к копии или `NA`), `dry_run`.
+#' @returns A list (invisibly): `migrated` (logins whose passwords were or would
+#'   be migrated), `skipped` (logins whose password is already a hash),
+#'   `backup` (path to the copy or `NA`), `dry_run`.
 #' @export
 #'
 #' @examples
@@ -347,18 +353,18 @@ aa_validate_login <- function(login, settings = aa_settings()) {
 #'   DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret', 'admin')")
 #'   DBI::dbDisconnect(conn)
 #'
-#'   # что будет перенесено
+#'   # what would be migrated
 #'   aa_migrate_plaintext_passwords(db, dry_run = TRUE)
 #'
-#'   # выполнить без резервной копии (в примере; в работе копию оставляйте)
+#'   # run without a backup (in this example only; keep the backup in real use)
 #'   aa_migrate_plaintext_passwords(db, backup = FALSE)
 #' }
 aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FALSE) {
-  rlang::check_installed("RSQLite", reason = "для переноса паролей в хеши.")
+  rlang::check_installed("RSQLite", reason = "to migrate passwords to hashes.")
 
   if (!(aa_is_string(db_path) && file.exists(db_path))) {
     rlang::abort(
-      paste0("Файл базы данных не найден: ", paste(db_path, collapse = ", ")),
+      paste0("Database file not found: ", paste(db_path, collapse = ", ")),
       class = "appauth_error_migration"
     )
   }
@@ -367,7 +373,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   if (!(is.logical(backup) && length(backup) == 1 && !is.na(backup)) && !aa_is_string(backup)) {
     rlang::abort(
-      "Параметр `backup` должен быть TRUE, FALSE или путём к файлу копии.",
+      "`backup` must be TRUE, FALSE or a path to the backup file.",
       class = "appauth_error_migration"
     )
   }
@@ -377,12 +383,12 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   if (!DBI::dbExistsTable(conn, "users")) {
     rlang::abort(
-      "В базе нет таблицы `users`, переносить нечего.",
+      "The database has no `users` table, nothing to migrate.",
       class = "appauth_error_migration"
     )
   }
 
-  # ключ строки это login (он уникален), колонки id в старых базах может не быть
+  # the row key is login (it is unique); old databases may have no id column
   users <- aa_query(conn, "SELECT login, password FROM users")
   is_hash <- aa_is_password_hash(users$password)
   to_migrate <- users[!is_hash, , drop = FALSE]
@@ -398,7 +404,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
     return(invisible(result))
   }
 
-  # резервная копия файла базы перед изменениями
+  # backup copy of the database file before any changes
   if (!identical(backup, FALSE)) {
     backup_path <- if (isTRUE(backup)) {
       paste0(db_path, ".bak_", format(Sys.time(), "%Y%m%d_%H%M%S"))
@@ -408,7 +414,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
     if (!file.copy(db_path, backup_path)) {
       rlang::abort(
-        paste0("Не удалось создать резервную копию: ", backup_path),
+        paste0("Could not create a backup copy: ", backup_path),
         class = "appauth_error_migration"
       )
     }
@@ -423,14 +429,14 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
         login <- to_migrate$login[i]
 
         if (!aa_is_string(plain)) {
-          rlang::abort(paste0("У пользователя ", login, " пустой пароль."))
+          rlang::abort(paste0("User ", login, " has an empty password."))
         }
 
         new_hash <- aa_hash_password(plain)
 
-        # убеждаемся, что хеш соответствует исходному паролю до записи
+        # make sure the hash matches the original password before writing
         if (!aa_verify_password(plain, new_hash)) {
-          rlang::abort(paste0("Хеш не прошёл проверку для ", login, "."))
+          rlang::abort(paste0("The hash failed verification for ", login, "."))
         }
 
         aa_execute(
@@ -442,7 +448,7 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
     }),
     error = function(e) {
       rlang::abort(
-        paste0("Миграция отменена, изменения не применены: ", conditionMessage(e)),
+        paste0("Migration cancelled, no changes were applied: ", conditionMessage(e)),
         class = "appauth_error_migration",
         parent = e
       )
@@ -451,19 +457,19 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   if (!is.na(result$backup)) {
     rlang::inform(paste0(
-      "Резервная копия базы содержит пароли в открытом виде: ", result$backup,
-      ". Удалите её после проверки."
+      "The database backup contains plain-text passwords: ", result$backup,
+      ". Delete it after checking."
     ))
   }
 
   invisible(result)
 }
 
-#' Список распространённых слабых паролей
+#' List of common weak passwords
 #'
-#' Используется функцией [aa_check_default_accounts()] по умолчанию.
+#' Used by [aa_check_default_accounts()] by default.
 #'
-#' @returns Вектор строк.
+#' @returns A character vector.
 #' @export
 #'
 #' @examples
@@ -477,25 +483,26 @@ aa_common_passwords <- function() {
   )
 }
 
-#' Найти учётные записи со слабыми паролями
+#' Find accounts with weak passwords
 #'
-#' Гигиеническая проверка таблицы `users`: находит пользователей, у которых
-#' пароль хранится в открытом виде, совпадает с логином (в нижнем и верхнем
-#' регистре тоже) или входит в список распространённых слабых паролей. Проверка
-#' идёт по хешам, пароли в открытом виде функция не показывает. Проверка может
-#' занять несколько секунд на каждого пользователя из-за стойкого хеширования.
+#' A hygiene check of the `users` table: finds users whose password is stored in
+#' plain text, equals the login (lower and upper case too) or is in the list of
+#' common weak passwords. The check works on hashes; the function does not show
+#' plain-text passwords. The check can take a few seconds per user because of
+#' strong hashing.
 #'
-#' Для одного пользователя может быть несколько строк результата, например, для
-#' пароля `root` в открытом виде у логина `root`.
+#' A single user can have several result rows, for example for the plain-text
+#' password `root` of the login `root`.
 #'
-#' @param conn Подключение к базе SQLite, в которой уже есть таблица `users`.
-#' @param common Список слабых паролей для проверки, по умолчанию
+#' @param conn A connection to the SQLite database that already has the `users`
+#'   table.
+#' @param common List of weak passwords to check, by default
 #'   [aa_common_passwords()].
 #'
-#' @returns Таблица с колонками `login`, `role` и `reason`: `plaintext`
-#'   (пароль хранится в открытом виде), `login_as_password` (пароль совпадает с
-#'   логином) или `common_password` (пароль из списка слабых). Если таких
-#'   пользователей нет, таблица пустая.
+#' @returns A table with `login`, `role` and `reason` columns: `plaintext` (the
+#'   password is stored in plain text), `login_as_password` (the password equals
+#'   the login) or `common_password` (a password from the weak list). If there
+#'   are no such users, the table is empty.
 #' @export
 #'
 #' @examples
@@ -514,7 +521,7 @@ aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
 
   if (!(is.character(common) && !anyNA(common))) {
     rlang::abort(
-      "Параметр `common` должен быть вектором строк.",
+      "`common` must be a character vector.",
       class = "appauth_error_password"
     )
   }
@@ -535,7 +542,7 @@ aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
     login_variants <- unique(c(login, tolower(login), toupper(login)))
 
     if (!aa_is_password_hash(stored)) {
-      # пароль в открытом виде: это уже проблема, плюс смотрим, не слабый ли он
+      # plain-text password: this is already a problem, and also check whether it is weak
       add(i, "plaintext")
 
       if (!is.na(stored) && stored %in% login_variants) {

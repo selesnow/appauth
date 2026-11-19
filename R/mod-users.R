@@ -1,16 +1,16 @@
-#' Модуль пользователей: интерфейс
+#' Users module: UI
 #'
-#' Таблица пользователей со статусами и кнопка добавления. Двойной клик по строке
-#' открывает карточку пользователя. Модуль виден только администратору, остальным
-#' ничего не показывает. Стили подключаются через [aa_app_head()].
+#' A table of users with statuses and an add button. Double-clicking a row
+#' opens the user card. The module is visible only to an administrator and shows
+#' nothing to anyone else. Styles are attached through [aa_app_head()].
 #'
-#' Остальное содержимое вкладки «Доступ» (редактор прав, переключатели логов)
-#' собирает приложение, например
-#' `tabPanel("Доступ", aa_users_ui("users"), мой_редактор_прав())`.
+#' The rest of the "Access" tab content (permissions editor, log switches)
+#' is assembled by the app, for example
+#' `tabPanel("Access", aa_users_ui("users"), my_permissions_editor())`.
 #'
-#' @param id Идентификатор модуля.
+#' @param id Module id.
 #'
-#' @returns Элемент интерфейса Shiny.
+#' @returns A Shiny UI element.
 #' @seealso [aa_users_server()]
 #' @export
 #'
@@ -20,38 +20,38 @@ aa_users_ui <- function(id) {
   shiny::uiOutput(shiny::NS(id, "main"))
 }
 
-#' Модуль пользователей: сервер
+#' Users module: server
 #'
-#' Управление пользователями для администратора: добавление, смена роли, сброс
-#' пароля, блокировка и разблокировка, снятие блокировки входа, удаление. Правила
-#' (нельзя заблокировать или удалить себя, нельзя остаться без активного
-#' администратора) проверяются на сервере функциями пакета, интерфейс лишь не
-#' показывает недопустимые кнопки.
+#' User management for an administrator: adding, role change, password
+#' reset, blocking and unblocking, clearing the login lock, deletion. The rules
+#' (one cannot block or delete oneself, one cannot be left without an active
+#' administrator) are checked on the server by the package functions; the UI merely does not
+#' show forbidden buttons.
 #'
-#' Модуль не зависит от матрицы прав приложения: управлять пользователями может
-#' только пользователь с ролью `settings$admin_role`, которая дополнительно
-#' сверяется с базой при каждом действии. Цель действия берётся из серверного
-#' состояния открытой карточки, а не из значения, присланного браузером.
+#' The module does not depend on the app's permission matrix: only a user with the role
+#' `settings$admin_role` can manage users, and the role is additionally
+#' checked against the database on every action. The target of an action is taken from the server
+#' state of the open card, not from a value sent by the browser.
 #'
-#' @section Слоты расширения:
-#' Приложение может добавить свой блок в карточку пользователя.
+#' @section Extension slots:
+#' The app can add its own block to the user card.
 #'
-#' * `extra_card_ui(login, ns)` возвращает интерфейс блока. Идентификаторы
-#'   элементов нужно оборачивать в `ns()`.
-#' * `extra_card_server(input, output, session, login)` вызывается один раз при
-#'   старте модуля внутри его пространства имён, `login` это реактивное значение
-#'   с логином открытой карточки. Здесь регистрируются обработчики блока.
+#' * `extra_card_ui(login, ns)` returns the block UI. Element ids
+#'   must be wrapped in `ns()`.
+#' * `extra_card_server(input, output, session, login)` is called once on
+#'   module start inside its namespace; `login` is a reactive value
+#'   with the login of the open card. Register the block handlers here.
 #'
-#' @param id Идентификатор модуля, такой же, как в [aa_users_ui()].
-#' @param conn Подключение к базе данных.
-#' @param auth Объект авторизации, результат [aa_auth_server()].
-#' @param settings Настройки, результат [aa_settings()].
-#' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
-#' @param extra_card_ui,extra_card_server Слоты расширения карточки, см. раздел
-#'   «Слоты расширения».
+#' @param id Module id, the same as in [aa_users_ui()].
+#' @param conn Database connection.
+#' @param auth Authentication object, the result of [aa_auth_server()].
+#' @param settings Settings, the result of [aa_settings()].
+#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param extra_card_ui,extra_card_server Card extension slots, see the section
+#'   "Extension slots".
 #'
-#' @returns Список с функцией `refresh()`, которая перерисовывает таблицу
-#'   (например после изменений, сделанных не через модуль).
+#' @returns A list with a `refresh()` function that redraws the table
+#'   (for example after changes made not through the module).
 #' @seealso [aa_users_ui()], [aa_auth_server()]
 #' @export
 #'
@@ -81,7 +81,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       shiny::showNotification(text, type = type)
     }
 
-    # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+    # with password_policy = "warn" a weak password is accepted, but we report it
     warn_weak <- function(password, login) {
       weak <- aa_password_warning(password, settings, login)
 
@@ -91,7 +91,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       }
     }
 
-    # администратор по серверному состоянию сессии и по текущим данным базы
+    # administrator according to the server session state and the current database data
     is_admin <- function() {
       acting <- acting_user()
 
@@ -113,7 +113,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       }
     }
 
-    # выполняет действие над пользователем, ошибки правил показывает уведомлением
+    # performs an action on a user, shows rule errors as a notification
     run_action <- function(action) {
       tryCatch(
         {
@@ -133,7 +133,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     })
 
     output$main <- shiny::renderUI({
-      auth$user() # зависимость: после входа или выхода интерфейс перерисовывается
+      auth$user() # dependency: the UI is redrawn after sign-in or sign-out
       if (!is_admin()) {
         return(NULL)
       }
@@ -151,12 +151,12 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     })
 
     output$table <- DT::renderDT({
-      # после выхода таблица перерисовывается без пользователя: это не отказ в доступе
+      # after sign-out the table is redrawn without a user: this is not an access denial
       shiny::req(auth$user())
       require_admin()
       data <- overview()
 
-      # галочка или тире для признаков; колонка 2FA нужна, только если 2FA включена в настройках
+      # check mark or dash for flags; the 2FA column is needed only if 2FA is enabled in the settings
       mark <- function(x) ifelse(x == 1, "\u2713", "\u2013")
 
       shown <- data.frame(
@@ -178,7 +178,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       shown[[ncol(shown) + 1]] <- data$state
       names(shown) <- c(labels, aa_text(settings, "col_autologins"), "state")
 
-      # последняя колонка служебная (state), перед ней признаки по центру
+      # the last column is a service one (state), the flags are centered before it
       state_col <- ncol(shown) - 1L
 
       DT::datatable(
@@ -210,7 +210,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       )
     })
 
-    # --- карточка пользователя -------------------------------------------------
+    # --- user card -------------------------------------------------------------
 
     show_card <- function(login) {
       user <- aa_get_user(conn, login)
@@ -353,7 +353,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       show_card(input$open)
     })
 
-    # цель действия берётся из состояния открытой карточки
+    # the target of an action is taken from the state of the open card
     target <- function() {
       login <- card_login()
       shiny::req(aa_is_string(login))
@@ -439,7 +439,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       }
     })
 
-    # потеря телефона: администратор сбрасывает 2FA, сессии пользователя завершаются
+    # lost phone: the administrator resets 2FA, the user's sessions are ended
     shiny::observeEvent(input$reset_totp, {
       require_admin()
       login <- target()
@@ -458,7 +458,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       notify(aa_text(settings, "done_sessions_revoked", login))
     })
 
-    # удаление необратимо: кнопка в карточке открывает окно подтверждения
+    # deletion is irreversible: the button in the card opens a confirmation window
     delete_pending <- shiny::reactiveVal(NULL)
 
     shiny::observeEvent(input$delete, {
@@ -489,7 +489,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     shiny::observeEvent(input$delete_confirm, {
       require_admin()
       login <- delete_pending()
-      # подтверждение действует только для пользователя, которого показали в окне
+      # the confirmation applies only to the user shown in the window
       shiny::req(aa_is_string(login), identical(login, card_login()))
       delete_pending(NULL)
 
@@ -502,7 +502,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       }
     })
 
-    # --- добавление пользователя -----------------------------------------------
+    # --- adding a user ---------------------------------------------------------
 
     add_message <- shiny::reactiveVal("")
 
@@ -524,7 +524,7 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         shiny::selectInput(
           ns("new_user_role"), aa_text(settings, "role_label"),
           choices = settings$roles,
-          # по умолчанию роль без прав администратора, повышать нужно осознанно
+          # by default a role without administrator rights, raising it must be deliberate
           selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
         ),
         shiny::textInput(ns("new_user_email"), aa_text(settings, "email_label"), placeholder = aa_text(settings, "email_not_set")),

@@ -2,20 +2,21 @@
 % Please edit documentation in R/users.R
 \name{aa_list_users}
 \alias{aa_list_users}
-\title{Список пользователей}
+\title{List of users}
 \usage{
 aa_list_users(conn)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 }
 \value{
-Таблица с колонками \code{login}, \code{role}, \code{blocked}, \code{created_at} и
-\code{last_login_at} в порядке создания (описание дат: \code{\link[=aa_get_user]{aa_get_user()}}).
-Хеши паролей в результат не попадают.
+A table with \code{login}, \code{role}, \code{blocked}, \code{created_at} and
+\code{last_login_at} columns in creation order (for the dates see
+\code{\link[=aa_get_user]{aa_get_user()}}). Password hashes are not included in the result.
 }
 \description{
-Список пользователей
+List of users
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

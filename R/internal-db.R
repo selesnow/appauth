@@ -1,17 +1,17 @@
-# Внутренние помощники для работы с таблицами авторизации. Используются
-# функциями про пользователей, защиту входа и сессии, наружу не экспортируются.
+# Internal helpers for working with the authentication tables. Used by the
+# user, login protection and session functions; not exported.
 
-#' Отозвать все токены автовхода пользователя
+#' Revoke all auto-login tokens of a user
 #'
-#' Токены остаются в таблице с признаком `revoked = 1` и перестают работать.
-#' Нужно при сбросе пароля и блокировке пользователя.
+#' Tokens stay in the table flagged `revoked = 1` and stop working.
+#' Needed on password reset and when a user is blocked.
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин пользователя.
-#' @param keep_hash Хеш токена, который оставить действующим (токен текущей
-#'   сессии при смене своего пароля), либо `NULL`.
+#' @param conn Database connection.
+#' @param login User login.
+#' @param keep_hash Hash of a token to keep valid (the token of the current
+#'   session when changing one's own password), or `NULL`.
 #'
-#' @returns Число отозванных токенов.
+#' @returns Number of revoked tokens.
 #' @noRd
 aa_revoke_user_tokens <- function(conn, login, keep_hash = NULL) {
   if (is.null(keep_hash)) {
@@ -29,14 +29,14 @@ aa_revoke_user_tokens <- function(conn, login, keep_hash = NULL) {
   }
 }
 
-#' Удалить токены автовхода пользователя
+#' Delete auto-login tokens of a user
 #'
-#' Нужно при удалении пользователя: без этого человек, которому позже достанется
-#' такой же логин, мог бы войти по cookie прежнего владельца.
+#' Needed when deleting a user: without it, a person who later receives the same
+#' login could sign in with the cookie of the previous owner.
 #'
 #' @inheritParams aa_revoke_user_tokens
 #'
-#' @returns Число удалённых токенов.
+#' @returns Number of deleted tokens.
 #' @noRd
 aa_delete_user_tokens <- function(conn, login) {
   aa_execute(
@@ -46,14 +46,14 @@ aa_delete_user_tokens <- function(conn, login) {
   )
 }
 
-#' Число активных (не заблокированных) администраторов
+#' Number of active (not blocked) administrators
 #'
-#' @param conn Подключение к базе данных.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param excluding Логин, которого не учитывать (например, того, кого блокируют
-#'   или удаляют), либо `NULL`.
+#' @param conn Database connection.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param excluding Login to leave out (for example, the one being blocked
+#'   or deleted), or `NULL`.
 #'
-#' @returns Целое число.
+#' @returns An integer.
 #' @noRd
 aa_active_admin_count <- function(conn, settings, excluding = NULL) {
   if (is.null(excluding)) {
@@ -71,16 +71,16 @@ aa_active_admin_count <- function(conn, settings, excluding = NULL) {
   }
 }
 
-#' Ошибка пользовательского действия
+#' User action error
 #'
-#' Прерывает выполнение с сообщением на языке настроек. Приложение может
-#' поймать ошибку и показать её текст пользователю, класс `appauth_error_user`
-#' общий, а в поле `reason` лежит ключ причины (например, `"user_exists"`).
+#' Aborts with a message in the settings language. The application can
+#' catch the error and show its text to the user; the class `appauth_error_user`
+#' is common, and the `reason` field holds the reason key (for example, `"user_exists"`).
 #'
-#' @param settings Настройки, результат [aa_settings()].
-#' @param reason Ключ текста из [aa_text_keys()].
-#' @param ... Значения для подстановки в текст.
-#' @param call Окружение для сообщения об ошибке.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param reason Text key from [aa_text_keys()].
+#' @param ... Values to substitute into the text.
+#' @param call Environment for the error message.
 #'
 #' @noRd
 aa_abort_user <- function(settings, reason, ..., call = rlang::caller_env()) {

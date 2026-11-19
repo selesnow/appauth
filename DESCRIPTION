@@ -1,21 +1,22 @@
 Package: appauth
-Title: Безопасная авторизация и управление пользователями для Shiny приложений
-Version: 0.9.0
+Title: Secure Authentication and User Management for 'shiny' Applications
+Version: 0.10.0
 Authors@R:
     person("Alexey", "Seleznev", , "selesnow@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-0410-7385"))
-Description: Внутренний пакет для Shiny приложений. Работает с SQLite (по
-    умолчанию), DuckDB, MySQL / MariaDB и PostgreSQL: вход по логину и
-    паролю с хранением паролей только в виде хешей, автовход по cookie, защита
-    от подбора пароля, блокировка и удаление пользователей с защитой от потери
-    последнего администратора, восстановление пароля по email (одноразовая
-    ссылка из письма), двухфакторная аутентификация (одноразовые коды TOTP), вход
-    через Google (OpenID Connect) с отключаемым входом по паролю, серверные проверки прав, модули интерфейса для
-    входа и управления пользователями с точками расширения, версионные
-    миграции схемы базы данных.
+Description: Provides login, user management and access control for 'shiny'
+    applications backed by 'SQLite' (the default), 'DuckDB', 'MySQL' / 'MariaDB'
+    or 'PostgreSQL'. Features include password login with hashed-only storage,
+    cookie-based auto-login, brute-force protection, blocking and deleting users
+    while keeping the last administrator, password recovery by email with
+    one-time links, two-factor authentication with time-based one-time
+    passwords, sign-in with 'Google' (OpenID Connect) with optional disabling
+    of password login, server-side permission checks, ready-made user
+    interface modules with extension points, and versioned database schema
+    migrations.
 License: MIT + file LICENSE
-URL: https://git.netpeak.net/netpeak_analytics/appauth
-BugReports: https://git.netpeak.net/netpeak_analytics/appauth/-/issues
+URL: https://github.com/selesnow/appauth
+BugReports: https://github.com/selesnow/appauth/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Imports:
@@ -31,6 +32,7 @@ Imports:
     shiny,
     sodium
 Suggests:
+    bit64,
     duckdb,
     knitr,
     qrcode,

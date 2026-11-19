@@ -2,22 +2,23 @@
 % Please edit documentation in R/reset.R
 \name{aa_reset_token_login}
 \alias{aa_reset_token_login}
-\title{Пользователь, которому принадлежит ссылка восстановления}
+\title{User who owns a recovery link}
 \usage{
 aa_reset_token_login(conn, token)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{token}{Токен из ссылки (параметр \code{reset} адресной строки).}
+\item{token}{Token from the link (the \code{reset} parameter of the address bar).}
 }
 \value{
-Логин пользователя или \code{NULL}.
+The user login or \code{NULL}.
 }
 \description{
-Проверяет токен из ссылки, ничего не меняя: он должен существовать, быть
-неиспользованным и непросроченным, а пользователь не должен быть заблокирован
-или удалён. Нужна, чтобы показать форму нового пароля только по рабочей ссылке.
+Checks the token from the link without changing anything: it must exist, be
+unused and not expired, and the user must not be blocked
+or deleted. Needed to show the new password form only for a working link.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

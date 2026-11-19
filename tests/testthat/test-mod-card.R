@@ -1,5 +1,5 @@
-# Содержимое карточки пользователя. showModal подменяется, чтобы получить HTML,
-# который увидел бы браузер.
+# User card contents. showModal is mocked to get the HTML
+# the browser would see.
 
 capture_card <- function(env = parent.frame()) {
   store <- new.env()
@@ -29,11 +29,11 @@ open_card <- function(con, login, acting = "alsey", ..., prepare = NULL) {
   card$html
 }
 
-test_that("карточка активного пользователя: действия, роль, пароль, удаление", {
+test_that("card of an active user: actions, role, password, deletion", {
   con <- card_users()
   html <- open_card(con, "ivan")
 
-  expect_match(html, "Карточка пользователя: ivan", fixed = TRUE)
+  expect_match(html, "User: ivan", fixed = TRUE)
   expect_match(html, "proxy1-block", fixed = TRUE)
   expect_match(html, "proxy1-change_role", fixed = TRUE)
   expect_match(html, "proxy1-reset_password", fixed = TRUE)
@@ -42,16 +42,16 @@ test_that("карточка активного пользователя: дей�
   expect_false(grepl("proxy1-unlock", html, fixed = TRUE))
 })
 
-test_that("карточка заблокированного: только разблокировка", {
+test_that("card of a blocked user: only unblocking", {
   con <- card_users()
   html <- open_card(con, "ivan", prepare = function(con) aa_set_blocked(con, "ivan", TRUE, acting_login = "alsey"))
 
   expect_match(html, "proxy1-unblock", fixed = TRUE)
   expect_false(grepl("proxy1-block\"", html, fixed = TRUE))
-  expect_match(html, "заблокирована администратором", fixed = TRUE)
+  expect_match(html, "blocked by an administrator", fixed = TRUE)
 })
 
-test_that("карточка заблокированного по попыткам: кнопка снятия блокировки входа", {
+test_that("card of a user locked by attempts: a button to remove the sign-in lock", {
   con <- card_users()
   settings <- aa_settings(max_failed_logins = 2)
   html <- open_card(con, "ivan", settings = settings, prepare = function(con) {
@@ -60,20 +60,20 @@ test_that("карточка заблокированного по попытка
   })
 
   expect_match(html, "proxy1-unlock", fixed = TRUE)
-  expect_match(html, "заблокирован ещё", fixed = TRUE)
+  expect_match(html, "locked for", fixed = TRUE)
 })
 
-test_that("в своей карточке нет кнопок блокировки и удаления, причина удаления показана", {
+test_that("own card has no block and delete buttons, the deletion reason is shown", {
   con <- card_users()
   html <- open_card(con, "alsey")
 
   expect_false(grepl("proxy1-block\"", html, fixed = TRUE))
   expect_false(grepl("id=\"proxy1-delete\"", html, fixed = TRUE))
-  expect_match(html, "Удаление этого пользователя недоступно", fixed = TRUE)
-  expect_match(html, "самого себя", fixed = TRUE)
+  expect_match(html, "This user cannot be deleted", fixed = TRUE)
+  expect_match(html, "yourself", fixed = TRUE)
 })
 
-test_that("логин с HTML и скриптами в карточке экранируется", {
+test_that("a login with HTML and scripts is escaped in the card", {
   con <- card_users()
   evil <- "<img src=x onerror=alert(1)>"
   html <- open_card(con, evil, prepare = function(con) raw_user(con, evil, "user"))
@@ -82,28 +82,28 @@ test_that("логин с HTML и скриптами в карточке экра
   expect_match(html, "&lt;img src=x onerror=alert(1)&gt;", fixed = TRUE)
 })
 
-test_that("слот карточки выводится в окне, идентификаторы получают пространство имён", {
+test_that("the card slot is rendered in the window, ids get the namespace", {
   con <- card_users()
   html <- open_card(
     con, "ivan",
-    extra_card_ui = function(login, ns) shiny::div(class = "my-extra", shiny::actionButton(ns("my_btn"), paste("Проекты", login)))
+    extra_card_ui = function(login, ns) shiny::div(class = "my-extra", shiny::actionButton(ns("my_btn"), paste("Projects", login)))
   )
 
   expect_match(html, "my-extra", fixed = TRUE)
-  expect_match(html, "Проекты ivan", fixed = TRUE)
+  expect_match(html, "Projects ivan", fixed = TRUE)
   expect_match(html, "-my_btn", fixed = TRUE)
 })
 
-test_that("карточка на английском и с переопределённым текстом", {
+test_that("card with a custom text override", {
   con <- card_users()
   html <- open_card(con, "ivan", settings = aa_settings(texts = aa_texts("en", button_block = "Lock account")))
 
   expect_match(html, "User: ivan", fixed = TRUE)
   expect_match(html, "Lock account", fixed = TRUE)
-  expect_false(grepl("Заблокировать", html, fixed = TRUE))
+  expect_false(grepl("Block", html, fixed = TRUE))
 })
 
-test_that("карточка предлагает роли из настроек и выбирает текущую", {
+test_that("the card offers roles from the settings and selects the current one", {
   con <- card_users()
   settings <- aa_settings(roles = c("admin", "editor", "viewer", "user"))
   html <- open_card(con, "ivan", settings = settings)
@@ -116,7 +116,7 @@ checkbox_checked <- function(html, id) {
   grepl(paste0("<input id=\"", id, "\"[^>]*checked"), html)
 }
 
-test_that("галочка временного пароля при сбросе: по умолчанию включена, настройка выключает", {
+test_that("temporary password checkbox on reset: on by default, a setting turns it off", {
   con <- card_users()
 
   html_on <- open_card(con, "ivan")
@@ -127,7 +127,7 @@ test_that("галочка временного пароля при сбросе:
   expect_false(checkbox_checked(html_off, "proxy1-reset_must_change"))
 })
 
-test_that("галочка временного пароля в окне добавления зависит от настройки", {
+test_that("temporary password checkbox in the add window depends on the setting", {
   con <- card_users()
   card <- capture_card()
 

@@ -1,28 +1,28 @@
-# Помощники тестов: временные базы и фикстуры "старых" схем.
+# Test helpers: temporary databases and "legacy" schema fixtures.
 #
-# Тесты идут на той базе, которую задаёт переменная окружения APPAUTH_TEST_DB:
-# sqlite (по умолчанию), duckdb, mysql или postgres. Для mysql и postgres
-# нужны переменные APPAUTH_TEST_MYSQL_* / APPAUTH_TEST_PG_* (HOST, PORT, USER,
-# PASSWORD, DBNAME); без них такие тесты пропускаются. Каждый тест получает
-# пустую базу: в серверных базах перед тестом и после него удаляются все таблицы
-# тестовой схемы, поэтому DBNAME должен указывать на отдельную тестовую схему.
+# Tests run on the database set by the APPAUTH_TEST_DB environment variable:
+# sqlite (default), duckdb, mysql or postgres. For mysql and postgres
+# the APPAUTH_TEST_MYSQL_* / APPAUTH_TEST_PG_* variables are needed (HOST, PORT, USER,
+# PASSWORD, DBNAME); without them such tests are skipped. Each test gets an
+# empty database: on server databases all tables of the test schema are dropped before and after
+# the test, so DBNAME must point to a separate test schema.
 
 test_backend <- function() tolower(Sys.getenv("APPAUTH_TEST_DB", "sqlite"))
 
-# Тест использует SQL или фикстуры, специфичные для SQLite.
+# The test uses SQL or fixtures specific to SQLite.
 skip_if_not_sqlite <- function() {
-  testthat::skip_if(test_backend() != "sqlite", "тест только для SQLite")
+  testthat::skip_if(test_backend() != "sqlite", "SQLite-only test")
 }
 
-# Переменная окружения серверной базы или пропуск теста.
+# Server database environment variable or skip the test.
 test_env <- function(prefix, name) {
   value <- Sys.getenv(paste0("APPAUTH_TEST_", prefix, "_", name), "")
   testthat::skip_if(!nzchar(value) && name %in% c("HOST", "USER", "DBNAME"),
-                    paste0("не задана APPAUTH_TEST_", prefix, "_", name))
+                    paste0("APPAUTH_TEST_", prefix, "_", name, " is not set"))
   value
 }
 
-# Удалить все таблицы тестовой серверной базы.
+# Drop all tables of the test server database.
 drop_all_tables <- function(con) {
   dialect <- aa_dialect(con)
 
@@ -40,7 +40,7 @@ drop_all_tables <- function(con) {
   invisible(NULL)
 }
 
-# Новая пустая база, закрывается автоматически в конце теста.
+# A new empty database, closed automatically at the end of the test.
 new_db <- function(env = parent.frame()) {
   backend <- test_backend()
 
@@ -72,12 +72,12 @@ new_db <- function(env = parent.frame()) {
         dbname = test_env("PG", "DBNAME")
       )
     },
-    stop("Неизвестная база для тестов: ", backend)
+    stop("Unknown test database: ", backend)
   )
 
   drop_all_tables(con)
 
-  # тест может закрыть подключение сам, поэтому проверяем перед закрытием
+  # a test may close the connection itself, so check before closing
   withr::defer({
     if (DBI::dbIsValid(con)) {
       drop_all_tables(con)
@@ -88,15 +88,15 @@ new_db <- function(env = parent.frame()) {
   con
 }
 
-# База со схемой авторизации, закрывается в конце теста.
+# A database with the authentication schema, closed at the end of the test.
 users_db <- function(env = parent.frame()) {
   con <- new_db(env)
   aa_init_db(con)
   con
 }
 
-# SQL тестов: datetime('now', '-1 hours') заменяется на UTC-литерал, плейсхолдеры
-# приводятся к виду базы. Так одни и те же запросы идут на всех базах.
+# Test SQL: datetime('now', '-1 hours') is replaced with a UTC literal, placeholders
+# are converted to the database form. This way the same queries run on all databases.
 sqlt <- function(sql) {
   pattern <- "datetime[(]'now'((?:,\\s*'[^']*')*)[)]"
   hits <- gregexpr(pattern, sql, perl = TRUE)
@@ -117,8 +117,8 @@ sqlt <- function(sql) {
 }
 
 texec <- function(con, sql, params = NULL) aa_execute(con, sqlt(sql), params)
-# Результат запроса: целые значения приводятся к integer, как их отдаёт SQLite
-# (DuckDB возвращает COUNT(*) числом double).
+# Query result: integer values are converted to integer, as SQLite returns them
+# (DuckDB returns COUNT(*) as a double).
 tquery <- function(con, sql, params = NULL) {
   res <- aa_query(con, sqlt(sql), params)
 
@@ -132,17 +132,17 @@ tquery <- function(con, sql, params = NULL) {
   res
 }
 
-# Названия таблиц без служебных.
+# Table names without service ones.
 table_names <- function(con) {
   setdiff(sort(DBI::dbListTables(con)), "sqlite_sequence")
 }
 
-# Названия колонок таблицы.
+# Table column names.
 columns_of <- function(con, table) {
   aa_table_columns(con, table)
 }
 
-# Содержимое таблицы, упорядоченное для сравнения.
+# Table contents, ordered for comparison.
 rows_of <- function(con, table, order_by = NULL) {
   if (is.null(order_by)) {
     order_by <- if (aa_dialect(con) == "sqlite") "rowid" else if ("id" %in% columns_of(con, table)) "id" else "1"
@@ -151,8 +151,8 @@ rows_of <- function(con, table, order_by = NULL) {
   tquery(con, sprintf("SELECT * FROM %s ORDER BY %s", table, order_by))
 }
 
-# Создаёт пользователя без проверок и без медленного хеширования
-# (для тестов, где важна только структура данных, а не пароль).
+# Creates a user without checks and without slow hashing
+# (for tests where only the data structure matters, not the password).
 raw_user <- function(con, login, role = "user", blocked = 0, password = "x") {
   aa_execute(
     con, "INSERT INTO users (login, password, role, blocked) VALUES (?, ?, ?, ?)",
@@ -160,7 +160,7 @@ raw_user <- function(con, login, role = "user", blocked = 0, password = "x") {
   )
 }
 
-# Токен автовхода пользователя, действует 30 дней.
+# Auto-login token of a user, valid for 30 days.
 raw_token <- function(con, login, hash, revoked = 0) {
   aa_execute(
     con,
@@ -170,7 +170,7 @@ raw_token <- function(con, login, hash, revoked = 0) {
   )
 }
 
-# Сколько дней осталось у выданного токена автовхода.
+# How many days an issued auto-login token has left.
 token_days_left <- function(con) {
   expires <- aa_query(con, "SELECT expires_at FROM auth_sessions")$expires_at
   parsed <- as.POSIXct(expires, tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
@@ -187,7 +187,7 @@ stored_password <- function(con, login) {
   aa_query(con, "SELECT password FROM users WHERE login = ?", params = list(login))$password
 }
 
-# Попытка входа с заданным временем (UTC): минуты или секунды назад.
+# Login attempt at a given time (UTC): minutes or seconds ago.
 add_attempt <- function(con, login, success, minutes_ago = 0, seconds_ago = NULL) {
   ago <- if (!is.null(seconds_ago)) as.integer(seconds_ago) else as.integer(minutes_ago) * 60L
 
@@ -202,9 +202,9 @@ count_attempts <- function(con) {
   tquery(con, "SELECT COUNT(*) AS n FROM login_attempts")$n
 }
 
-# Фикстура: Server Manager на проде до релиза с защитой входа.
-# Таблица users с id, хеши паролей, есть auth_sessions, нет blocked и login_attempts.
-fixture_server_manager_prod <- function(con) {
+# Fixture: a production app on a schema from before login protection was added.
+# A users table with id, password hashes, auth_sessions exists, no blocked and login_attempts.
+fixture_legacy_full <- function(con) {
   DBI::dbExecute(con, "
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,8 +234,8 @@ fixture_server_manager_prod <- function(con) {
   invisible(con)
 }
 
-# Фикстура: старая схема dev Server Manager, login это PRIMARY KEY, колонки id нет.
-fixture_server_manager_dev_old <- function(con) {
+# Fixture: an old dev schema, login is the PRIMARY KEY, no id column.
+fixture_legacy_old <- function(con) {
   DBI::dbExecute(con, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)")
   DBI::dbExecute(con, "
     INSERT INTO users VALUES
@@ -245,10 +245,10 @@ fixture_server_manager_dev_old <- function(con) {
   invisible(con)
 }
 
-# Фикстура: приложение рекрутинга (схема воспроизведена вручную по create_db.R).
-# Пароли в открытом виде, строка root/root, нет остальных таблиц авторизации,
-# есть прикладные таблицы с данными.
-fixture_recruitment <- function(con) {
+# Fixture: an app with a home-grown schema (reproduced by hand).
+# Plain-text passwords, a root/root row, no other authentication tables,
+# application tables with data exist.
+fixture_legacy_plain <- function(con) {
   DBI::dbExecute(con, "
     CREATE TABLE users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -2,23 +2,23 @@
 % Please edit documentation in R/settings.R
 \name{aa_settings_from_list}
 \alias{aa_settings_from_list}
-\title{Настройки из списка (например, из раздела \code{config.yaml})}
+\title{Settings from a list (for example, from a \code{config.yaml} section)}
 \usage{
 aa_settings_from_list(x = NULL, ...)
 }
 \arguments{
-\item{x}{Список настроек, например \code{yaml::read_yaml("config.yaml")$security},
-либо \code{NULL}.}
+\item{x}{A list of settings, for example
+\code{yaml::read_yaml("config.yaml")$security}, or \code{NULL}.}
 
-\item{...}{Параметры \code{\link[=aa_settings]{aa_settings()}}, которые заменяют значения из \code{x}.}
+\item{...}{Parameters of \code{\link[=aa_settings]{aa_settings()}} that replace the values from \code{x}.}
 }
 \value{
-Список настроек класса \code{aa_settings}.
+A list of settings of class \code{aa_settings}.
 }
 \description{
-Удобно, когда настройки защиты хранятся в конфиге приложения. Берутся только
-известные параметры \code{\link[=aa_settings]{aa_settings()}}, остальные игнорируются, а любой параметр
-можно переопределить аргументами \code{...}.
+Convenient when the protection settings are kept in the application config.
+Only known parameters of \code{\link[=aa_settings]{aa_settings()}} are taken, the rest are ignored, and
+any parameter can be overridden with the \code{...} arguments.
 }
 \examples{
 security <- list(max_failed_logins = 3, lockout_minutes = 10, unknown_key = 1)

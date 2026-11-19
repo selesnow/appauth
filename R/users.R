@@ -1,27 +1,27 @@
-# Пользователи: создание, первый администратор, вход по паролю, смена пароля и
-# роли, блокировка, удаление и проверки допустимости действий.
+# Users: creation, the first administrator, password login, password and role
+# changes, blocking, deletion and checks of whether actions are allowed.
 #
-# Правила, которые держат эти функции:
-#  - логины сравниваются ТОЧНО (с учётом регистра), как в SQLite; для НОВЫХ
-#    пользователей запрещён логин, который совпадает с существующим без учёта
-#    регистра, существующие пары не трогаются;
-#  - нельзя заблокировать или удалить самого себя и нельзя остаться без
-#    активного (не заблокированного) администратора, в том числе сменой роли;
-#  - сброс пароля и блокировка отзывают токены автовхода, удаление удаляет
-#    токены и неудачные попытки входа логина.
+# Rules these functions uphold:
+#  - logins are compared EXACTLY (case-sensitive), as in SQLite; for NEW users a
+#    login that matches an existing one case-insensitively is forbidden, and
+#    existing pairs are left alone;
+#  - you cannot block or delete yourself and cannot be left without an active
+#    (not blocked) administrator, including by changing a role;
+#  - a password reset and blocking revoke autologin tokens, and deletion removes
+#    the tokens and the login's failed login attempts.
 #
-# Функции действий (aa_create_user, aa_set_password, aa_set_role,
-# aa_set_blocked, aa_delete_user) при нарушении правил прерываются ошибкой
-# класса `appauth_error_user` с текстом на языке настроек; в поле `reason`
-# лежит ключ причины из aa_text_keys(). Функции aa_check_* и aa_validate_*
-# ничего не делают, а возвращают текст проблемы или NULL, их удобно
-# использовать в интерфейсе.
+# The action functions (aa_create_user, aa_set_password, aa_set_role,
+# aa_set_blocked, aa_delete_user) abort with an error of class
+# `appauth_error_user` when the rules are violated, with text in the settings
+# language; the `reason` field holds the reason key from aa_text_keys(). The
+# aa_check_* and aa_validate_* functions do nothing; they return the problem
+# text or NULL, which is convenient to use in the interface.
 
-#' Прервать действие с текстом проблемы
+#' Abort an action with the problem text
 #'
-#' @param settings Настройки, результат [aa_settings()].
-#' @param problem Результат `aa_*_problem()`: список `reason` и `args`.
-#' @param call Окружение для сообщения об ошибке.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param problem The result of `aa_*_problem()`: a list with `reason` and `args`.
+#' @param call The environment for the error message.
 #'
 #' @noRd
 aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
@@ -33,14 +33,15 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
   )
 }
 
-#' Колонки пользователя для выборки
+#' User columns for a query
 #'
-#' Даты создания и последнего входа появились в схеме позже остальных колонок:
-#' если их в таблице ещё нет (схема не достроена), вместо них отдаётся `NULL`.
+#' The creation and last login dates appeared in the schema later than the other
+#' columns: if they are not in the table yet (the schema is not fully migrated),
+#' `NULL` is returned in their place.
 #'
-#' @param conn Подключение к базе данных.
+#' @param conn Database connection.
 #'
-#' @returns Строка со списком колонок для `SELECT`.
+#' @returns A string with the column list for `SELECT`.
 #' @noRd
 aa_user_columns <- function(conn) {
   cols <- aa_table_columns(conn, "users")
@@ -52,12 +53,13 @@ aa_user_columns <- function(conn) {
   )
 }
 
-#' Запомнить время успешного входа по паролю
+#' Remember the time of a successful password login
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин.
+#' @param conn Database connection.
+#' @param login Login.
 #'
-#' @returns Невидимо `TRUE`, если дата записана. Ошибка не прерывает вход.
+#' @returns Invisibly `TRUE` if the date was recorded. An error does not
+#'   interrupt login.
 #' @noRd
 aa_touch_last_login <- function(conn, login) {
   ok <- tryCatch(
@@ -70,7 +72,7 @@ aa_touch_last_login <- function(conn, login) {
       TRUE
     },
     error = function(e) {
-      message("appauth: не удалось записать время входа: ", conditionMessage(e))
+      message("appauth: could not record the login time: ", conditionMessage(e))
       FALSE
     }
   )
@@ -78,19 +80,20 @@ aa_touch_last_login <- function(conn, login) {
   invisible(ok)
 }
 
-#' Пользователь по логину
+#' User by login
 #'
-#' Логин сравнивается точно, с учётом регистра. Пароль в результат не
-#' попадает.
+#' The login is matched exactly, case-sensitive. The password is not included in
+#' the result.
 #'
-#' @param conn Подключение к базе SQLite (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
-#' @param login Логин.
+#' @param conn A connection to the SQLite database
+#'   (`DBI::dbConnect(RSQLite::SQLite(), ...)`).
+#' @param login Login.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked`,
-#'   `created_at` и `last_login_at` либо `NULL`, если такого пользователя нет.
-#'   Даты хранятся текстом `"ГГГГ-ММ-ДД ЧЧ:ММ:СС"` по UTC; у пользователей,
-#'   созданных до версии 0.3.0, `created_at` пустая (`NA`), а `last_login_at`
-#'   пустая, пока пользователь не войдёт по паролю.
+#' @returns A one-row table with `login`, `role`, `blocked`, `created_at` and
+#'   `last_login_at` columns, or `NULL` if there is no such user. Dates are
+#'   stored as text `"YYYY-MM-DD HH:MM:SS"` in UTC; for users created before
+#'   version 0.3.0 `created_at` is empty (`NA`), and `last_login_at` is empty
+#'   until the user logs in with a password.
 #' @export
 #'
 #' @examples
@@ -118,13 +121,13 @@ aa_get_user <- function(conn, login) {
   if (nrow(user) == 0) NULL else user[1, , drop = FALSE]
 }
 
-#' Список пользователей
+#' List of users
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns Таблица с колонками `login`, `role`, `blocked`, `created_at` и
-#'   `last_login_at` в порядке создания (описание дат: [aa_get_user()]).
-#'   Хеши паролей в результат не попадают.
+#' @returns A table with `login`, `role`, `blocked`, `created_at` and
+#'   `last_login_at` columns in creation order (for the dates see
+#'   [aa_get_user()]). Password hashes are not included in the result.
 #' @export
 #'
 #' @examples
@@ -141,14 +144,14 @@ aa_list_users <- function(conn) {
   aa_query(conn, paste0("SELECT ", aa_user_columns(conn), " FROM users ORDER BY ", aa_users_order(conn)))
 }
 
-#' Есть ли в базе хотя бы один пользователь
+#' Does the database have at least one user
 #'
-#' Если пользователей нет, приложению нужно показать окно создания первого
-#' администратора, это делает модуль входа пакета.
+#' If there are no users, the app needs to show the form for creating the first
+#' administrator; the package login module does this.
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @export
 #'
 #' @examples
@@ -164,12 +167,12 @@ aa_users_exist <- function(conn) {
   aa_query(conn, "SELECT COUNT(*) AS n FROM users")$n > 0
 }
 
-#' Найти проблему в данных нового пользователя
+#' Find a problem in a new user's data
 #'
 #' @inheritParams aa_create_user
-#' @param check_password Проверять ли пароль.
+#' @param check_password Whether to check the password.
 #'
-#' @returns `NULL` или список `reason` и `args`.
+#' @returns `NULL` or a list with `reason` and `args`.
 #' @noRd
 aa_new_user_problem <- function(conn, login, password, role, settings, check_password = TRUE) {
   problem <- aa_login_problem(login, settings)
@@ -190,7 +193,7 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
     return(list(reason = "user_exists", args = list()))
   }
 
-  # регистр сравниваем в R, так как lower() в SQLite не понимает кириллицу
+  # compare case in R, because SQLite lower() does not handle non-ASCII letters
   if (any(tolower(existing) == tolower(login))) {
     return(list(reason = "user_exists_case", args = list()))
   }
@@ -198,17 +201,19 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
   NULL
 }
 
-#' Проверить данные нового пользователя
+#' Validate a new user's data
 #'
-#' Проверяет логин, пароль, роль и уникальность логина, ничего не создавая.
-#' Подходит для показа ошибки в форме до создания пользователя.
+#' Checks the login, password, role and login uniqueness without creating
+#' anything. Suitable for showing an error in a form before the user is created.
 #'
-#' Логин считается занятым, если он совпадает с существующим точно или без учёта
-#' регистра (так новые пользователи не создают пар вида `Kiruka` и `kiruka`).
+#' A login is considered taken if it matches an existing one exactly or
+#' case-insensitively (so new users do not create pairs like `Kiruka` and
+#' `kiruka`).
 #'
 #' @inheritParams aa_create_user
 #'
-#' @returns `NULL`, если данные подходят, иначе текст проблемы (на языке настроек).
+#' @returns `NULL` if the data is fine, otherwise the problem text (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
@@ -226,24 +231,25 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
   aa_problem_text(settings, aa_new_user_problem(conn, login, password, role, settings))
 }
 
-#' Создать пользователя
+#' Create a user
 #'
-#' Создаёт пользователя с хешем пароля. Перед созданием проверяются логин,
-#' пароль, роль (должна быть в `roles` из настроек) и уникальность логина.
-#' При нарушении правил функция прерывается ошибкой класса `appauth_error_user`
-#' с текстом на языке настроек (в поле `reason` ключ причины), который можно
-#' показать пользователю.
+#' Creates a user with a password hash. Before creation the login, password,
+#' role (must be in `roles` from the settings) and login uniqueness are
+#' checked. On a rule violation the function aborts with an error of class
+#' `appauth_error_user` with text in the settings language (the `reason` field
+#' holds the reason key) that can be shown to the user.
 #'
 #' @inheritParams aa_get_user
-#' @param password Пароль в открытом виде (в базу попадёт только хеш).
-#' @param role Роль из списка `roles` настроек.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param must_change Потребовать смену пароля при первом входе (разумно, если
-#'   пароль задал администратор).
-#' @param email Адрес для восстановления пароля или `NULL` (адрес можно указать
-#'   позже через [aa_set_email()]). Проверяется формат и уникальность.
+#' @param password The password in plain text (only the hash goes to the
+#'   database).
+#' @param role A role from the `roles` list of the settings.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param must_change Require a password change at the first login (sensible if
+#'   the password was set by an administrator).
+#' @param email Address for password recovery or `NULL` (the address can be set
+#'   later with [aa_set_email()]). The format and uniqueness are checked.
 #'
-#' @returns `TRUE` (невидимо).
+#' @returns `TRUE` (invisibly).
 #' @export
 #'
 #' @examples
@@ -253,7 +259,7 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #'   aa_create_user(conn, "worker", "worker-password", "user")
 #'   aa_list_users(conn)
 #'
-#'   # ошибку можно показать пользователю
+#'   # the error can be shown to the user
 #'   tryCatch(
 #'     aa_create_user(conn, "worker", "another-password", "user"),
 #'     appauth_error_user = function(e) conditionMessage(e)
@@ -280,7 +286,7 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
       params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)), aa_utc())
     ),
     error = function(e) {
-      # при одновременном создании сработает ограничение уникальности логина
+      # on simultaneous creation the login uniqueness constraint fires
       if (aa_is_unique_violation(e)) {
         aa_abort_user(settings, "user_exists")
       }
@@ -296,19 +302,20 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
   invisible(TRUE)
 }
 
-#' Создать первого пользователя (администратора)
+#' Create the first user (administrator)
 #'
-#' Создаёт пользователя с ролью `admin_role` из настроек **только если
-#' таблица `users` пуста**. Проверка и вставка выполняются одним SQL-запросом,
-#' поэтому из двух одновременных запросов (две вкладки браузера, две сессии)
-#' сработает только один.
+#' Creates a user with the `admin_role` role from the settings **only if the
+#' `users` table is empty**. The check and the insert run in one SQL statement,
+#' so of two simultaneous requests (two browser tabs, two sessions) only one
+#' succeeds.
 #'
-#' Логин и пароль проверяются по тем же правилам, что и в [aa_create_user()]
-#' (при нарушении ошибка класса `appauth_error_user`).
+#' The login and password are checked by the same rules as in
+#' [aa_create_user()] (on a violation, an error of class `appauth_error_user`).
 #'
 #' @inheritParams aa_create_user
 #'
-#' @returns `TRUE`, если администратор создан, `FALSE`, если пользователи уже есть.
+#' @returns `TRUE` if the administrator was created, `FALSE` if users already
+#'   exist.
 #' @export
 #'
 #' @examples
@@ -326,7 +333,7 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
   if (is.null(problem)) problem <- aa_password_problem(password, settings, login)
   if (!is.null(problem)) aa_abort_problem(settings, problem)
 
-  # типы параметров в списке SELECT PostgreSQL выводит только из явного приведения
+  # PostgreSQL infers parameter types in a SELECT list only from an explicit cast
   p <- aa_text_param(conn)
 
   n <- aa_execute(
@@ -343,24 +350,24 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
   n == 1
 }
 
-#' Проверить логин и пароль (вход)
+#' Verify login and password (login)
 #'
-#' Ищет пользователя по логину (точно, с учётом регистра) и проверяет пароль по
-#' хешу. Если пользователя нет, проверка всё равно выполняется на фиктивном
-#' хеше, чтобы по времени ответа нельзя было понять, существует ли логин. Пароль
-#' в открытом виде в базе никогда не принимается.
+#' Looks up the user by login (exact, case-sensitive) and verifies the password
+#' against the hash. If the user does not exist, verification is still run
+#' against a dummy hash so the response time does not reveal whether the login
+#' exists. A plain-text password in the database is never accepted.
 #'
-#' Для пользователя, заблокированного администратором, при верном пароле
-#' возвращается строка с `blocked = 1`: что делать дальше, решает вызывающий код
-#' (модуль входа сообщает о блокировке только тому, кто знает пароль). При
-#' неверном пароле результат всегда `NULL`.
+#' For a user blocked by an administrator, with a correct password a row with
+#' `blocked = 1` is returned: what to do next is up to the calling code (the
+#' login module reports the block only to someone who knows the password). With
+#' a wrong password the result is always `NULL`.
 #'
 #' @inheritParams aa_get_user
-#' @param password Введённый пароль.
+#' @param password The entered password.
 #'
-#' @returns Таблица из одной строки с колонками `login`, `role`, `blocked` и
-#'   `must_change` (пароль в результат не попадает) либо `NULL`, если логин или
-#'   пароль неверны.
+#' @returns A one-row table with `login`, `role`, `blocked` and `must_change`
+#'   columns (the password is not included in the result), or `NULL` if the
+#'   login or password is wrong.
 #' @export
 #'
 #' @examples
@@ -379,8 +386,8 @@ aa_authenticate <- function(conn, login, password) {
     return(NULL)
   }
 
-  # колонки blocked и must_change появляются миграциями; если их по какой-то
-  # причине нет, вход продолжает работать по паролю
+  # the blocked and must_change columns come from migrations; if for some
+  # reason they are missing, login keeps working by password
   user <- tryCatch(
     aa_query(
       conn,
@@ -400,7 +407,7 @@ aa_authenticate <- function(conn, login, password) {
   )
 
   if (nrow(user) != 1) {
-    # пользователя нет: проверяем на фиктивном хеше, чтобы время ответа было тем же
+    # no such user: verify against a dummy hash so the response time is the same
     aa_verify_password(password, aa_dummy_hash())
     return(NULL)
   }
@@ -412,22 +419,23 @@ aa_authenticate <- function(conn, login, password) {
   user[, c("login", "role", "blocked", "must_change"), drop = FALSE]
 }
 
-#' Задать пользователю новый пароль
+#' Set a new password for a user
 #'
-#' Записывает хеш нового пароля и **отзывает все токены автовхода**
-#' пользователя, чтобы после сброса пароля старые сессии браузера перестали
-#' работать (открытые сессии завершит [aa_session_guard()]). Неиспользованные
-#' ссылки восстановления пароля по email тоже перестают работать. Пароль проверяется
-#' по правилам из настроек, при нарушении ошибка класса `appauth_error_user`.
+#' Stores the hash of the new password and **revokes all autologin tokens** of
+#' the user, so that after a password reset old browser sessions stop working
+#' (open sessions are ended by [aa_session_guard()]). Unused password recovery
+#' links sent by email also stop working. The password is checked against the
+#' rules from the settings; on a violation, an error of class
+#' `appauth_error_user`.
 #'
 #' @inheritParams aa_create_user
-#' @param must_change Потребовать от пользователя сменить этот пароль при
-#'   следующем входе (разумно, если пароль задал администратор).
-#' @param keep_token Токен автовхода, который не нужно отзывать (текущая сессия
-#'   того, кто меняет свой пароль), либо `NULL`.
+#' @param must_change Require the user to change this password at the next login
+#'   (sensible if the password was set by an administrator).
+#' @param keep_token An autologin token that must not be revoked (the current
+#'   session of the person changing their own password), or `NULL`.
 #'
-#' @returns Число изменённых пользователей (невидимо): 1 или 0, если такого
-#'   логина нет.
+#' @returns The number of changed users (invisibly): 1, or 0 if there is no such
+#'   login.
 #' @export
 #'
 #' @examples
@@ -461,22 +469,23 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
       conn, login,
       keep_hash = if (aa_is_string(keep_token)) aa_token_hash(keep_token) else NULL
     )
-    # ссылки восстановления, выданные до смены пароля, больше не нужны
+    # recovery links issued before the password change are no longer needed
     aa_invalidate_resets(conn, login)
   }
 
   invisible(n)
 }
 
-#' Можно ли сменить пользователю роль
+#' Can a user's role be changed
 #'
-#' Роль должна быть в списке `roles` настроек, а у **последнего активного
-#' (не заблокированного) администратора** нельзя снять роль администратора,
-#' иначе в приложении некому будет управлять пользователями.
+#' The role must be in the `roles` list of the settings, and the administrator
+#' role cannot be taken from the **last active (not blocked) administrator**,
+#' otherwise nobody in the app could manage users.
 #'
 #' @inheritParams aa_create_user
 #'
-#' @returns `NULL`, если можно, иначе текст причины отказа (на языке настроек).
+#' @returns `NULL` if allowed, otherwise the reason for refusal (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
@@ -493,11 +502,11 @@ aa_check_can_change_role <- function(conn, login, role, settings = aa_settings()
   aa_problem_text(settings, aa_role_change_problem(conn, login, role, settings))
 }
 
-#' Найти проблему при смене роли
+#' Find a problem with a role change
 #'
 #' @inheritParams aa_check_can_change_role
 #'
-#' @returns `NULL` или список `reason` и `args`.
+#' @returns `NULL` or a list with `reason` and `args`.
 #' @noRd
 aa_role_change_problem <- function(conn, login, role, settings) {
   if (!aa_is_string(login)) {
@@ -522,20 +531,20 @@ aa_role_change_problem <- function(conn, login, role, settings) {
   NULL
 }
 
-#' Сменить пользователю роль
+#' Change a user's role
 #'
-#' Роль должна быть в списке `roles` настроек, у последнего активного
-#' администратора роль администратора снять нельзя (см.
-#' [aa_check_can_change_role()]). При нарушении ошибка класса
+#' The role must be in the `roles` list of the settings; the administrator role
+#' cannot be taken from the last active administrator (see
+#' [aa_check_can_change_role()]). On a violation, an error of class
 #' `appauth_error_user`.
 #'
-#' Открытая сессия пользователя продолжает работать с прежней ролью до
-#' ближайшей проверки живой сессии модулем входа, а при следующем входе роль
-#' берётся из базы.
+#' The user's open session keeps working with the old role until the login
+#' module's next live-session check, and at the next login the role is taken
+#' from the database.
 #'
 #' @inheritParams aa_create_user
 #'
-#' @returns Число изменённых пользователей (невидимо).
+#' @returns The number of changed users (invisibly).
 #' @export
 #'
 #' @examples
@@ -564,12 +573,12 @@ aa_set_role <- function(conn, login, role, settings = aa_settings()) {
   invisible(n)
 }
 
-#' Найти проблему при блокировке или удалении
+#' Find a problem with blocking or deletion
 #'
-#' @param action `"block"` или `"delete"`.
+#' @param action `"block"` or `"delete"`.
 #' @inheritParams aa_check_can_block
 #'
-#' @returns `NULL` или список `reason` и `args`.
+#' @returns `NULL` or a list with `reason` and `args`.
 #' @noRd
 aa_user_removal_problem <- function(conn, login, acting_login, settings, action) {
   if (!aa_is_string(login)) {
@@ -586,7 +595,7 @@ aa_user_removal_problem <- function(conn, login, acting_login, settings, action)
     return(list(reason = paste0("cannot_", action, "_self"), args = list()))
   }
 
-  # нельзя остаться без активных администраторов
+  # you cannot be left without active administrators
   if (identical(user$role, settings$admin_role) &&
       aa_active_admin_count(conn, settings, excluding = login) == 0) {
     return(list(reason = paste0("cannot_", action, "_last_admin"), args = list()))
@@ -595,16 +604,17 @@ aa_user_removal_problem <- function(conn, login, acting_login, settings, action)
   NULL
 }
 
-#' Можно ли заблокировать пользователя
+#' Can a user be blocked
 #'
-#' Нельзя заблокировать самого себя и последнего активного администратора.
+#' You cannot block yourself or the last active administrator.
 #'
 #' @inheritParams aa_get_user
-#' @param acting_login Логин того, кто блокирует (текущий администратор), либо
-#'   `NULL` (например, при вызове из скрипта).
-#' @param settings Настройки, результат [aa_settings()].
+#' @param acting_login Login of the person blocking (the current administrator),
+#'   or `NULL` (for example, when called from a script).
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `NULL`, если можно, иначе текст причины отказа (на языке настроек).
+#' @returns `NULL` if allowed, otherwise the reason for refusal (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
@@ -621,13 +631,14 @@ aa_check_can_block <- function(conn, login, acting_login = NULL, settings = aa_s
   aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "block"))
 }
 
-#' Можно ли удалить пользователя
+#' Can a user be deleted
 #'
-#' Нельзя удалить самого себя и последнего активного администратора.
+#' You cannot delete yourself or the last active administrator.
 #'
 #' @inheritParams aa_check_can_block
 #'
-#' @returns `NULL`, если можно, иначе текст причины отказа (на языке настроек).
+#' @returns `NULL` if allowed, otherwise the reason for refusal (in the
+#'   settings language).
 #' @export
 #'
 #' @examples
@@ -644,22 +655,22 @@ aa_check_can_delete <- function(conn, login, acting_login = NULL, settings = aa_
   aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "delete"))
 }
 
-#' Заблокировать или разблокировать пользователя
+#' Block or unblock a user
 #'
-#' Ручная блокировка закрывает пользователю вход (и по паролю, и по токену
-#' автовхода) без удаления учётной записи, пока администратор не снимет её.
-#' При блокировке **отзываются все токены автовхода** пользователя, а уже
-#' открытая у него сессия закрывается при ближайшей проверке модулем входа.
+#' A manual block closes login for the user (both by password and by autologin
+#' token) without deleting the account, until an administrator lifts it. When
+#' blocking, **all autologin tokens** of the user are revoked, and a session
+#' already open for the user is closed at the login module's next check.
 #'
-#' Блокировка выполняется только если [aa_check_can_block()] разрешает её
-#' (нельзя заблокировать себя и последнего активного администратора), иначе
-#' ошибка класса `appauth_error_user`. Разблокировка проверок не требует и
-#' отозванные токены не восстанавливает, пользователю нужен новый вход.
+#' Blocking is performed only if [aa_check_can_block()] allows it (you cannot
+#' block yourself or the last active administrator), otherwise an error of class
+#' `appauth_error_user`. Unblocking needs no checks and does not restore
+#' revoked tokens; the user has to log in again.
 #'
 #' @inheritParams aa_check_can_block
-#' @param blocked `TRUE` заблокировать, `FALSE` разблокировать.
+#' @param blocked `TRUE` to block, `FALSE` to unblock.
 #'
-#' @returns Число изменённых пользователей (невидимо).
+#' @returns The number of changed users (invisibly).
 #' @export
 #'
 #' @examples
@@ -700,20 +711,20 @@ aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, set
   invisible(n)
 }
 
-#' Удалить пользователя
+#' Delete a user
 #'
-#' Удаляет запись пользователя, **его токены автовхода и неудачные попытки
-#' входа**. Это важно: без удаления токенов человек, которому позже достанется
-#' такой же логин, мог бы войти по cookie прежнего владельца.
+#' Deletes the user record, **the user's autologin tokens and failed login
+#' attempts**. This matters: without deleting the tokens, a person who later
+#' gets the same login could log in with the cookie of the previous owner.
 #'
-#' Удаление выполняется только если [aa_check_can_delete()] разрешает его
-#' (нельзя удалить себя и последнего активного администратора), иначе ошибка
-#' класса `appauth_error_user`. Открытая у пользователя сессия закрывается при
-#' ближайшей проверке модулем входа.
+#' Deletion is performed only if [aa_check_can_delete()] allows it (you cannot
+#' delete yourself or the last active administrator), otherwise an error of
+#' class `appauth_error_user`. A session open for the user is closed at the
+#' login module's next check.
 #'
 #' @inheritParams aa_check_can_block
 #'
-#' @returns Число удалённых пользователей (невидимо).
+#' @returns The number of deleted users (invisibly).
 #' @export
 #'
 #' @examples
@@ -741,30 +752,32 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
       aa_execute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login)),
       error = function(e) NULL
     )
-    # таблицы попыток входа может не быть, это не должно мешать удалению
+    # the login attempts table may not exist; this must not block deletion
     tryCatch(aa_clear_attempts(conn, login, settings), error = function(e) NULL)
   }
 
   invisible(n)
 }
 
-#' Сменить собственный пароль
+#' Change your own password
 #'
-#' Для самого пользователя: нужно подтвердить текущий пароль. Новый пароль
-#' проверяется по правилам из настроек и должен отличаться от текущего. Токены
-#' автовхода остальных сессий отзываются, токен текущей сессии (`keep_token`)
-#' остаётся. Требование сменить пароль (`must_change`) снимается.
+#' For the user themselves: the current password must be confirmed. The new
+#' password is checked against the rules from the settings and must differ from
+#' the current one. Autologin tokens of other sessions are revoked; the token of
+#' the current session (`keep_token`) stays. The password change requirement
+#' (`must_change`) is cleared.
 #'
-#' Ошибки (неверный текущий пароль, слабый или тот же пароль) имеют класс
-#' `appauth_error_user` и текст на языке настроек.
+#' Errors (wrong current password, weak or the same password) have class
+#' `appauth_error_user` and text in the settings language.
 #'
 #' @inheritParams aa_get_user
-#' @param old_password Текущий пароль.
-#' @param new_password Новый пароль.
-#' @param settings Настройки, результат [aa_settings()].
-#' @param keep_token Токен автовхода текущей сессии, который не нужно отзывать.
+#' @param old_password The current password.
+#' @param new_password The new password.
+#' @param settings Settings, the result of [aa_settings()].
+#' @param keep_token Autologin token of the current session that must not be
+#'   revoked.
 #'
-#' @returns `TRUE` (невидимо).
+#' @returns `TRUE` (invisibly).
 #' @export
 #'
 #' @examples
@@ -798,15 +811,15 @@ aa_change_own_password <- function(conn, login, old_password, new_password,
   invisible(TRUE)
 }
 
-#' Завершить все сессии пользователя
+#' End all sessions of a user
 #'
-#' Отзывает все токены автовхода пользователя. Открытые сессии с такими
-#' токенами завершит [aa_session_guard()] при ближайшей проверке, а cookie в
-#' браузерах перестанут работать.
+#' Revokes all autologin tokens of the user. Open sessions with such tokens are
+#' ended by [aa_session_guard()] at its next check, and the cookies in browsers
+#' stop working.
 #'
 #' @inheritParams aa_get_user
 #'
-#' @returns Число отозванных токенов (невидимо).
+#' @returns The number of revoked tokens (invisibly).
 #' @export
 #'
 #' @examples

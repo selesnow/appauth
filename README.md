@@ -4,127 +4,129 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-Пакет `appauth` даёт Shiny приложениям отдела безопасную авторизацию и управление пользователями: вход, пароли, защиту от подбора, блокировки, сессии, права и готовые модули интерфейса. Он вырос из авторизации приложения Server Manager и заменяет самописный код входа, паролей и сессий в наших приложениях.
+The `appauth` package gives Shiny applications secure authentication and user management: login, passwords, brute-force protection, blocking, sessions, permissions and ready-made UI modules. It replaces hand-written login, password and session code.
 
-Пакет работает с SQLite (по умолчанию), DuckDB, MySQL / MariaDB и PostgreSQL, подключение к базе передаёт приложение. Подробности в разделе «Базы данных» ниже.
+The package works with SQLite (the default), DuckDB, MySQL / MariaDB and PostgreSQL; the application supplies the database connection. See the "Databases" section below.
 
-## Зачем он нужен
+Interface texts default to English. Russian is available with `aa_texts("ru")`, and any string can be replaced.
 
-Авторизацию в каждом приложении легко написать «на скорую руку», и почти всегда в ней находятся одни и те же дыры: пароли в открытом виде, SQL-инъекция в проверке логина, нет защиты от подбора, токены автовхода хранятся как есть, права проверяются только скрытием кнопок. `appauth` решает эти вещи один раз, одинаково и с автотестами (более 1400 проверок), а всё, что отличается между приложениями (матрица прав, состав вкладок, переключатели логов), оставляет приложению.
+## Why use it
 
-Сравнение с готовыми пакетами вроде `shinyauthr` и `shinymanager` детально не проводилось. Причина отдельного пакета практическая: `appauth` подключается к уже работающим базам наших приложений без переноса данных, умеет безопасно перевести открытые пароли в хеши, и все его гарантии (см. виньетку `architecture-and-security`) подтверждены автотестами и проверкой в браузере.
+Authentication is easy to write in a hurry, and it almost always ends up with the same holes: plaintext passwords, SQL injection in the login check, no brute-force protection, auto-login tokens stored as is, permissions enforced only by hiding buttons. `appauth` solves these once, in the same way everywhere and with automated tests (more than 1400 checks), and leaves everything that differs between applications (the permission matrix, the set of tabs, logging switches) to the application.
 
-## Что умеет
+A detailed comparison with existing packages such as `shinyauthr` and `shinymanager` has not been done. The reason for a separate package is practical: `appauth` connects to the databases of already running applications without moving data, can safely convert plaintext passwords to hashes, and all of its guarantees (see the `architecture-and-security` vignette) are backed by automated tests and browser checks.
 
-* Пароли только в виде хешей (scrypt), открытые пароли не принимаются, разовый безопасный перенос открытых паролей в хеши.
-* Вход по логину и паролю, создание первого администратора, автовход по cookie (токен в базе только в виде sha256), выход.
-* Защита от подбора: блокировка логина после серии неудач и общий лимит неудач в минуту.
-* Ручная блокировка и удаление пользователей, смена роли, сброс пароля, завершение всех сессий. Нельзя заблокировать или удалить себя и последнего активного администратора, а также снять с него роль.
-* Принудительный выход: заблокированный, удалённый, с изменённой ролью или со сброшенным паролем пользователь теряет открытую сессию за интервал проверки (по умолчанию 30 секунд).
-* Смена собственного пароля, обязательная смена временного пароля, который задал администратор, и выход на всех устройствах (`auth$logout_all()`).
-* Восстановление пароля по email: одноразовая ссылка из письма, лимиты на письма, ответ формы не раскрывает, существует ли пользователь (выключено по умолчанию, письмо отправляет функция приложения).
-* Двухфакторная аутентификация (TOTP): добровольная, код из приложения-аутентификатора и 10 резервных кодов, секрет в базе зашифрован, неверные коды блокируют логин, сброс администратором (выключено по умолчанию).
-* Вход через Google (OpenID Connect): только для существующих пользователей по email, с проверкой домена организации, без автосоздания; вход по паролю можно отключить (выключено по умолчанию).
-* Серверные проверки прав (`aa_can()`, `aa_require()`), права из матрицы «право -> роли» или из любого своего источника.
-* Готовые модули: вход, пользователи (со слотами для своих блоков), смена пароля; стили с переменными и светлой темой.
-* Одно место для логирования: хук событий `on_event`, каталог событий `aa_events()`.
-* Версионные миграции схемы, совместимые с базами Server Manager.
-* Тексты на русском и английском, любую строку можно заменить.
+## Features
 
-## Быстрый старт
+* Passwords stored only as hashes (scrypt); plaintext passwords are not accepted; a one-off safe migration of plaintext passwords to hashes.
+* Login and password sign-in, creation of the first administrator, cookie auto-login (the token is stored in the database only as sha256), logout.
+* Brute-force protection: a login is locked after a series of failures, plus a global failure limit per minute.
+* Manual blocking and deletion of users, role changes, password reset, ending all sessions. You cannot block or delete yourself or the last active administrator, or remove that administrator's role.
+* Forced logout: a blocked, deleted, role-changed or password-reset user loses the open session within the check interval (30 seconds by default).
+* Changing your own password, a mandatory change of a temporary password set by an administrator, and logout on all devices (`auth$logout_all()`).
+* Password recovery by email: a one-time link from the email, email rate limits, the form response does not reveal whether a user exists (off by default; the email is sent by an application function).
+* Two-factor authentication (TOTP): optional, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).
+* Sign-in with Google (OpenID Connect): only for existing users by email, with an organisation domain check, no auto-creation; password login can be disabled (off by default).
+* Server-side permission checks (`aa_can()`, `aa_require()`), with permissions from a "permission -> roles" matrix or from any custom source.
+* Ready-made modules: login, users (with slots for custom blocks), password change; styles with variables and a light theme.
+* A single place for logging: the `on_event` hook and the `aa_events()` event catalogue.
+* Versioned schema migrations.
+* Interface texts in English (default) and Russian, any string can be replaced.
 
-Пакет уже установлен в общую библиотеку сервера, отдельная установка не нужна. Подробнее в виньетке `getting-started`, готовые запускаемые примеры в `inst/examples`.
+## Quick start
+
+See the `getting-started` vignette for details and the ready-to-run examples in `inst/examples`.
 
 ```r
 library(shiny)
 library(appauth)
 
-settings <- aa_settings()                                            # 1. настройки
+settings <- aa_settings()                                            # 1. settings
 
-ui <- fluidPage(aa_app_head(), aa_auth_ui("auth"), uiOutput("main")) # 2. интерфейс
+ui <- fluidPage(aa_app_head(), aa_auth_ui("auth"), uiOutput("main")) # 2. UI
 
 server <- function(input, output, session) {
-  conn <- aa_session_connection("app.db", prepare = TRUE)            # 3. база
-  auth <- aa_auth_server("auth", conn, settings)                     # 4. вход
-  aa_session_guard(auth, conn, settings)                             # 5. принудительный выход
+  conn <- aa_session_connection("app.db", prepare = TRUE)            # 3. database
+  auth <- aa_auth_server("auth", conn, settings)                     # 4. login
+  aa_session_guard(auth, conn, settings)                             # 5. forced logout
 
   output$main <- renderUI({
     req(auth$logged_in())
-    p("Вы вошли как ", auth$user()$login)
+    p("Signed in as ", auth$user()$login)
   })
 }
 
 shinyApp(ui, server)
 ```
 
-Первый запуск на пустой базе предложит создать администратора.
+The first run on an empty database offers to create an administrator.
 
-## Функции
+## Functions
 
-| Тема | Функции |
+| Topic | Functions |
 | --- | --- |
-| Настройки и тексты | `aa_settings()`, `aa_settings_from_list()`, `aa_texts()`, `aa_text()`, `aa_text_keys()` |
-| База данных | `aa_init_db()`, `aa_prepare_db()`, `aa_schema_version()`, `aa_cleanup()`, `aa_session_connection()` |
-| Пароли | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()` |
-| Пользователи | `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_active_autologins()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
-| Восстановление пароля | `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()` |
-| Двухфакторная аутентификация | `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()` |
-| Защита входа | `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()` |
-| Сессии | `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_user_session_valid()` |
-| Права | `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()` |
-| События | `aa_events()` |
-| Модули интерфейса | `aa_app_head()`, `aa_auth_ui()` и `aa_auth_server()`, `aa_users_ui()` и `aa_users_server()`, `aa_password_ui()` и `aa_password_server()`, `aa_totp_ui()` и `aa_totp_server()` |
-| Помощники приложения | `aa_session_guard()`, `aa_register_module()` |
-| Навыки для ИИ-агентов | `aa_install_skills()` |
+| Settings and texts | `aa_settings()`, `aa_settings_from_list()`, `aa_texts()`, `aa_text()`, `aa_text_keys()` |
+| Database | `aa_init_db()`, `aa_prepare_db()`, `aa_schema_version()`, `aa_cleanup()`, `aa_session_connection()` |
+| Passwords | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()` |
+| Users | `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_active_autologins()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
+| Password recovery | `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()` |
+| Two-factor authentication | `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()` |
+| Login protection | `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()` |
+| Sessions | `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_user_session_valid()` |
+| Permissions | `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()` |
+| Events | `aa_events()` |
+| UI modules | `aa_app_head()`, `aa_auth_ui()` and `aa_auth_server()`, `aa_users_ui()` and `aa_users_server()`, `aa_password_ui()` and `aa_password_server()`, `aa_totp_ui()` and `aa_totp_server()` |
+| App helpers | `aa_session_guard()`, `aa_register_module()` |
+| AI agent skills | `aa_install_skills()` |
 
-Справка по каждой функции: `?aa_authenticate` и так далее.
+Help for each function: `?aa_authenticate` and so on.
 
-## Документация
+## Documentation
 
-Виньетки (`browseVignettes("appauth")`):
+Vignettes (`browseVignettes("appauth")`):
 
-* `getting-started` — быстрый старт и основные понятия;
-* `integrating-existing-app` — как перевести существующее приложение с самописной авторизации, в том числе с открытыми паролями;
-* `extension-points` — права, роли, события, слоты карточки, тексты, оформление;
-* `testing-your-app` — как тестировать приложение с `appauth`;
-* `deployment` — HTTPS и nginx, cookie, резервные копии, блокировка файла базы на Windows;
-* `architecture-and-security` — устройство, модель угроз, гарантии и ограничения.
+* `getting-started` - quick start and core concepts;
+* `integrating-existing-app` - how to move an existing application off hand-written authentication, including plaintext passwords;
+* `extension-points` - permissions, roles, events, card slots, texts, styling;
+* `testing-your-app` - how to test an application that uses `appauth`;
+* `deployment` - HTTPS and nginx, cookies, backups, database file locking on Windows;
+* `architecture-and-security` - design, threat model, guarantees and limitations.
 
-Два рабочих примера лежат в `inst/examples` (`system.file("examples", package = "appauth")`).
+Two working examples are in `inst/examples` (`system.file("examples", package = "appauth")`).
 
-## Навыки для ИИ-агентов
+## Skills for AI agents
 
-В пакет встроены два навыка на английском языке: `appauth` (справочник функций, схема базы, события) и `appauth-secure-shiny` (внедрение, перенос старой авторизации, аудит безопасности). Они помогают агентам (Claude Code, Codex, Posit Assistant) писать и проверять код с `appauth`.
+The package ships two skills in English: `appauth` (function reference, database schema, events) and `appauth-secure-shiny` (adoption, migrating old authentication, security audit). They help agents (Claude Code, Codex, Posit Assistant) write and review code that uses `appauth`.
 
 ```r
-# Claude Code: .claude/skills в текущем проекте
+# Claude Code: .claude/skills in the current project
 aa_install_skills()
 
 # Codex, Posit Assistant: .agents/skills
 aa_install_skills(agent = "agents")
 
-# после обновления пакета
+# after updating the package
 aa_install_skills(overwrite = TRUE)
 ```
 
-Исходники навыков лежат в `inst/skills` (`system.file("skills", package = "appauth")`).
+The skill sources are in `inst/skills` (`system.file("skills", package = "appauth")`).
 
-## Базы данных
+## Databases
 
-| База | Драйвер | Заметки |
+| Database | Driver | Notes |
 |---|---|---|
-| SQLite (по умолчанию) | `RSQLite` | Схема и формат данных не менялись: работающие базы подключаются без переноса. |
-| MySQL / MariaDB | `RMariaDB` | Колонки логинов, ролей и хешей создаются с двоичной collation без игнорирования пробелов (`utf8mb4_0900_bin`, в MariaDB `utf8mb4_nopad_bin`), чтобы `Alsey` и `alsey` оставались разными логинами. DDL нельзя откатить, поэтому миграции идемпотентны и выполняются под блокировкой `GET_LOCK`. |
-| PostgreSQL | `RPostgres` | Автоинкремент через `GENERATED BY DEFAULT AS IDENTITY`, миграции под консультативной блокировкой. |
-| DuckDB | `duckdb` | Файл открывает один процесс: для приложения в нескольких процессах R не подходит. |
+| SQLite (default) | `RSQLite` | Existing databases connect without any migration of data. |
+| MySQL / MariaDB | `RMariaDB` | Login, role and hash columns are created with a binary collation that does not ignore trailing spaces (`utf8mb4_0900_bin`, in MariaDB `utf8mb4_nopad_bin`), so `Alice` and `alice` remain different logins. DDL cannot be rolled back, so migrations are idempotent and run under a `GET_LOCK` lock. |
+| PostgreSQL | `RPostgres` | Auto-increment via `GENERATED BY DEFAULT AS IDENTITY`, migrations under an advisory lock. |
+| DuckDB | `duckdb` | The file is opened by a single process: not suitable for an application running in several R processes. |
 
-Подключение создаёт приложение, остальное пакет делает сам:
+The application creates the connection; the package does the rest:
 
 ```r
-# SQLite (как раньше)
+# SQLite
 conn <- aa_session_connection("app.db", prepare = TRUE)
 
-# MySQL / MariaDB, PostgreSQL, DuckDB: функция, которая открывает подключение
+# MySQL / MariaDB, PostgreSQL, DuckDB: a function that opens the connection
 conn <- aa_session_connection(
   prepare = TRUE,
   connect = function() DBI::dbConnect(
@@ -134,20 +136,20 @@ conn <- aa_session_connection(
 )
 ```
 
-Даты хранятся текстом по UTC (`ГГГГ-ММ-ДД ЧЧ:ММ:СС`) во всех базах, время считает R, поэтому запросы одинаковы везде. BigQuery и другие аналитические хранилища не поддерживаются: в них нет уникальных ограничений и атомарных обновлений, на которых держатся одноразовые токены и защита последнего администратора. Для облака используйте управляемый PostgreSQL или MySQL.
+Dates are stored as UTC text (`YYYY-MM-DD HH:MM:SS`) in all databases and time is computed by R, so queries are the same everywhere. BigQuery and other analytical warehouses are not supported: they lack the unique constraints and atomic updates that one-time tokens and last-administrator protection rely on. In the cloud, use managed PostgreSQL or MySQL.
 
-Тесты запускаются на любой поддерживаемой базе: `Rscript dev/run-tests-db.R duckdb` (см. заголовок скрипта).
+Tests can run on any supported database: `Rscript dev/run-tests-db.R duckdb` (see the script header).
 
-## Принципы
+## Principles
 
-* Пакет содержит только то, что должно быть одинаковым во всех приложениях (безопасность). Матрица ролей и прав, переключатели логов и состав вкладки доступа остаются за приложением.
-* Пакет сам ничего не пишет в логи приложения, он сообщает о событиях хуку.
-* Подключение к базе принадлежит приложению; пакет работает с SQLite, DuckDB, MySQL / MariaDB и PostgreSQL и не вызывает команд Windows.
+* The package contains only what must be identical in all applications (security). The role and permission matrix, logging switches and the contents of the access tab stay with the application.
+* The package writes nothing to the application logs itself; it reports events to a hook.
+* The database connection belongs to the application; the package works with SQLite, DuckDB, MySQL / MariaDB and PostgreSQL and does not call operating system commands.
 
-## Ограничения
+## Limitations
 
-Известные ограничения (cookie без `HttpOnly`, блокировка по логину, BigQuery и другие аналитические хранилища не поддерживаются, двухфакторная защита добровольная и только TOTP, единый вход только через Google, независимого аудита не было) перечислены в виньетке `architecture-and-security`.
+Known limitations (the cookie is not `HttpOnly`, lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the `architecture-and-security` vignette.
 
-## Разработка
+## Development
 
-Автотесты: `devtools::test()`; полная проверка: `devtools::check()`. Проверка модулей в настоящем браузере (Chrome и Playwright) описана в `dev/e2e/README.md`. История изменений в `NEWS.md`.
+Automated tests: `devtools::test()`; full check: `devtools::check()`. Module checks in a real browser (Chrome and Playwright) are described in `dev/e2e/README.md`. Change history is in `NEWS.md`.

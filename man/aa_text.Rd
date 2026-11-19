@@ -2,27 +2,27 @@
 % Please edit documentation in R/texts.R
 \name{aa_text}
 \alias{aa_text}
-\title{Получить текст по ключу}
+\title{Get a text by key}
 \usage{
 aa_text(x, key, ...)
 }
 \arguments{
-\item{x}{Набор текстов (результат \code{\link[=aa_texts]{aa_texts()}}) или настройки (результат
+\item{x}{A set of texts (result of \code{\link[=aa_texts]{aa_texts()}}) or settings (result of
 \code{\link[=aa_settings]{aa_settings()}}).}
 
-\item{key}{Ключ текста, см. \code{\link[=aa_text_keys]{aa_text_keys()}}.}
+\item{key}{Text key, see \code{\link[=aa_text_keys]{aa_text_keys()}}.}
 
-\item{...}{Значения для подстановки в маркеры \verb{\%d} и \verb{\%s}.}
+\item{...}{Values for the \verb{\%d} and \verb{\%s} placeholders.}
 }
 \value{
-Строка.
+A string.
 }
 \description{
-Возвращает строку из набора текстов. Если передать значения, они
-подставляются в строку по правилам \code{\link[=sprintf]{sprintf()}}.
+Returns a string from a set of texts. If values are passed, they are
+substituted into the string following the rules of \code{\link[=sprintf]{sprintf()}}.
 }
 \examples{
-texts <- aa_texts("ru")
+texts <- aa_texts("en")
 aa_text(texts, "login_button")
 aa_text(texts, "locked", 15)
 }

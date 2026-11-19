@@ -1,26 +1,26 @@
-# Слой диалектов: всё, что отличается между базами данных.
+# Dialect layer: everything that differs between databases.
 #
-# Пакет работает с SQLite (по умолчанию), DuckDB, MySQL / MariaDB и PostgreSQL.
-# Чтобы остальной код не зависел от базы, различия собраны здесь:
-#   * время считает R и передаёт параметром (строка UTC "ГГГГ-ММ-ДД ЧЧ:ММ:СС"),
-#     поэтому в запросах нет datetime('now'), NOW() и подобного;
-#   * обёртки aa_query() и aa_execute() подставляют плейсхолдеры нужного вида;
-#   * типы колонок, автоинкремент и индексы описаны функциями ниже.
-# Даты везде хранятся текстом UTC: так сравнение дат одинаково во всех базах,
-# а работающие базы SQLite остаются совместимыми без переноса данных.
+# The package works with SQLite (the default), DuckDB, MySQL / MariaDB and PostgreSQL.
+# So that the rest of the code does not depend on the database, the differences are collected here:
+#   * R computes the time and passes it as a parameter (a UTC string "YYYY-MM-DD HH:MM:SS"),
+#     so queries have no datetime('now'), NOW() and the like;
+#   * the aa_query() and aa_execute() wrappers substitute placeholders of the right kind;
+#   * column types, auto-increment and indexes are described by the functions below.
+# Dates are stored everywhere as UTC text: this way date comparison is the same in all databases,
+# and existing SQLite databases stay compatible without moving data.
 
-#' Поддерживаемые базы данных
+#' Supported databases
 #'
-#' @returns Названия диалектов.
+#' @returns Dialect names.
 #' @noRd
 aa_dialects <- function() c("sqlite", "duckdb", "mysql", "postgres")
 
-#' Диалект базы по подключению
+#' Database dialect by connection
 #'
-#' @param conn Подключение DBI.
+#' @param conn A DBI connection.
 #'
-#' @returns `"sqlite"`, `"duckdb"`, `"mysql"` (MySQL и MariaDB), `"postgres"`
-#'   или `NA`, если база не поддерживается.
+#' @returns `"sqlite"`, `"duckdb"`, `"mysql"` (MySQL and MariaDB), `"postgres"`
+#'   or `NA` if the database is not supported.
 #' @noRd
 aa_dialect <- function(conn) {
   if (inherits(conn, "SQLiteConnection")) {
@@ -36,24 +36,24 @@ aa_dialect <- function(conn) {
   }
 }
 
-#' Проверка подключения к базе данных
+#' Database connection check
 #'
-#' Подключение должно быть открытым и принадлежать одной из поддерживаемых баз:
-#' SQLite (`RSQLite`), DuckDB (`duckdb`), MySQL / MariaDB (`RMariaDB`) или
+#' The connection must be open and belong to one of the supported databases:
+#' SQLite (`RSQLite`), DuckDB (`duckdb`), MySQL / MariaDB (`RMariaDB`) or
 #' PostgreSQL (`RPostgres`).
 #'
-#' @param conn Подключение к базе данных.
-#' @param call Окружение для сообщения об ошибке.
+#' @param conn Database connection.
+#' @param call Environment for the error message.
 #'
-#' @returns Подключение (невидимо), либо ошибка класса `appauth_error_connection`.
+#' @returns The connection (invisibly), or an error of class `appauth_error_connection`.
 #' @noRd
 aa_check_conn <- function(conn, call = rlang::caller_env()) {
   if (is.na(aa_dialect(conn))) {
     rlang::abort(
       paste0(
-        "Пакет appauth работает с базами SQLite, DuckDB, MySQL / MariaDB и PostgreSQL: ",
-        "передайте подключение, созданное через `DBI::dbConnect()` с драйвером ",
-        "RSQLite::SQLite(), duckdb::duckdb(), RMariaDB::MariaDB() или RPostgres::Postgres()."
+        "The appauth package works with SQLite, DuckDB, MySQL / MariaDB and PostgreSQL databases: ",
+        "pass a connection created with `DBI::dbConnect()` and the driver ",
+        "RSQLite::SQLite(), duckdb::duckdb(), RMariaDB::MariaDB() or RPostgres::Postgres()."
       ),
       class = "appauth_error_connection",
       call = call
@@ -62,7 +62,7 @@ aa_check_conn <- function(conn, call = rlang::caller_env()) {
 
   if (!DBI::dbIsValid(conn)) {
     rlang::abort(
-      "Подключение к базе данных закрыто, откройте его заново.",
+      "The database connection is closed, open it again.",
       class = "appauth_error_connection",
       call = call
     )
@@ -71,26 +71,26 @@ aa_check_conn <- function(conn, call = rlang::caller_env()) {
   invisible(conn)
 }
 
-#' Текущее время в UTC для записи в базу
+#' Current UTC time for writing to the database
 #'
-#' @param offset_seconds Сдвиг в секундах от текущего момента (может быть отрицательным).
-#' @param now Момент, от которого считать (для тестов).
+#' @param offset_seconds Offset in seconds from the current moment (may be negative).
+#' @param now The moment to count from (for tests).
 #'
-#' @returns Строка `"ГГГГ-ММ-ДД ЧЧ:ММ:СС"` по UTC.
+#' @returns A `"YYYY-MM-DD HH:MM:SS"` string in UTC.
 #' @noRd
 aa_utc <- function(offset_seconds = 0, now = Sys.time()) {
   format(now + offset_seconds, "%Y-%m-%d %H:%M:%S", tz = "UTC")
 }
 
-#' Заменить плейсхолдеры `?` на вид, который понимает база
+#' Replace `?` placeholders with the form the database understands
 #'
-#' PostgreSQL (RPostgres) принимает только `$1, $2, ...`, остальные базы `?`.
-#' В запросах пакета знак `?` не встречается внутри строковых литералов.
+#' PostgreSQL (RPostgres) accepts only `$1, $2, ...`, other databases accept `?`.
+#' In the package queries the `?` sign does not occur inside string literals.
 #'
-#' @param conn Подключение к базе.
-#' @param sql Текст запроса с плейсхолдерами `?`.
+#' @param conn Database connection.
+#' @param sql Query text with `?` placeholders.
 #'
-#' @returns Текст запроса.
+#' @returns Query text.
 #' @noRd
 aa_prepare_sql <- function(conn, sql) {
   if (!identical(aa_dialect(conn), "postgres") || !grepl("?", sql, fixed = TRUE)) {
@@ -104,14 +104,14 @@ aa_prepare_sql <- function(conn, sql) {
   sub("\001", "", out, fixed = TRUE)
 }
 
-#' Привести 64-битные целые к обычным числам
+#' Convert 64-bit integers to ordinary numbers
 #'
-#' `COUNT(*)` в PostgreSQL и MySQL возвращается как `integer64`, с которым
-#' неудобно сравнивать и форматировать значения.
+#' `COUNT(*)` in PostgreSQL and MySQL is returned as `integer64`, which
+#' is inconvenient to compare and format.
 #'
-#' @param x Таблица результата запроса.
+#' @param x Query result table.
 #'
-#' @returns Таблица, где `integer64` заменены на числа.
+#' @returns A table where `integer64` is replaced with numbers.
 #' @noRd
 aa_fix_integers <- function(x) {
   for (i in seq_along(x)) {
@@ -123,15 +123,15 @@ aa_fix_integers <- function(x) {
   x
 }
 
-#' Выполнить запрос с результатом
+#' Run a query with a result
 #'
-#' Обёртка над `DBI::dbGetQuery()`: плейсхолдеры в `?`, числа без `integer64`.
+#' A wrapper around `DBI::dbGetQuery()`: `?` placeholders, numbers without `integer64`.
 #'
-#' @param conn Подключение к базе.
-#' @param sql Текст запроса.
-#' @param params Список параметров или `NULL`.
+#' @param conn Database connection.
+#' @param sql Query text.
+#' @param params A list of parameters or `NULL`.
 #'
-#' @returns Таблица.
+#' @returns A table.
 #' @noRd
 aa_query <- function(conn, sql, params = NULL) {
   sql <- aa_prepare_sql(conn, sql)
@@ -145,13 +145,13 @@ aa_query <- function(conn, sql, params = NULL) {
   aa_fix_integers(res)
 }
 
-#' Выполнить запрос без результата
+#' Run a query without a result
 #'
-#' Обёртка над `DBI::dbExecute()`: плейсхолдеры в `?`.
+#' A wrapper around `DBI::dbExecute()`: `?` placeholders.
 #'
 #' @inheritParams aa_query
 #'
-#' @returns Число затронутых строк.
+#' @returns The number of affected rows.
 #' @noRd
 aa_execute <- function(conn, sql, params = NULL) {
   sql <- aa_prepare_sql(conn, sql)
@@ -165,17 +165,17 @@ aa_execute <- function(conn, sql, params = NULL) {
   as.integer(n)
 }
 
-#' Сколько строк подошло под условие обновления
+#' How many rows matched the update condition
 #'
-#' SQLite, DuckDB и PostgreSQL возвращают число найденных строк, а MySQL только
-#' число изменённых: обновление тем же значением даёт 0. Для MySQL при нулевом
-#' результате наличие пользователя проверяется отдельно.
+#' SQLite, DuckDB and PostgreSQL return the number of found rows, while MySQL returns only
+#' the number of changed ones: updating with the same value gives 0. For MySQL with a zero
+#' result the existence of the user is checked separately.
 #'
-#' @param conn Подключение к базе.
-#' @param n Число затронутых строк из `aa_execute()`.
-#' @param login Логин, по которому шло обновление `users`.
+#' @param conn Database connection.
+#' @param n The number of affected rows from `aa_execute()`.
+#' @param login The login the `users` update was for.
 #'
-#' @returns Число подошедших строк (0 или 1).
+#' @returns The number of matched rows (0 or 1).
 #' @noRd
 aa_rows_matched <- function(conn, n, login) {
   if (n > 0 || !identical(aa_dialect(conn), "mysql")) {
@@ -185,22 +185,22 @@ aa_rows_matched <- function(conn, n, login) {
   as.integer(aa_query(conn, "SELECT COUNT(*) AS n FROM users WHERE login = ?", params = list(login))$n)
 }
 
-#' Колонки таблицы (в нижнем регистре)
+#' Table columns (in lower case)
 #'
-#' @param conn Подключение к базе.
-#' @param table Название таблицы.
+#' @param conn Database connection.
+#' @param table Table name.
 #'
-#' @returns Вектор названий колонок.
+#' @returns A vector of column names.
 #' @noRd
 aa_table_columns <- function(conn, table) {
   tolower(DBI::dbListFields(conn, table))
 }
 
-#' Нарушено ли ограничение уникальности
+#' Whether a uniqueness constraint is violated
 #'
-#' @param e Ошибка, пойманная при записи.
+#' @param e An error caught on write.
 #'
-#' @returns `TRUE` или `FALSE`.
+#' @returns `TRUE` or `FALSE`.
 #' @noRd
 aa_is_unique_violation <- function(e) {
   grepl(
@@ -210,11 +210,11 @@ aa_is_unique_violation <- function(e) {
   )
 }
 
-#' Порядок строк таблицы пользователей «по добавлению»
+#' Order of users table rows "by insertion"
 #'
-#' @param conn Подключение к базе.
+#' @param conn Database connection.
 #'
-#' @returns Выражение для `ORDER BY`.
+#' @returns An expression for `ORDER BY`.
 #' @noRd
 aa_users_order <- function(conn) {
   if ("id" %in% aa_table_columns(conn, "users")) {
@@ -226,15 +226,15 @@ aa_users_order <- function(conn) {
   }
 }
 
-#' Двоичная collation без игнорирования пробелов в конце
+#' Binary collation that does not ignore trailing spaces
 #'
-#' Обычная `utf8mb4_bin` считает `"alsey"` и `"alsey "` равными (PAD SPACE), а логины
-#' должны сравниваться точно. В MySQL 8 для этого есть `utf8mb4_0900_bin`, в MariaDB
+#' The usual `utf8mb4_bin` treats `"alsey"` and `"alsey "` as equal (PAD SPACE), while logins
+#' must be compared exactly. In MySQL 8 there is `utf8mb4_0900_bin` for this, in MariaDB
 #' `utf8mb4_nopad_bin`.
 #'
-#' @param conn Подключение к MySQL / MariaDB.
+#' @param conn Connection to MySQL / MariaDB.
 #'
-#' @returns Название collation.
+#' @returns The collation name.
 #' @noRd
 aa_mysql_collation <- function(conn) {
   version <- DBI::dbGetQuery(conn, "SELECT VERSION() AS v")$v
@@ -242,17 +242,17 @@ aa_mysql_collation <- function(conn) {
   if (grepl("mariadb", version, ignore.case = TRUE)) "utf8mb4_nopad_bin" else "utf8mb4_0900_bin"
 }
 
-#' Типы колонок схемы для базы
+#' Schema column types for a database
 #'
-#' Логины, роли и хеши сравниваются точно (с учётом регистра), поэтому в MySQL,
-#' где сравнение по умолчанию без учёта регистра, такие колонки создаются с
-#' двоичной collation. Время хранится текстом UTC.
+#' Logins, roles and hashes are compared exactly (case-sensitively), so in MySQL,
+#' where comparison is case-insensitive by default, such columns are created with
+#' a binary collation. Time is stored as UTC text.
 #'
-#' @param conn Подключение к базе.
+#' @param conn Database connection.
 #'
-#' @returns Список: `key` (короткий текст для логинов, ролей, хешей), `text`
-#'   (произвольный текст), `ts` (колонка времени) и `ts_now` (колонка времени
-#'   со значением по умолчанию «сейчас»).
+#' @returns A list: `key` (short text for logins, roles, hashes), `text`
+#'   (arbitrary text), `ts` (a time column) and `ts_now` (a time column
+#'   with the default value "now").
 #' @noRd
 aa_col_types <- function(conn) {
   dialect <- aa_dialect(conn)
@@ -282,14 +282,14 @@ aa_col_types <- function(conn) {
   )
 }
 
-#' Описание колонки `id` с автоинкрементом
+#' Definition of the `id` column with auto-increment
 #'
-#' Для DuckDB заодно создаёт последовательность таблицы.
+#' For DuckDB it also creates the table sequence.
 #'
-#' @param conn Подключение к базе.
-#' @param table Название таблицы.
+#' @param conn Database connection.
+#' @param table Table name.
 #'
-#' @returns Строка с определением колонки для `CREATE TABLE`.
+#' @returns A string with the column definition for `CREATE TABLE`.
 #' @noRd
 aa_pk_column <- function(conn, table) {
   switch(
@@ -305,18 +305,18 @@ aa_pk_column <- function(conn, table) {
   )
 }
 
-#' Создать индекс, если его ещё нет
+#' Create an index if it does not exist yet
 #'
-#' MySQL не поддерживает `CREATE INDEX IF NOT EXISTS`, поэтому наличие индекса
-#' проверяется отдельно.
+#' MySQL does not support `CREATE INDEX IF NOT EXISTS`, so the existence of the index
+#' is checked separately.
 #'
-#' @param conn Подключение к базе.
-#' @param name Название индекса.
-#' @param table Название таблицы.
-#' @param columns Колонки индекса (строка, через запятую).
-#' @param unique Сделать индекс уникальным.
+#' @param conn Database connection.
+#' @param name Index name.
+#' @param table Table name.
+#' @param columns Index columns (a string, comma-separated).
+#' @param unique Make the index unique.
 #'
-#' @returns Невидимо `NULL`.
+#' @returns Invisibly `NULL`.
 #' @noRd
 aa_create_index <- function(conn, name, table, columns, unique = FALSE) {
   kind <- if (unique) "UNIQUE INDEX" else "INDEX"
@@ -342,13 +342,13 @@ aa_create_index <- function(conn, name, table, columns, unique = FALSE) {
   invisible(NULL)
 }
 
-#' Запрос «вставить, если такой строки ещё нет»
+#' Query "insert if such a row does not exist yet"
 #'
-#' @param conn Подключение к базе.
-#' @param table Название таблицы.
-#' @param columns Названия колонок.
+#' @param conn Database connection.
+#' @param table Table name.
+#' @param columns Column names.
 #'
-#' @returns Текст `INSERT` с плейсхолдерами `?`.
+#' @returns `INSERT` text with `?` placeholders.
 #' @noRd
 aa_insert_ignore_sql <- function(conn, table, columns) {
   base <- sprintf(
@@ -364,31 +364,31 @@ aa_insert_ignore_sql <- function(conn, table, columns) {
   }
 }
 
-#' Явное приведение параметра к тексту
+#' Explicit cast of a parameter to text
 #'
-#' PostgreSQL не может определить тип параметра в списке `SELECT` без `INSERT`
-#' колонок, поэтому в запросах вида `INSERT ... SELECT ?` параметр приводится
-#' явно. Для остальных баз возвращается просто `?`.
+#' PostgreSQL cannot determine the type of a parameter in a `SELECT` list without `INSERT`
+#' columns, so in queries like `INSERT ... SELECT ?` the parameter is cast
+#' explicitly. For other databases just `?` is returned.
 #'
-#' @param conn Подключение к базе.
+#' @param conn Database connection.
 #'
-#' @returns Фрагмент запроса.
+#' @returns A query fragment.
 #' @noRd
 aa_text_param <- function(conn) {
   if (identical(aa_dialect(conn), "postgres")) "CAST(? AS TEXT)" else "?"
 }
 
-#' Блокировка на время миграций
+#' Lock for the duration of migrations
 #'
-#' Если несколько экземпляров приложения стартуют одновременно, схему должен
-#' достраивать только один. MySQL: именованная блокировка на подключение;
-#' PostgreSQL: консультативная блокировка внутри транзакции миграций (снимается
-#' вместе с ней). SQLite и DuckDB блокируют файл сами.
+#' If several app instances start simultaneously, only one should
+#' complete the schema. MySQL: a named lock per connection;
+#' PostgreSQL: an advisory lock inside the migration transaction (released
+#' with it). SQLite and DuckDB lock the file themselves.
 #'
-#' @param conn Подключение к базе.
+#' @param conn Database connection.
 #'
-#' @returns Функция без аргументов, снимающая блокировку (для SQLite, DuckDB и
-#'   PostgreSQL ничего не делает).
+#' @returns A function without arguments that releases the lock (does nothing for SQLite, DuckDB and
+#'   PostgreSQL).
 #' @noRd
 aa_migration_lock <- function(conn) {
   dialect <- aa_dialect(conn)
@@ -397,7 +397,7 @@ aa_migration_lock <- function(conn) {
     got <- aa_query(conn, "SELECT GET_LOCK('appauth_migrations', 60) AS ok")$ok
 
     if (!isTRUE(as.numeric(got) == 1)) {
-      rlang::abort("Не удалось получить блокировку на миграции схемы.", class = "appauth_error_migration")
+      rlang::abort("Could not obtain the lock for schema migrations.", class = "appauth_error_migration")
     }
 
     return(function() {

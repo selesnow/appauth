@@ -2,16 +2,16 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_secret}
 \alias{aa_totp_secret}
-\title{Случайный секрет для приложения-аутентификатора}
+\title{Random secret for an authenticator app}
 \usage{
 aa_totp_secret()
 }
 \value{
-Строка base32 из 32 символов (160 бит), так её вводят в приложение
-вручную.
+A base32 string of 32 characters (160 bits), the way it is entered into the app
+manually.
 }
 \description{
-Случайный секрет для приложения-аутентификатора
+Random secret for an authenticator app
 }
 \examples{
 nchar(aa_totp_secret())

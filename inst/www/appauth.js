@@ -1,14 +1,14 @@
-// appauth: работа с cookie автовхода. Подключается через aa_app_head().
+// appauth: auto-login cookie handling. Included through aa_app_head().
 //
-// Токен автовхода хранится в cookie. HttpOnly для cookie, которую пишет JS, не
-// ставится, поэтому токен в базе хранится только в виде sha256 и отзывается при
-// выходе, блокировке, удалении и смене пароля.
+// The auto-login token is stored in a cookie. HttpOnly cannot be set on a cookie
+// written by JS, so the token is stored in the database only as a sha256 hash and
+// is revoked on sign-out, blocking, deletion and password change.
 (function () {
   function secureFlag() {
     return window.location.protocol === 'https:' ? '; Secure' : '';
   }
 
-  // Enter в поле формы входа нажимает кнопку формы
+  // Enter in a login form field presses the form button
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' || e.isComposing) return;
     var field = e.target;
@@ -17,15 +17,15 @@
     if (!card) return;
     var button = card.querySelector('.aa-login-button');
     if (button) {
-      // значение поля доходит до Shiny по событию change, поэтому сначала снимаем фокус
+      // the field value reaches Shiny on the change event, so blur the field first
       field.blur();
       button.click();
       e.preventDefault();
     }
   });
 
-  // Кнопки копирования: .aa-copy, текст в атрибуте data-copy. По HTTPS работает буфер
-  // браузера, иначе (и в окнах Bootstrap с ловушкой фокуса) копируем через скрытое поле
+  // Copy buttons: .aa-copy, the text is in the data-copy attribute. Over HTTPS the browser
+  // clipboard is used; otherwise (and in Bootstrap modals with a focus trap) copy via a hidden field
   function copyText(text, host) {
     if (navigator.clipboard && window.isSecureContext) {
       return navigator.clipboard.writeText(text);
@@ -70,8 +70,8 @@
         '; SameSite=Lax' + secureFlag();
     });
 
-    // {url, origin}: переход на страницу согласия Google или на адрес сайта origin, который
-    // передал сервер (другие адреса игнорируются)
+    // {url, origin}: redirect to the Google consent page or to the site address origin
+    // sent by the server (other addresses are ignored)
     Shiny.addCustomMessageHandler('appauth_redirect', function (msg) {
       if (typeof msg.url !== 'string') return;
       var toGoogle = msg.url.indexOf('https://accounts.google.com/') === 0;
@@ -87,7 +87,7 @@
       document.cookie = encodeURIComponent(msg.name) + '=; path=/; max-age=0; SameSite=Lax' + secureFlag();
     });
 
-    // {name, input}: значение cookie (или null) уходит в input модуля
+    // {name, input}: the cookie value (or null) is sent to the module input
     Shiny.addCustomMessageHandler('appauth_read_cookie', function (msg) {
       var wanted = encodeURIComponent(msg.name) + '=';
       var value = null;
@@ -101,8 +101,8 @@
     });
   }
 
-  // Скрипт из <head> может загрузиться раньше shiny.js, поэтому ждём появления
-  // Shiny. Подключение к серверу происходит позже, обработчики успевают.
+  // A script in <head> can load before shiny.js, so wait for Shiny to appear.
+  // The server connection happens later, so the handlers are registered in time.
   function tryRegister() {
     if (window.Shiny && Shiny.addCustomMessageHandler) {
       register();

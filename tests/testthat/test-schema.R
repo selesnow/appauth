@@ -1,4 +1,4 @@
-test_that("на пустой базе создаются все таблицы и применяются все миграции", {
+test_that("on an empty database all tables are created and all migrations applied", {
   con <- new_db()
 
   expect_identical(aa_schema_version(con), 0L)
@@ -15,7 +15,7 @@ test_that("на пустой базе создаются все таблицы �
   expect_identical(aa_schema_version(con), 9L)
 })
 
-test_that("колонки таблиц соответствуют схеме Server Manager", {
+test_that("table columns match the schema of earlier versions", {
   con <- new_db()
   aa_init_db(con)
 
@@ -27,7 +27,7 @@ test_that("колонки таблиц соответствуют схеме Ser
   expect_identical(columns_of(con, "login_attempts"), c("id", "login", "success", "attempted_at"))
 })
 
-test_that("у нового пользователя blocked по умолчанию 0, логин уникален", {
+test_that("a new user has blocked 0 by default, login is unique", {
   con <- new_db()
   aa_init_db(con)
 
@@ -39,7 +39,7 @@ test_that("у нового пользователя blocked по умолчан�
   )
 })
 
-test_that("миграции записываются в служебную таблицу", {
+test_that("migrations are recorded in the service table", {
   con <- new_db()
   aa_init_db(con)
 
@@ -53,7 +53,7 @@ test_that("миграции записываются в служебную та�
   )
 })
 
-test_that("повторный запуск ничего не меняет", {
+test_that("a repeated run changes nothing", {
   con <- new_db()
   aa_init_db(con)
 
@@ -69,10 +69,10 @@ test_that("повторный запуск ничего не меняет", {
   expect_identical(before, after)
 })
 
-test_that("Server Manager prod: старая схема достраивается, данные не меняются", {
+test_that("production schema from before login protection: completed, data unchanged", {
   skip_if_not_sqlite()
   con <- new_db()
-  fixture_server_manager_prod(con)
+  fixture_legacy_full(con)
 
   users_before    <- rows_of(con, "users")
   sessions_before <- rows_of(con, "auth_sessions")
@@ -90,10 +90,10 @@ test_that("Server Manager prod: старая схема достраиваетс
   expect_identical(rows_of(con, "auth_sessions"), sessions_before)
 })
 
-test_that("старая схема dev без колонки id тоже достраивается", {
+test_that("an old dev schema without an id column is completed too", {
   skip_if_not_sqlite()
   con <- new_db()
-  fixture_server_manager_dev_old(con)
+  fixture_legacy_old(con)
 
   users_before <- rows_of(con, "users")
 
@@ -108,10 +108,10 @@ test_that("старая схема dev без колонки id тоже дос�
   expect_true(all(users_after$blocked == 0))
 })
 
-test_that("рекрутинг: пароли в открытом виде и root/root остаются как есть, прикладные таблицы не затронуты", {
+test_that("home-grown schema: plain-text passwords and root/root stay as is, application tables are untouched", {
   skip_if_not_sqlite()
   con <- new_db()
-  fixture_recruitment(con)
+  fixture_legacy_plain(con)
 
   users_before <- rows_of(con, "users")
   log_before   <- rows_of(con, "action_log")
@@ -130,9 +130,9 @@ test_that("рекрутинг: пароли в открытом виде и root
   expect_identical(rows_of(con, "action_log"), log_before)
 })
 
-test_that("повторный запуск на старых схемах тоже ничего не меняет", {
+test_that("a repeated run on old schemas changes nothing either", {
   skip_if_not_sqlite()
-  for (fixture in list(fixture_server_manager_prod, fixture_server_manager_dev_old, fixture_recruitment)) {
+  for (fixture in list(fixture_legacy_full, fixture_legacy_old, fixture_legacy_plain)) {
     con <- new_db()
     fixture(con)
     aa_init_db(con)
@@ -148,26 +148,26 @@ test_that("повторный запуск на старых схемах тож
   }
 })
 
-test_that("при ошибке в миграции изменения откатываются одной транзакцией", {
+test_that("on a migration error the changes are rolled back in one transaction", {
   con <- new_db()
-  # в MySQL каждая команда DDL завершает транзакцию неявно, откатить создание таблиц нельзя
-  # (миграции идемпотентны, поэтому повторный запуск достроит схему)
-  testthat::skip_if(aa_dialect(con) == "mysql", "DDL в MySQL не откатывается")
+  # in MySQL every DDL command ends the transaction implicitly, table creation cannot be rolled back
+  # (migrations are idempotent, so a repeated run will complete the schema)
+  testthat::skip_if(aa_dialect(con) == "mysql", "DDL in MySQL is not rolled back")
 
   testthat::local_mocked_bindings(
     aa_migrations = function() {
       list(
         list(version = 1L, name = "ok",   up = function(conn) DBI::dbExecute(conn, "CREATE TABLE users (login TEXT)")),
-        list(version = 2L, name = "boom", up = function(conn) stop("сбой миграции"))
+        list(version = 2L, name = "boom", up = function(conn) stop("migration failure"))
       )
     }
   )
 
-  expect_error(aa_init_db(con), "сбой миграции")
+  expect_error(aa_init_db(con), "migration failure")
   expect_identical(table_names(con), character())
 })
 
-test_that("aa_init_db и aa_schema_version отклоняют неподдерживаемые базы и закрытые подключения", {
+test_that("aa_init_db and aa_schema_version reject unsupported databases and closed connections", {
   expect_error(aa_init_db(list()), class = "appauth_error_connection")
   expect_error(aa_schema_version("not a connection"), class = "appauth_error_connection")
 
@@ -177,7 +177,7 @@ test_that("aa_init_db и aa_schema_version отклоняют неподдерж
   expect_error(aa_init_db(con), class = "appauth_error_connection")
 })
 
-test_that("aa_cleanup удаляет только устаревшие попытки и токены", {
+test_that("aa_cleanup deletes only stale attempts and tokens", {
   con <- new_db()
   aa_init_db(con)
 
@@ -204,7 +204,7 @@ test_that("aa_cleanup удаляет только устаревшие попы�
   )
 })
 
-test_that("aa_cleanup учитывает сроки хранения из настроек", {
+test_that("aa_cleanup honors retention periods from the settings", {
   con <- new_db()
   aa_init_db(con)
 
@@ -219,22 +219,22 @@ test_that("aa_cleanup учитывает сроки хранения из нас
   expect_identical(tquery(con, "SELECT login FROM login_attempts")$login, "b")
 })
 
-test_that("aa_prepare_db подготавливает базу и не бросает ошибок", {
+test_that("aa_prepare_db prepares the database and does not throw errors", {
   con <- new_db()
 
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
   expect_identical(aa_schema_version(con), 9L)
 
-  expect_message(aa_prepare_db(new_db(), aa_settings()), "применены миграции схемы")
+  expect_message(aa_prepare_db(new_db(), aa_settings()), "schema migrations applied")
 })
 
-test_that("aa_prepare_db при ошибке возвращает FALSE и пишет предупреждение в лог", {
+test_that("aa_prepare_db on error returns FALSE and writes a warning to the log", {
   con <- new_db()
   DBI::dbDisconnect(con)
 
-  expect_message(res <- aa_prepare_db(con, aa_settings()), "ВНИМАНИЕ")
+  expect_message(res <- aa_prepare_db(con, aa_settings()), "WARNING")
   expect_false(res)
 
-  expect_message(res2 <- aa_prepare_db(list(), aa_settings()), "ВНИМАНИЕ")
+  expect_message(res2 <- aa_prepare_db(list(), aa_settings()), "WARNING")
   expect_false(res2)
 })

@@ -1,4 +1,4 @@
-test_that("каталог событий: уникальные ключи, все поля заполнены, нужные события есть", {
+test_that("events catalog: unique keys, all fields filled, required events present", {
   ev <- aa_events()
 
   expect_named(ev, c("event", "description", "value"))
@@ -13,9 +13,9 @@ test_that("каталог событий: уникальные ключи, вс�
   ) %in% ev$event))
 })
 
-test_that("все события, которые отправляет код пакета, описаны в каталоге", {
+test_that("all events emitted by the package code are described in the catalog", {
   files <- list.files(testthat::test_path("..", "..", "R"), pattern = "\\.R$", full.names = TRUE)
-  skip_if(length(files) == 0, "исходники недоступны (установленный пакет)")
+  skip_if(length(files) == 0, "sources not available (installed package)")
 
   code <- unlist(lapply(files, readLines, encoding = "UTF-8"))
   used <- unique(unlist(regmatches(
@@ -27,7 +27,7 @@ test_that("все события, которые отправляет код п�
   expect_true(all(used %in% aa_events()$event), info = paste(setdiff(used, aa_events()$event), collapse = ", "))
 })
 
-test_that("aa_emit передаёт хуку все поля и подставляет значения по умолчанию", {
+test_that("aa_emit passes all fields to the hook and fills in defaults", {
   got <- NULL
   hook <- function(event, user, session_id, value) got <<- list(event, user, session_id, value)
 
@@ -41,12 +41,23 @@ test_that("aa_emit передаёт хуку все поля и подставл
   expect_equal(got, list("logout", "anonymous", "", "5"))
 })
 
-test_that("aa_emit без хука ничего не делает, ошибка хука не пробрасывается", {
+test_that("aa_emit without a hook does nothing, a hook error is not propagated", {
   expect_false(aa_emit(NULL, "logout"))
-  expect_false(aa_emit("не функция", "logout"))
+  expect_false(aa_emit("not a function", "logout"))
   expect_message(
-    res <- aa_emit(function(event, user, session_id, value) stop("лог недоступен"), "logout"),
-    "лог недоступен"
+    res <- aa_emit(function(event, user, session_id, value) stop("log unavailable"), "logout"),
+    "log unavailable"
   )
   expect_false(res)
+})
+
+test_that("Russian catalog has the same events and ASCII-only source", {
+  en <- aa_events()
+  ru <- aa_events("ru")
+
+  expect_named(ru, names(en))
+  expect_identical(ru$event, en$event)
+  expect_true(all(nzchar(ru$description)))
+  expect_false(identical(ru$description, en$description))
+  expect_error(aa_events("de"))
 })

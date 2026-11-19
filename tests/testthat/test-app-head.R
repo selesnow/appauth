@@ -1,4 +1,4 @@
-test_that("aa_app_head подключает CSS и JS пакета как зависимость", {
+test_that("aa_app_head attaches the package CSS and JS as a dependency", {
   head <- aa_app_head()
   deps <- htmltools::findDependencies(head)
 
@@ -10,7 +10,7 @@ test_that("aa_app_head подключает CSS и JS пакета как зав
   expect_true(file.exists(file.path(deps[[1]]$src$file, "appauth.css")))
 })
 
-test_that("JS содержит обработчики cookie и ставит SameSite и Secure", {
+test_that("JS contains cookie handlers and sets SameSite and Secure", {
   js <- paste(readLines(system.file("www", "appauth.js", package = "appauth"), encoding = "UTF-8"), collapse = "\n")
 
   expect_match(js, "appauth_set_cookie", fixed = TRUE)
@@ -20,7 +20,7 @@ test_that("JS содержит обработчики cookie и ставит Sam
   expect_match(js, "Secure", fixed = TRUE)
 })
 
-test_that("CSS содержит классы, на которые опираются модули", {
+test_that("CSS contains the classes the modules rely on", {
   css <- paste(readLines(system.file("www", "appauth.css", package = "appauth"), encoding = "UTF-8"), collapse = "\n")
 
   for (cls in c("aa-login", "aa-login-card", "aa-login-message", "aa-row-blocked", "aa-row-locked",

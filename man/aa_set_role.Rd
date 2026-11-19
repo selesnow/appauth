@@ -2,32 +2,33 @@
 % Please edit documentation in R/users.R
 \name{aa_set_role}
 \alias{aa_set_role}
-\title{Сменить пользователю роль}
+\title{Change a user's role}
 \usage{
 aa_set_role(conn, login, role, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{role}{Роль из списка \code{roles} настроек.}
+\item{role}{A role from the \code{roles} list of the settings.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Число изменённых пользователей (невидимо).
+The number of changed users (invisibly).
 }
 \description{
-Роль должна быть в списке \code{roles} настроек, у последнего активного
-администратора роль администратора снять нельзя (см.
-\code{\link[=aa_check_can_change_role]{aa_check_can_change_role()}}). При нарушении ошибка класса
+The role must be in the \code{roles} list of the settings; the administrator role
+cannot be taken from the last active administrator (see
+\code{\link[=aa_check_can_change_role]{aa_check_can_change_role()}}). On a violation, an error of class
 \code{appauth_error_user}.
 }
 \details{
-Открытая сессия пользователя продолжает работать с прежней ролью до
-ближайшей проверки живой сессии модулем входа, а при следующем входе роль
-берётся из базы.
+The user's open session keeps working with the old role until the login
+module's next live-session check, and at the next login the role is taken
+from the database.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

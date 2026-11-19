@@ -1,13 +1,13 @@
-#' Модуль смены собственного пароля: интерфейс
+#' Own password change module: UI
 #'
-#' Форма «текущий пароль, новый пароль, подтверждение». Показывается только
-#' вошедшему пользователю. Разместите её там, где у приложения личный кабинет или
-#' настройки (на вкладке или в модальном окне). Стили подключаются через
+#' A form with "current password, new password, confirmation". Shown only to a
+#' signed-in user. Place it wherever the app has an account page or
+#' settings (in a tab or a modal window). Styles are attached through
 #' [aa_app_head()].
 #'
-#' @param id Идентификатор модуля.
+#' @param id Module id.
 #'
-#' @returns Элемент интерфейса Shiny.
+#' @returns A Shiny UI element.
 #' @seealso [aa_password_server()]
 #' @export
 #'
@@ -17,20 +17,20 @@ aa_password_ui <- function(id) {
   shiny::uiOutput(shiny::NS(id, "form"))
 }
 
-#' Модуль смены собственного пароля: сервер
+#' Own password change module: server
 #'
-#' Пользователь подтверждает текущий пароль и задаёт новый ([aa_change_own_password()]).
-#' Токены автовхода остальных сессий отзываются, текущая сессия продолжает
-#' работать. О смене модуль сообщает хуку `on_event` событием `password_changed`.
+#' The user confirms the current password and sets a new one ([aa_change_own_password()]).
+#' Auto-login tokens of the other sessions are revoked, the current session keeps
+#' working. The module reports the change to the `on_event` hook with the `password_changed` event.
 #'
-#' @param id Идентификатор модуля, такой же, как в [aa_password_ui()].
-#' @param conn Подключение к базе данных.
-#' @param auth Объект авторизации, результат [aa_auth_server()].
-#' @param settings Настройки, результат [aa_settings()].
-#' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
+#' @param id Module id, the same as in [aa_password_ui()].
+#' @param conn Database connection.
+#' @param auth Authentication object, the result of [aa_auth_server()].
+#' @param settings Settings, the result of [aa_settings()].
+#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
 #'
-#' @returns Список с реактивным значением `changed`: число успешных смен пароля в
-#'   этой сессии (можно использовать, чтобы закрыть окно или показать сообщение).
+#' @returns A list with the reactive value `changed`: the number of successful password changes in
+#'   this session (can be used to close a window or show a message).
 #' @seealso [aa_password_ui()]
 #' @export
 #'
@@ -45,7 +45,7 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
   shiny::moduleServer(id, function(input, output, session) {
     changed <- shiny::reactiveVal(0)
     message_text <- shiny::reactiveVal("")
-    # счётчик перерисовки формы: после успешной смены поля очищаются
+    # form redraw counter: fields are cleared after a successful change
     form_version <- shiny::reactiveVal(0)
 
     output$form <- shiny::renderUI({
@@ -97,7 +97,7 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
         changed(changed() + 1)
         shiny::showNotification(aa_text(settings, "done_password_changed"), type = "message")
 
-        # в режиме password_policy = "warn" слабый пароль принимается, но об этом сообщаем
+        # with password_policy = "warn" a weak password is accepted, but we report it
         weak <- aa_password_warning(new_password, settings, user$login)
         if (!is.null(weak)) {
           aa_emit(on_event, "weak_password_set", user$login, session$token, paste0(user$login, ": ", weak$reason))

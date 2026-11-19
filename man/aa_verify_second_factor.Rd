@@ -2,29 +2,30 @@
 % Please edit documentation in R/totp.R
 \name{aa_verify_second_factor}
 \alias{aa_verify_second_factor}
-\title{Проверить второй фактор при входе}
+\title{Verify the second factor at sign-in}
 \usage{
 aa_verify_second_factor(conn, login, code, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{code}{Введённый код.}
+\item{code}{Entered code.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} с \code{totp_enabled = TRUE}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 }
 \value{
-Список: \code{ok} (\code{TRUE} или \code{FALSE}) и \code{method} (\code{"totp"}, \code{"recovery"}
-или \code{NA}).
+A list: \code{ok} (\code{TRUE} or \code{FALSE}) and \code{method} (\code{"totp"}, \code{"recovery"}
+or \code{NA}).
 }
 \description{
-Принимает код из приложения (6 цифр) или резервный код. Код из приложения
-принимается один раз: повтор того же кода (шага времени) отклоняется. Резервный
-код одноразовый. Функция \strong{не ограничивает число попыток сама}: перед ней
-вызывайте \code{\link[=aa_login_gate]{aa_login_gate()}}, а после неверного кода \code{\link[=aa_record_attempt]{aa_record_attempt()}}, как
-делает модуль входа.
+Accepts a code from the app (6 digits) or a recovery code. An app code
+is accepted once: a repeat of the same code (time step) is rejected. A recovery
+code is one-time. The function \strong{does not limit the number of attempts itself}: call
+\code{\link[=aa_login_gate]{aa_login_gate()}} before it and \code{\link[=aa_record_attempt]{aa_record_attempt()}} after a wrong code, as
+the sign-in module does.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

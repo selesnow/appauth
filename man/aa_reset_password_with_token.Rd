@@ -2,34 +2,35 @@
 % Please edit documentation in R/reset.R
 \name{aa_reset_password_with_token}
 \alias{aa_reset_password_with_token}
-\title{Задать новый пароль по ссылке из письма}
+\title{Set a new password by the link from the email}
 \usage{
 aa_reset_password_with_token(conn, token, password, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{token}{Токен из ссылки (параметр \code{reset} адресной строки).}
+\item{token}{Token from the link (the \code{reset} parameter of the address bar).}
 
-\item{password}{Новый пароль.}
+\item{password}{New password.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Логин пользователя, чей пароль изменён (невидимо).
+The login of the user whose password was changed (invisibly).
 }
 \description{
-Проверяет токен (\code{\link[=aa_reset_token_login]{aa_reset_token_login()}}), проверяет новый пароль по правилам
-из настроек и записывает его. Токен одноразовый: слабый пароль ошибкой
-отклоняется и токен не тратит, а после успешной смены ссылка перестаёт
-работать. Вместе с паролем отзываются все токены автовхода пользователя, гасятся
-остальные ссылки восстановления, снимается требование смены пароля и
-блокировка по неудачным попыткам входа.
+Checks the token (\code{\link[=aa_reset_token_login]{aa_reset_token_login()}}), checks the new password against the rules
+from the settings and writes it. The token is one-time: a weak password is rejected
+with an error and does not spend the token, and after a successful change the link stops
+working. Along with the password, all of the user's auto-login tokens are revoked, the
+other recovery links are consumed, and the password change requirement and the
+lock for failed login attempts are cleared.
 }
 \details{
-Неверная, просроченная или использованная ссылка даёт ошибку класса
-\code{appauth_error_user} с \code{reason = "reset_link_invalid"}, слабый пароль ошибку
-того же класса с причиной пароля.
+A wrong, expired or used link raises an error of class
+\code{appauth_error_user} with \code{reason = "reset_link_invalid"}, a weak password an error
+of the same class with a password reason.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

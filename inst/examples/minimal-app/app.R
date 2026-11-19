@@ -1,49 +1,49 @@
-# Минимальное приложение с авторизацией appauth.
+# A minimal application with appauth authentication.
 #
-# Что показывает:
-#   * вход, создание первого администратора на пустой базе, автовход по cookie;
-#   * права из матрицы "право -> роли" (config.yaml), вкладки по правам;
-#   * проверку права в обработчике (aa_require);
-#   * вкладку пользователей для администратора;
-#   * кнопки рядом с плашкой пользователя: смена своего пароля (окно с формой модуля),
-#     выход и выход на всех устройствах (с подтверждением);
-#   * принудительный выход при блокировке, удалении, смене роли или сброса пароля;
-#   * хук событий (все события пишутся в консоль).
+# What it shows:
+#   * login, creating the first administrator on an empty database, cookie auto-login;
+#   * permissions from a "permission -> roles" matrix (config.yaml), tabs by permission;
+#   * a permission check in a handler (aa_require);
+#   * a users tab for the administrator;
+#   * buttons next to the user badge: change your own password (a dialog with the
+#     module form), sign out and sign out on all devices (with confirmation);
+#   * forced logout on blocking, deletion, role change or password reset;
+#   * an events hook (all events are written to the console).
 #
-# Запуск: shiny::runApp("minimal-app")
-# База по умолчанию временная, поэтому при каждом запуске приложение предложит
-# создать администратора. Постоянную базу задаёт переменная APPAUTH_EXAMPLE_DB.
+# Run: shiny::runApp("minimal-app")
+# The default database is temporary, so every run offers to create an
+# administrator. A permanent database is set with APPAUTH_EXAMPLE_DB.
 
 library(shiny)
 library(appauth)
 
 conf <- yaml::read_yaml("config.yaml")
-settings <- aa_settings_from_list(conf$security, texts = aa_texts("ru"))
+settings <- aa_settings_from_list(conf$security)
 provider <- aa_permissions_from_matrix(function() conf$access_matrix)
 db_path <- Sys.getenv("APPAUTH_EXAMPLE_DB", file.path(tempdir(), "minimal-app.db"))
 
-# единственное место, где приложение решает, что делать с событиями авторизации
+# the only place where the app decides what to do with authentication events
 log_event <- function(event, user, session_id, value) {
   message(sprintf("[appauth] %s user=%s value=%s", event, user, value))
 }
 
 ui <- fluidPage(
   aa_app_head(),
-  titlePanel("Минимальное приложение"),
+  titlePanel("Minimal application"),
   aa_auth_ui("auth"),
   uiOutput("main")
 )
 
 server <- function(input, output, session) {
-  # подключение закрывается вместе с сессией, схема готовится при подключении
+  # the connection is closed with the session, the schema is prepared on connect
   conn <- aa_session_connection(db_path, prepare = TRUE, settings = settings)
 
-  auth <- aa_auth_server("auth", conn, settings, on_event = log_event, title = "Вход")
+  auth <- aa_auth_server("auth", conn, settings, on_event = log_event, title = "Sign in")
 
-  # блокировка, удаление, смена роли и сброс пароля вступают в силу за 30 секунд
+  # blocking, deletion, role change and password reset take effect within 30 seconds
   aa_session_guard(auth, conn, settings)
 
-  # серверные части вкладок подключаются только тем, у кого есть право
+  # the server parts of tabs are attached only for users who have the permission
   aa_register_module(auth, "Access", provider, function() {
     aa_users_server("users", conn, auth, settings, on_event = log_event)
   })
@@ -56,44 +56,44 @@ server <- function(input, output, session) {
     tabs <- list(
       if (aa_can(user, "Tasks", provider)) {
         tabPanel(
-          "Задачи",
-          p("Вы вошли как ", strong(user$login), " (роль ", user$role, ")."),
-          if (aa_can(user, "Run", provider)) actionButton("run", "Запустить задачу")
+          "Tasks",
+          p("Signed in as ", strong(user$login), " (role ", user$role, ")."),
+          if (aa_can(user, "Run", provider)) actionButton("run", "Run task")
         )
       },
-      if (aa_can(user, "Access", provider)) tabPanel("Доступ", aa_users_ui("users"))
+      if (aa_can(user, "Access", provider)) tabPanel("Access", aa_users_ui("users"))
     )
 
     tagList(
-      # плашка пользователя с кнопками личного кабинета
+      # user badge with the account buttons
       div(
         style = "margin-bottom: 12px;",
         span(icon("user"), strong(user$login), paste0(" (", user$role, ") ")),
-        actionButton("change_password", "Сменить пароль", class = "btn-sm"),
-        actionButton("logout_all", "Выйти на всех устройствах", class = "btn-sm"),
-        actionButton("logout", "Выйти", class = "btn-danger btn-sm")
+        actionButton("change_password", "Change password", class = "btn-sm"),
+        actionButton("logout_all", "Sign out everywhere", class = "btn-sm"),
+        actionButton("logout", "Sign out", class = "btn-danger btn-sm")
       ),
       do.call(tabsetPanel, Filter(Negate(is.null), tabs))
     )
   })
 
-  # смена своего пароля: форма модуля в окне, после успешной смены окно закрывается
+  # changing your own password: the module form in a dialog, closed after a successful change
   observeEvent(input$change_password, {
     showModal(modalDialog(
       aa_password_ui("password"),
-      title = "Смена пароля", easyClose = TRUE, footer = modalButton("Закрыть")
+      title = "Change password", easyClose = TRUE, footer = modalButton("Close")
     ))
   })
   observeEvent(pw$changed(), removeModal(), ignoreInit = TRUE)
 
-  # выход на всех устройствах только после подтверждения: кнопка выбросит и с других устройств
+  # sign out everywhere only after confirmation: the button also ends sessions on other devices
   observeEvent(input$logout_all, {
     showModal(modalDialog(
-      "Все ваши сессии на всех устройствах будут завершены, в приложение придётся войти заново.",
-      title = "Выйти на всех устройствах?", easyClose = TRUE,
+      "All your sessions on all devices will be ended; you will have to sign in again.",
+      title = "Sign out on all devices?", easyClose = TRUE,
       footer = tagList(
-        modalButton("Отмена"),
-        actionButton("logout_all_confirm", "Выйти везде", class = "btn-danger")
+        modalButton("Cancel"),
+        actionButton("logout_all_confirm", "Sign out everywhere", class = "btn-danger")
       )
     ))
   })
@@ -103,9 +103,9 @@ server <- function(input, output, session) {
   })
 
   observeEvent(input$run, {
-    # проверка на сервере: скрытая кнопка не защита, обработчик можно вызвать из браузера
+    # a server-side check: a hidden button is not protection, the handler can be called from the browser
     aa_require(auth, "Run", provider, on_event = log_event, settings = settings)
-    showNotification("Задача запущена", type = "message")
+    showNotification("Task started", type = "message")
   })
 
   observeEvent(input$logout, auth$logout(reload = TRUE))

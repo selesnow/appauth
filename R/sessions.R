@@ -1,30 +1,31 @@
-#' Хеш токена автовхода
+#' Autologin token hash
 #'
-#' В базе хранится только sha256 токена в виде текста (64 символа), как в
-#' Server Manager, поэтому уже выданные токены продолжают работать.
+#' Only the sha256 of the token is stored in the database, as text (64
+#' characters).
 #'
-#' @param token Токен из cookie.
+#' @param token Token from the cookie.
 #'
-#' @returns Строка из 64 символов.
+#' @returns A string of 64 characters.
 #' @noRd
 aa_token_hash <- function(token) {
   as.character(openssl::sha256(token))
 }
 
-#' Выдать токен автовхода
+#' Issue an autologin token
 #'
-#' Создаёт случайный токен (32 байта), записывает в базу его хеш и срок действия
-#' (`session_days` из [aa_settings()]). Сам токен нужно передать браузеру
-#' (в cookie), в базе его восстановить нельзя.
+#' Creates a random token (32 bytes) and stores its hash and expiry
+#' (`session_days` from [aa_settings()]) in the database. The token itself must
+#' be handed to the browser (in a cookie); it cannot be recovered from the
+#' database.
 #'
-#' Токен не выдаётся (возвращается `NULL`), если автовход выключен в настройках,
-#' пользователя нет или он заблокирован.
+#' No token is issued (`NULL` is returned) if autologin is disabled in the
+#' settings, the user does not exist or the user is blocked.
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин пользователя.
-#' @param settings Настройки, результат [aa_settings()].
+#' @param conn Database connection.
+#' @param login User login.
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Строка с токеном или `NULL`.
+#' @returns A string with the token or `NULL`.
 #' @export
 #'
 #' @examples
@@ -55,22 +56,23 @@ aa_issue_token <- function(conn, login, settings = aa_settings()) {
   token
 }
 
-#' Найти пользователя по токену автовхода
+#' Find a user by autologin token
 #'
-#' Возвращает пользователя только если токен существует, не отозван и не истёк,
-#' а сам пользователь есть, не заблокирован и не обязан сменить пароль (после
-#' смены пароля войти нужно заново). Роль берётся из базы на момент проверки.
+#' Returns the user only if the token exists, is not revoked and has not
+#' expired, and the user exists, is not blocked and is not required to change
+#' the password (after a password change the user must log in again). The role
+#' is taken from the database at the time of the check.
 #'
 #' @inheritParams aa_issue_token
-#' @param token Токен из cookie.
+#' @param token Token from the cookie.
 #'
-#' @returns Список с полями `login` и `role` или `NULL`.
+#' @returns A list with `login` and `role` fields, or `NULL`.
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' user <- aa_find_session_user(conn, input$auth_cookie)
-#' if (!is.null(user)) { # пользователь входит без пароля }
+#' if (!is.null(user)) { # the user logs in without a password }
 #' }
 aa_find_session_user <- function(conn, token) {
   if (!aa_is_string(token)) {
@@ -97,13 +99,13 @@ aa_find_session_user <- function(conn, token) {
   list(login = res$login[1], role = res$role[1])
 }
 
-#' Отозвать токен автовхода
+#' Revoke an autologin token
 #'
-#' Нужно при выходе: cookie в браузере после этого перестаёт работать.
+#' Needed on logout: the cookie in the browser stops working afterwards.
 #'
 #' @inheritParams aa_find_session_user
 #'
-#' @returns Число отозванных токенов (0 или 1), невидимо.
+#' @returns The number of revoked tokens (0 or 1), invisibly.
 #' @export
 #'
 #' @examples
@@ -122,12 +124,12 @@ aa_revoke_token <- function(conn, token) {
   ))
 }
 
-#' Активен ли токен автовхода
+#' Is the autologin token active
 #'
-#' @param conn Подключение к базе данных.
-#' @param token Токен из cookie.
+#' @param conn Database connection.
+#' @param token Token from the cookie.
 #'
-#' @returns `TRUE`, если токен существует, не отозван и не истёк.
+#' @returns `TRUE` if the token exists, is not revoked and has not expired.
 #' @noRd
 aa_token_active <- function(conn, token) {
   n <- aa_query(
@@ -140,19 +142,20 @@ aa_token_active <- function(conn, token) {
   n > 0
 }
 
-#' Сколько действующих автовходов у пользователей
+#' How many active autologins users have
 #'
-#' Считает токены автовхода, которые не отозваны и не истекли: столько устройств
-#' сейчас «помнят» вход пользователя (cookie), то есть могут войти без пароля.
-#' Это не число открытых вкладок: приложение их не отслеживает. Если таблицы
-#' токенов нет или к ней не удалось обратиться, считается, что токенов нет.
+#' Counts autologin tokens that are not revoked and have not expired: that many
+#' devices currently "remember" the user's login (cookie), i.e. can log in
+#' without a password. This is not the number of open tabs: the app does not
+#' track them. If the token table does not exist or cannot be queried, it is
+#' assumed there are no tokens.
 #'
-#' @param conn Подключение к базе данных.
-#' @param login Логин пользователя или `NULL`.
+#' @param conn Database connection.
+#' @param login User login or `NULL`.
 #'
-#' @returns Для заданного `login` целое число (0, если токенов нет). При `login = NULL`
-#'   таблица с колонками `login` и `n` для пользователей, у которых есть действующие
-#'   токены.
+#' @returns For a given `login`, an integer (0 if there are no tokens). With
+#'   `login = NULL`, a table with `login` and `n` columns for users that have
+#'   active tokens.
 #' @export
 #'
 #' @examples
@@ -190,26 +193,28 @@ aa_active_autologins <- function(conn, login = NULL) {
   if (length(n) == 0) 0L else n[1]
 }
 
-#' Проверить, что открытая сессия всё ещё действует
+#' Check that an open session is still valid
 #'
-#' Вызывается периодически (интервал `session_check_seconds`), чтобы блокировка,
-#' удаление, понижение роли и завершение сессий вступали в силу у уже вошедшего
-#' пользователя, а не только при следующем входе. Сессия недействительна, если
-#' пользователь удалён, заблокирован, его роль в базе отличается от роли в
-#' сессии или токен этой сессии отозван (сброс пароля, «завершить все сессии»).
+#' Called periodically (every `session_check_seconds`) so that blocking,
+#' deletion, role demotion and session termination take effect for a user who
+#' is already logged in, not only at the next login. A session is invalid if
+#' the user was deleted or blocked, the role in the database differs from the
+#' role in the session, or the token of this session was revoked (password
+#' reset, "end all sessions").
 #'
-#' Если базу прочитать не удалось, сессия считается действующей
-#' (`reason = "check_failed"`), чтобы сбой базы не выбросил всех пользователей;
-#' доступ при этом не расширяется, так как пароль не проверяется.
+#' If the database cannot be read, the session is considered valid
+#' (`reason = "check_failed"`) so that a database failure does not kick out all
+#' users; access is not widened, because no password is checked.
 #'
 #' @inheritParams aa_issue_token
-#' @param role Роль, с которой пользователь вошёл.
-#' @param token Токен автовхода этой сессии (`auth$token()`) или `NULL`, если
-#'   у сессии токена нет (например, автовход выключен): тогда токен не проверяется.
+#' @param role The role the user logged in with.
+#' @param token Autologin token of this session (`auth$token()`) or `NULL` if
+#'   the session has no token (for example, autologin is disabled): then the
+#'   token is not checked.
 #'
-#' @returns Список: `valid` (логическое), `reason` (`"ok"`, `"deleted"`,
-#'   `"blocked"`, `"role_changed"`, `"token_revoked"`, `"check_failed"`) и `role`
-#'   (актуальная роль из базы или `NULL`).
+#' @returns A list: `valid` (logical), `reason` (`"ok"`, `"deleted"`,
+#'   `"blocked"`, `"role_changed"`, `"token_revoked"`, `"check_failed"`) and
+#'   `role` (the current role from the database or `NULL`).
 #' @export
 #'
 #' @examples

@@ -2,25 +2,26 @@
 % Please edit documentation in R/users.R
 \name{aa_get_user}
 \alias{aa_get_user}
-\title{Пользователь по логину}
+\title{User by login}
 \usage{
 aa_get_user(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-Таблица из одной строки с колонками \code{login}, \code{role}, \code{blocked},
-\code{created_at} и \code{last_login_at} либо \code{NULL}, если такого пользователя нет.
-Даты хранятся текстом \code{"ГГГГ-ММ-ДД ЧЧ:ММ:СС"} по UTC; у пользователей,
-созданных до версии 0.3.0, \code{created_at} пустая (\code{NA}), а \code{last_login_at}
-пустая, пока пользователь не войдёт по паролю.
+A one-row table with \code{login}, \code{role}, \code{blocked}, \code{created_at} and
+\code{last_login_at} columns, or \code{NULL} if there is no such user. Dates are
+stored as text \code{"YYYY-MM-DD HH:MM:SS"} in UTC; for users created before
+version 0.3.0 \code{created_at} is empty (\code{NA}), and \code{last_login_at} is empty
+until the user logs in with a password.
 }
 \description{
-Логин сравнивается точно, с учётом регистра. Пароль в результат не
-попадает.
+The login is matched exactly, case-sensitive. The password is not included in
+the result.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

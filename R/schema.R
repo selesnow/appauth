@@ -1,27 +1,27 @@
-# Схема таблиц авторизации и её версионные миграции.
+# Schema of the authentication tables and its versioned migrations.
 #
-# Пакет владеет семью таблицами:
-#   users             - пользователи (логин, хеш пароля, роль, признак блокировки, email);
-#   auth_sessions     - токены автовхода (хранится sha256 токена);
-#   login_attempts    - попытки входа для защиты от подбора пароля;
-#   password_resets   - одноразовые токены восстановления пароля (хранится sha256 токена);
-#   totp_recovery     - резервные коды двухфакторной аутентификации (хранится sha256 кода);
-#   oauth_states      - одноразовые параметры входа через Google (хранится sha256 state);
-#   appauth_migrations - служебная таблица версий миграций.
+# The package owns seven tables:
+#   users             - users (login, password hash, role, blocked flag, email);
+#   auth_sessions     - auto-login tokens (the sha256 of the token is stored);
+#   login_attempts    - login attempts for protection against password guessing;
+#   password_resets   - one-time password recovery tokens (the sha256 of the token is stored);
+#   totp_recovery     - two-factor authentication recovery codes (the sha256 of the code is stored);
+#   oauth_states      - one-time Google sign-in parameters (the sha256 of state is stored);
+#   appauth_migrations - a service table of migration versions.
 #
-# Имена и колонки таблиц совпадают с базами приложения Server Manager, поэтому
-# работающие базы подключаются без переноса данных. Каждая миграция
-# идемпотентна: она проверяет, что уже существует, и создаёт только
-# недостающее, не изменяя существующие данные. Поэтому старые схемы (таблица
-# users без колонки id или без blocked, база без остальных таблиц, пароли в
-# открытом виде) распознаются и достраиваются без потерь.
+# Table names and columns are compatible with schemas created by earlier versions
+# of the package, so existing databases are connected without moving data. Each migration is
+# idempotent: it checks what already exists and creates only what
+# is missing, without changing existing data. So old schemas (a users table
+# without an id column or without blocked, a database without the other tables, plain-text
+# passwords) are recognized and completed without losses.
 
-#' Список миграций схемы
+#' List of schema migrations
 #'
-#' Таблицы и колонки одинаковы во всех базах, различаются только типы и
-#' автоинкремент (см. dialect.R). В SQLite схема совпадает с прежней.
+#' Tables and columns are the same in all databases, only the types and
+#' auto-increment differ (see dialect.R). In SQLite the schema matches the earlier one.
 #'
-#' @returns Список миграций, у каждой `version`, `name` и функция `up(conn)`.
+#' @returns A list of migrations, each with `version`, `name` and an `up(conn)` function.
 #' @noRd
 aa_migrations <- function() {
   list(
@@ -31,9 +31,9 @@ aa_migrations <- function() {
       up      = function(conn) {
         t <- aa_col_types(conn)
 
-        # DuckDB не позволяет менять таблицу, на которую уже есть индекс (а на users он
-        # появится в миграции 7), поэтому там все поздние колонки создаются сразу;
-        # миграции 2, 5, 6, 7 и 8 проверяют наличие колонок и ничего не добавят
+        # DuckDB does not allow altering a table that already has an index (and users gets one
+        # in migration 7), so all the late columns are created at once there;
+        # migrations 2, 5, 6, 7 and 8 check that the columns exist and add nothing
         later <- if (identical(aa_dialect(conn), "duckdb")) {
           paste0(",
             blocked        INTEGER NOT NULL DEFAULT 0,
@@ -124,8 +124,8 @@ aa_migrations <- function() {
         cols <- aa_table_columns(conn, "users")
         t <- aa_col_types(conn)
 
-        # SQLite не разрешает DEFAULT CURRENT_TIMESTAMP в ALTER TABLE, поэтому колонки
-        # допускают NULL: у уже существующих пользователей даты неизвестны
+        # SQLite does not allow DEFAULT CURRENT_TIMESTAMP in ALTER TABLE, so the columns
+        # allow NULL: the dates are unknown for existing users
         if (!"created_at" %in% cols) {
           aa_execute(conn, paste("ALTER TABLE users ADD COLUMN created_at", t$ts))
         }
@@ -142,9 +142,9 @@ aa_migrations <- function() {
         cols <- aa_table_columns(conn, "users")
         t <- aa_col_types(conn)
 
-        # email хранится в нижнем регистре и допускает NULL: у существующих
-        # пользователей адреса нет; уникальность действует только для заданных адресов
-        # (во всех поддерживаемых базах несколько NULL в уникальном индексе допустимы)
+        # email is stored in lower case and allows NULL: existing
+        # users have no address; uniqueness applies only to set addresses
+        # (in all supported databases several NULLs in a unique index are allowed)
         if (!"email" %in% cols) {
           aa_execute(conn, paste("ALTER TABLE users ADD COLUMN email", t$key))
         }
@@ -172,8 +172,8 @@ aa_migrations <- function() {
         cols <- aa_table_columns(conn, "users")
         t <- aa_col_types(conn)
 
-        # секрет хранится зашифрованным (см. aa_totp_seal), у существующих пользователей
-        # двухфакторная аутентификация выключена
+        # the secret is stored encrypted (see aa_totp_seal), two-factor authentication
+        # is off for existing users
         if (!"totp_secret" %in% cols) {
           aa_execute(conn, paste("ALTER TABLE users ADD COLUMN totp_secret", t$text))
         }
@@ -204,8 +204,8 @@ aa_migrations <- function() {
       up      = function(conn) {
         t <- aa_col_types(conn)
 
-        # вход через Google: state хранится только в виде sha256, запись живёт минуты и
-        # используется один раз; nonce и PKCE-проверка нужны при возврате от Google
+        # sign-in with Google: state is stored only as sha256, the record lives minutes and
+        # is used once; nonce and the PKCE verifier are needed on return from Google
         aa_execute(conn, paste0("
           CREATE TABLE IF NOT EXISTS oauth_states (
             ", aa_pk_column(conn, "oauth_states"), ",
@@ -223,26 +223,26 @@ aa_migrations <- function() {
   )
 }
 
-#' Создать или обновить схему таблиц авторизации
+#' Create or update the authentication table schema
 #'
-#' Применяет версионные миграции: создаёт недостающие таблицы и колонки и
-#' записывает применённые версии в служебную таблицу `appauth_migrations`.
-#' Существующие данные не изменяются, повторный запуск ничего не меняет.
-#' Распознаются и старые схемы (например, таблица `users` без колонки `id` или
-#' без `blocked`, база без таблиц сессий и попыток входа): недостающее
-#' достраивается, пользователи, пароли и токены остаются как были.
+#' Applies versioned migrations: creates missing tables and columns and
+#' records the applied versions in the service table `appauth_migrations`.
+#' Existing data is not changed, a repeated run changes nothing.
+#' Old schemas are recognized too (for example, a `users` table without an `id` column or
+#' without `blocked`, a database without session and login attempt tables): what is missing
+#' is completed, users, passwords and tokens stay as they were.
 #'
-#' Миграции выполняются одной транзакцией: при ошибке изменения откатываются.
-#' Функцию безопасно вызывать при каждом запуске приложения, в том числе на
-#' работающих базах. Для запуска, который не должен останавливать приложение
-#' при ошибке, используйте [aa_prepare_db()].
+#' Migrations run in a single transaction: on error the changes are rolled back.
+#' It is safe to call the function on every app start, including on
+#' live databases. For a start that must not stop the app
+#' on error, use [aa_prepare_db()].
 #'
-#' @param conn Подключение к базе данных: SQLite, DuckDB, MySQL / MariaDB или PostgreSQL
-#'   (`DBI::dbConnect()` с драйвером RSQLite, duckdb, RMariaDB или RPostgres).
+#' @param conn Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
+#'   (`DBI::dbConnect()` with the RSQLite, duckdb, RMariaDB or RPostgres driver).
 #'
-#' @returns Список (невидимо): `applied` (версии миграций, применённые в этом
-#'   вызове), `version` (текущая версия схемы) и `legacy` (`TRUE`, если таблица
-#'   `users` уже существовала до подключения пакета).
+#' @returns A list (invisibly): `applied` (migration versions applied in this
+#'   call), `version` (the current schema version) and `legacy` (`TRUE` if the
+#'   `users` table already existed before the package was connected).
 #' @export
 #'
 #' @examples
@@ -297,12 +297,12 @@ aa_init_db <- function(conn) {
   ))
 }
 
-#' Текущая версия схемы таблиц авторизации
+#' Current version of the authentication table schema
 #'
 #' @inheritParams aa_init_db
 #'
-#' @returns Целое число: номер последней применённой миграции или `0`, если
-#'   схема ещё не создана пакетом.
+#' @returns An integer: the number of the last applied migration or `0` if the
+#'   schema has not been created by the package yet.
 #' @export
 #'
 #' @examples
@@ -325,21 +325,21 @@ aa_schema_version <- function(conn) {
   if (is.na(version)) 0L else as.integer(version)
 }
 
-#' Удалить устаревшие данные авторизации
+#' Delete stale authentication data
 #'
-#' Удаляет записи о попытках входа старше `attempts_retention_hours` часов, а
-#' также просроченные и отозванные токены автовхода старше `token_retention_days`
-#' дней, а также использованные и просроченные токены восстановления пароля
-#' и параметры входа через Google старше суток. Активные токены и свежие попытки не затрагиваются. Вызывать нужно
-#' после [aa_init_db()].
+#' Deletes login attempt records older than `attempts_retention_hours` hours, as
+#' well as expired and revoked auto-login tokens older than `token_retention_days`
+#' days, as well as used and expired password recovery tokens
+#' and Google sign-in parameters older than a day. Active tokens and fresh attempts are not touched. Call it
+#' after [aa_init_db()].
 #'
 #' @inheritParams aa_init_db
-#' @param settings Настройки, результат [aa_settings()].
+#' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns Список (невидимо): `login_attempts` (число удалённых попыток входа),
-#'   `auth_sessions` (число удалённых токенов) и `password_resets` (число удалённых
-#'   токенов восстановления пароля) и `oauth_states` (число удалённых параметров входа
-#'   через Google).
+#' @returns A list (invisibly): `login_attempts` (the number of deleted login attempts),
+#'   `auth_sessions` (the number of deleted tokens), `password_resets` (the number of deleted
+#'   password recovery tokens) and `oauth_states` (the number of deleted sign-in parameters
+#'   for Google).
 #' @export
 #'
 #' @examples
@@ -370,7 +370,7 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     params = list(token_cutoff, token_cutoff)
   )
 
-  # таблицы восстановления пароля может не быть, если схема не достроена
+  # the password recovery table may be missing if the schema is not upgraded
   resets <- tryCatch(
     aa_execute(
       conn,
@@ -392,17 +392,17 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
   ))
 }
 
-#' Подготовка базы при запуске приложения
+#' Prepare the database on app start
 #'
-#' Вызывает [aa_init_db()] и [aa_cleanup()] и **никогда не останавливает
-#' приложение**: при ошибке пишет сообщение в лог приложения и возвращает
-#' `FALSE`. Рассчитана на вызов один раз при старте приложения. Без подготовленных
-#' таблиц защита от перебора и блокировки работать не будут, а вход по паролю
-#' продолжит работать.
+#' Calls [aa_init_db()] and [aa_cleanup()] and **never stops
+#' the app**: on error it writes a message to the app log and returns
+#' `FALSE`. Meant to be called once at app start. Without the prepared
+#' tables, protection against guessing and locks will not work, while password sign-in
+#' will keep working.
 #'
 #' @inheritParams aa_cleanup
 #'
-#' @returns `TRUE`, если схема подготовлена, иначе `FALSE` (невидимо).
+#' @returns `TRUE` if the schema is prepared, otherwise `FALSE` (invisibly).
 #' @export
 #'
 #' @examples
@@ -417,20 +417,20 @@ aa_prepare_db <- function(conn, settings = aa_settings()) {
     cleaned <- aa_cleanup(conn, settings)
 
     if (length(init$applied) > 0) {
-      message("appauth: применены миграции схемы: ", paste(init$applied, collapse = ", "))
+      message("appauth: schema migrations applied: ", paste(init$applied, collapse = ", "))
     }
 
     if (cleaned$login_attempts + cleaned$auth_sessions + cleaned$password_resets > 0) {
       message(
-        "appauth: удалено устаревших записей: попыток входа ", cleaned$login_attempts,
-        ", токенов ", cleaned$auth_sessions,
-        ", токенов восстановления пароля ", cleaned$password_resets
+        "appauth: stale records deleted: login attempts ", cleaned$login_attempts,
+        ", tokens ", cleaned$auth_sessions,
+        ", password recovery tokens ", cleaned$password_resets
       )
     }
 
     invisible(TRUE)
   }, error = function(e) {
-    message("ВНИМАНИЕ: appauth не подготовил базу данных: ", conditionMessage(e))
+    message("WARNING: appauth could not prepare the database: ", conditionMessage(e))
     invisible(FALSE)
   })
 }

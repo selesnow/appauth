@@ -2,29 +2,29 @@
 % Please edit documentation in R/mod-password.R
 \name{aa_password_server}
 \alias{aa_password_server}
-\title{Модуль смены собственного пароля: сервер}
+\title{Own password change module: server}
 \usage{
 aa_password_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
 }
 \arguments{
-\item{id}{Идентификатор модуля, такой же, как в \code{\link[=aa_password_ui]{aa_password_ui()}}.}
+\item{id}{Module id, the same as in \code{\link[=aa_password_ui]{aa_password_ui()}}.}
 
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{auth}{Объект авторизации, результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
+\item{auth}{Authentication object, the result of \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Хук событий \verb{function(event, user, session_id, value)} или \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
 }
 \value{
-Список с реактивным значением \code{changed}: число успешных смен пароля в
-этой сессии (можно использовать, чтобы закрыть окно или показать сообщение).
+A list with the reactive value \code{changed}: the number of successful password changes in
+this session (can be used to close a window or show a message).
 }
 \description{
-Пользователь подтверждает текущий пароль и задаёт новый (\code{\link[=aa_change_own_password]{aa_change_own_password()}}).
-Токены автовхода остальных сессий отзываются, текущая сессия продолжает
-работать. О смене модуль сообщает хуку \code{on_event} событием \code{password_changed}.
+The user confirms the current password and sets a new one (\code{\link[=aa_change_own_password]{aa_change_own_password()}}).
+Auto-login tokens of the other sessions are revoked, the current session keeps
+working. The module reports the change to the \code{on_event} hook with the \code{password_changed} event.
 }
 \examples{
 \dontrun{

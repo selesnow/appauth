@@ -2,22 +2,22 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_uri}
 \alias{aa_totp_uri}
-\title{Ссылка otpauth для приложения-аутентификатора}
+\title{otpauth link for an authenticator app}
 \usage{
 aa_totp_uri(secret, login, issuer = "appauth")
 }
 \arguments{
-\item{secret}{Секрет в base32.}
+\item{secret}{Secret in base32.}
 
-\item{login}{Логин пользователя.}
+\item{login}{User login.}
 
-\item{issuer}{Название сервиса, которое покажет приложение.}
+\item{issuer}{Service name the app will show.}
 }
 \value{
-Строка вида \verb{otpauth://totp/...}.
+A string like \verb{otpauth://totp/...}.
 }
 \description{
-Из этой ссылки строится QR-код, её же понимают приложения при ручном вводе.
+The QR code is built from this link, and apps also understand it on manual entry.
 }
 \examples{
 aa_totp_uri("JBSWY3DPEHPK3PXP", "ivan", "Reports portal")

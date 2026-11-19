@@ -2,28 +2,28 @@
 % Please edit documentation in R/passwords.R
 \name{aa_weak_password_warning}
 \alias{aa_weak_password_warning}
-\title{Предупреждение о слабом пароле}
+\title{Weak password warning}
 \usage{
 aa_weak_password_warning(password, settings = aa_settings(), login = NULL)
 }
 \arguments{
-\item{password}{Принятый пароль.}
+\item{password}{The accepted password.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{login}{Логин пользователя (необязательно).}
+\item{login}{User login (optional).}
 }
 \value{
-Текст предупреждения (на языке настроек) либо \code{NULL}, если режим не
-\code{"warn"} или слабых мест нет.
+The warning text (in the settings language), or \code{NULL} if the mode
+is not \code{"warn"} or there are no weaknesses.
 }
 \description{
-В режиме \code{password_policy = "warn"} (по умолчанию) слабый пароль принимается,
-но пользователю нужно сообщить, что лучше выбрать надёжнее: встроенные модули
-показывают это уведомлением после успешной смены пароля. Функция нужна
-приложениям со своим интерфейсом. Слабым считается пароль из списка
-\code{\link[=aa_common_passwords]{aa_common_passwords()}}, совпадающий с логином (без учёта регистра) или
-состоящий из одного повторяющегося символа.
+In the \code{password_policy = "warn"} mode (the default) a weak password is
+accepted, but the user should be told to choose a stronger one: the built-in
+modules show this as a notification after a successful password change. The
+function is for apps with their own interface. A password is weak if it is
+in the \code{\link[=aa_common_passwords]{aa_common_passwords()}} list, equals the login (case-insensitive) or
+consists of one repeated character.
 }
 \examples{
 aa_weak_password_warning("123456")

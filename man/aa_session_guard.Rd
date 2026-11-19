@@ -2,7 +2,7 @@
 % Please edit documentation in R/helpers.R
 \name{aa_session_guard}
 \alias{aa_session_guard}
-\title{Принудительно завершать недействительные сессии}
+\title{Forcibly end invalid sessions}
 \usage{
 aa_session_guard(
   auth,
@@ -13,34 +13,35 @@ aa_session_guard(
 )
 }
 \arguments{
-\item{auth}{Результат \code{\link[=aa_auth_server]{aa_auth_server()}}.}
+\item{auth}{A result of \code{\link[=aa_auth_server]{aa_auth_server()}}.}
 
-\item{conn}{Подключение к базе данных.}
+\item{conn}{Database connection.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, a result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{reload}{Перезагружать страницу после выхода, чтобы модули прежнего
-пользователя исчезли. Рекомендуется \code{TRUE}.}
+\item{reload}{Reload the page after sign-out so that the modules of the
+previous user disappear. \code{TRUE} is recommended.}
 
-\item{cleanup_minutes}{Как часто чистить устаревшие записи, в минутах.}
+\item{cleanup_minutes}{How often to clean up outdated records, in minutes.}
 }
 \value{
-Невидимо наблюдатель Shiny (его можно остановить через \verb{$destroy()}).
+Invisibly a Shiny observer (it can be stopped with \verb{$destroy()}).
 }
 \description{
-Раз в \code{session_check_seconds} (из \code{\link[=aa_settings]{aa_settings()}}) проверяет открытую сессию
-(\code{\link[=aa_user_session_valid]{aa_user_session_valid()}}). Если пользователя заблокировали, удалили или
-сменили ему роль, сессия завершается через \code{auth$logout()}: хук \code{on_event}
-получает \code{session_forced_logout} с причиной, токены отзываются. Благодаря
-этому блокировка и понижение роли действуют в течение интервала проверки, а не
-при следующем входе.
+Every \code{session_check_seconds} (from \code{\link[=aa_settings]{aa_settings()}}) checks the open session
+(\code{\link[=aa_user_session_valid]{aa_user_session_valid()}}). If the user has been blocked, deleted or had
+their role changed, the session is ended through \code{auth$logout()}: the
+\code{on_event} hook receives \code{session_forced_logout} with the reason, and tokens
+are revoked. Thanks to this, blocking and role downgrades take effect within
+the check interval rather than at the next sign-in.
 }
 \details{
-Если базу прочитать не удалось, сессия не завершается.
+If the database cannot be read, the session is not ended.
 
-Токен сессии (\code{auth$token()}) тоже проверяется: сброс пароля пользователя или
-«завершить все сессии» завершают и открытые сессии. Раз в \code{cleanup_minutes}
-сторож заодно удаляет устаревшие попытки входа и токены (\code{\link[=aa_cleanup]{aa_cleanup()}}).
+The session token (\code{auth$token()}) is checked too: a password reset of a
+user or "end all sessions" also end open sessions. Every \code{cleanup_minutes}
+the guard also deletes outdated sign-in attempts and tokens
+(\code{\link[=aa_cleanup]{aa_cleanup()}}).
 }
 \examples{
 \dontrun{

@@ -2,35 +2,36 @@
 % Please edit documentation in R/passwords.R
 \name{aa_validate_password}
 \alias{aa_validate_password}
-\title{Проверить новый пароль по правилам}
+\title{Validate a new password against the rules}
 \usage{
 aa_validate_password(password, settings = aa_settings(), login = NULL)
 }
 \arguments{
-\item{password}{Проверяемый пароль.}
+\item{password}{The password to check.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{login}{Логин пользователя, нужен для проверки совпадения пароля с
-логином (необязательно).}
+\item{login}{User login, needed to check whether the password equals the
+login (optional).}
 }
 \value{
-\code{NULL}, если пароль подходит, иначе текст ошибки (на языке настроек).
+\code{NULL} if the password is fine, otherwise the error text (in the
+settings language).
 }
 \description{
-Проверяет пароль, который задаётся пользователю (при создании или сбросе).
-Правила берутся из настроек: минимальная и максимальная длина считаются в
-символах, а не в байтах. Ограничения действуют только для новых паролей,
-уже существующие пароли не затрагиваются.
+Checks a password being set for a user (on creation or reset). The rules come
+from the settings: minimum and maximum length are counted in characters, not
+bytes. The limits apply only to new passwords; existing passwords are not
+affected.
 }
 \details{
-Если в настройках \code{password_policy = "reject"}, слабые пароли (из списка
-\code{\link[=aa_common_passwords]{aa_common_passwords()}}, совпадающие с логином, из одного повторяющегося
-символа) тоже считаются ошибкой. Режим \code{"warn"} пароль не отклоняет: о
-слабом пароле сообщает \code{\link[=aa_weak_password_warning]{aa_weak_password_warning()}}.
+If the settings have \code{password_policy = "reject"}, weak passwords (from the
+\code{\link[=aa_common_passwords]{aa_common_passwords()}} list, equal to the login, one repeated character)
+are also an error. The \code{"warn"} mode does not reject the password: a weak
+password is reported by \code{\link[=aa_weak_password_warning]{aa_weak_password_warning()}}.
 }
 \examples{
 aa_validate_password("abc")
 aa_validate_password("long-enough-password")
-aa_validate_password("abc", aa_settings(texts = aa_texts("en")))
+aa_validate_password("long-enough-password", aa_settings(password_min = 30))
 }

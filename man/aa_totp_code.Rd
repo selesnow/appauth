@@ -2,25 +2,25 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_code}
 \alias{aa_totp_code}
-\title{Одноразовый код TOTP для момента времени}
+\title{One-time TOTP code for a point in time}
 \usage{
 aa_totp_code(secret, time = Sys.time(), digits = 6, period = 30)
 }
 \arguments{
-\item{secret}{Секрет в base32.}
+\item{secret}{Secret in base32.}
 
-\item{time}{Момент времени (по умолчанию сейчас).}
+\item{time}{Point in time (now by default).}
 
-\item{digits}{Число цифр кода.}
+\item{digits}{Number of digits in the code.}
 
-\item{period}{Длина шага, секунд.}
+\item{period}{Step length, seconds.}
 }
 \value{
-Строка из \code{digits} цифр или \code{NA}, если секрет некорректен.
+A string of \code{digits} digits or \code{NA} if the secret is invalid.
 }
 \description{
-Алгоритм RFC 6238 (HMAC-SHA1, шаг 30 секунд). Нужна в тестах и для сверки с
-приложением-аутентификатором.
+The RFC 6238 algorithm (HMAC-SHA1, 30-second step). Needed in tests and for comparing with
+an authenticator app.
 }
 \examples{
 aa_totp_code("JBSWY3DPEHPK3PXP")

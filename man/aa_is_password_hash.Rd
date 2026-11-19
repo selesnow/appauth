@@ -2,19 +2,20 @@
 % Please edit documentation in R/passwords.R
 \name{aa_is_password_hash}
 \alias{aa_is_password_hash}
-\title{Является ли значение хешем пароля}
+\title{Is the value a password hash}
 \usage{
 aa_is_password_hash(x)
 }
 \arguments{
-\item{x}{Вектор строк, например колонка \code{password} таблицы \code{users}.}
+\item{x}{A character vector, for example the \code{password} column of the
+\code{users} table.}
 }
 \value{
-Логический вектор той же длины.
+A logical vector of the same length.
 }
 \description{
-Отличает хеш, созданный \code{\link[=aa_hash_password]{aa_hash_password()}}, от пароля в открытом виде.
-Функция векторизована, \code{NA} не считается хешем.
+Distinguishes a hash created by \code{\link[=aa_hash_password]{aa_hash_password()}} from a plain-text
+password. The function is vectorized; \code{NA} is not considered a hash.
 }
 \examples{
 aa_is_password_hash(c(aa_hash_password("secret"), "root", NA))

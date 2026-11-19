@@ -1,15 +1,15 @@
-# ---- ключ логина --------------------------------------------------------------------
+# ---- login key --------------------------------------------------------------------
 
-test_that("ключ логина это точный логин: регистр и пробелы сохраняются", {
+test_that("the login key is the exact login: case and whitespace are kept", {
   s <- aa_settings()
 
   expect_identical(aa_login_key("Alsey", s), "Alsey")
   expect_identical(aa_login_key("alsey", s), "alsey")
   expect_identical(aa_login_key(" alsey", s), " alsey")
-  expect_identical(aa_login_key("Иван", s), "Иван")
+  expect_identical(aa_login_key("\u0418\u0432\u0430\u043d", s), "\u0418\u0432\u0430\u043d")
 })
 
-test_that("пустые логины и не строки не имеют ключа", {
+test_that("empty logins and non-strings have no key", {
   s <- aa_settings()
 
   for (bad in list("", "   ", "\t", NA_character_, NULL, 5, c("a", "b"))) {
@@ -17,14 +17,14 @@ test_that("пустые логины и не строки не имеют клю
   }
 })
 
-test_that("слишком длинный логин усекается до login_max символов", {
+test_that("a too long login is truncated to login_max characters", {
   expect_identical(nchar(aa_login_key(strrep("a", 500), aa_settings())), 64L)
-  expect_identical(nchar(aa_login_key(strrep("я", 500), aa_settings(login_max = 10))), 10L)
+  expect_identical(nchar(aa_login_key(strrep("\u044f", 500), aa_settings(login_max = 10))), 10L)
 })
 
-# ---- запись попыток -----------------------------------------------------------------
+# ---- recording attempts -----------------------------------------------------------------
 
-test_that("aa_record_attempt записывает точный логин и результат", {
+test_that("aa_record_attempt records the exact login and result", {
   con <- users_db()
 
   expect_true(aa_record_attempt(con, "Alsey", FALSE))
@@ -36,7 +36,7 @@ test_that("aa_record_attempt записывает точный логин и р�
   expect_identical(rows$success, c(0L, 1L))
 })
 
-test_that("попытки с пустым логином не записываются", {
+test_that("attempts with an empty login are not recorded", {
   con <- users_db()
 
   for (bad in list("", "   ", NA_character_, NULL, 5)) {
@@ -47,7 +47,7 @@ test_that("попытки с пустым логином не записываю
   expect_false(withVisible(aa_record_attempt(con, "a", FALSE))$visible)
 })
 
-test_that("aa_record_attempt проверяет аргументы", {
+test_that("aa_record_attempt validates its arguments", {
   con <- users_db()
 
   expect_error(aa_record_attempt(con, "a", NA), class = "appauth_error_settings")
@@ -55,9 +55,9 @@ test_that("aa_record_attempt проверяет аргументы", {
   expect_error(aa_record_attempt(list(), "a", FALSE), class = "appauth_error_connection")
 })
 
-# ---- блокировка логина --------------------------------------------------------------
+# ---- login lockout --------------------------------------------------------------
 
-test_that("до лимита вход разрешён, после лимита логин блокируется примерно на lockout_minutes", {
+test_that("login is allowed below the limit and blocked for about lockout_minutes after it", {
   con <- users_db()
 
   for (i in 1:4) aa_record_attempt(con, "alsey", FALSE)
@@ -71,7 +71,7 @@ test_that("до лимита вход разрешён, после лимита 
   expect_lte(remaining, 15 * 60)
 })
 
-test_that("другой логин не блокируется", {
+test_that("another login is not blocked", {
   con <- users_db()
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
 
@@ -79,7 +79,7 @@ test_that("другой логин не блокируется", {
   expect_identical(aa_login_lock_remaining(con, "ida"), 0L)
 })
 
-test_that("логин считается ТОЧНО: другой регистр и пробелы это другие логины с отдельными счётчиками", {
+test_that("the login is matched EXACTLY: other case and whitespace are different logins with separate counters", {
   con <- users_db()
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
 
@@ -89,7 +89,7 @@ test_that("логин считается ТОЧНО: другой регистр
   expect_identical(aa_login_lock_remaining(con, " alsey"), 0L)
   expect_identical(aa_login_lock_remaining(con, "alsey "), 0L)
 
-  # неудачи по несуществующему "Alsey" не блокируют настоящего "alsey"
+  # failures for a non-existent "Alsey" do not block the real "alsey"
   con2 <- users_db()
   for (i in 1:10) aa_record_attempt(con2, "Alsey", FALSE)
 
@@ -97,7 +97,7 @@ test_that("логин считается ТОЧНО: другой регистр
   expect_gt(aa_login_lock_remaining(con2, "Alsey"), 0)
 })
 
-test_that("пары логинов, различающихся регистром (как kiruka и Kiruka в рекрутинге), не мешают друг другу", {
+test_that("login pairs differing in case (like kiruka and Kiruka in a legacy app) do not interfere", {
   con <- users_db()
 
   for (i in 1:5) aa_record_attempt(con, "Kiruka", FALSE)
@@ -106,20 +106,20 @@ test_that("пары логинов, различающихся регистро�
   expect_gt(aa_login_lock_remaining(con, "Kiruka"), 0)
   expect_identical(aa_login_lock_remaining(con, "kiruka"), 0L)
 
-  # успех одного не сбрасывает счётчик другого
+  # a success of one does not reset the counter of the other
   aa_record_attempt(con, "kiruka", TRUE)
   expect_gt(aa_login_lock_remaining(con, "Kiruka"), 0)
 })
 
-test_that("кириллические логины считаются точно", {
+test_that("non-ASCII logins are matched exactly", {
   con <- users_db()
-  for (i in 1:5) aa_record_attempt(con, "Иван", FALSE)
+  for (i in 1:5) aa_record_attempt(con, "\u0418\u0432\u0430\u043d", FALSE)
 
-  expect_gt(aa_login_lock_remaining(con, "Иван"), 0)
-  expect_identical(aa_login_lock_remaining(con, "иван"), 0L)
+  expect_gt(aa_login_lock_remaining(con, "\u0418\u0432\u0430\u043d"), 0)
+  expect_identical(aa_login_lock_remaining(con, "\u0438\u0432\u0430\u043d"), 0L)
 })
 
-test_that("несуществующий логин блокируется так же, пустой логин никогда", {
+test_that("a non-existent login is blocked the same way, an empty login never", {
   con <- users_db()
   for (i in 1:5) aa_record_attempt(con, "no_such_user", FALSE)
 
@@ -130,7 +130,7 @@ test_that("несуществующий логин блокируется так
   }
 })
 
-test_that("успешный вход обнуляет счётчик, даже если все записи сделаны в одну секунду", {
+test_that("a successful login resets the counter even if all records are made within one second", {
   con <- users_db()
 
   for (i in 1:3) aa_record_attempt(con, "ida", FALSE)
@@ -144,7 +144,7 @@ test_that("успешный вход обнуляет счётчик, даже �
   expect_gt(aa_login_lock_remaining(con, "ida"), 0)
 })
 
-test_that("успех другого логина счётчик не обнуляет", {
+test_that("a success of another login does not reset the counter", {
   con <- users_db()
 
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
@@ -153,7 +153,7 @@ test_that("успех другого логина счётчик не обнул
   expect_gt(aa_login_lock_remaining(con, "alsey"), 0)
 })
 
-test_that("окно: старые неудачи не считаются, блокировка отсчитывается от последней неудачи", {
+test_that("window: old failures are not counted, the lockout is counted from the last failure", {
   con <- users_db()
 
   for (i in 1:5) add_attempt(con, "old20", FALSE, minutes_ago = 20)
@@ -170,7 +170,7 @@ test_that("окно: старые неудачи не считаются, бло
   expect_lte(remaining, 5 * 60 + 5)
 })
 
-test_that("пороги берутся из настроек", {
+test_that("thresholds come from the settings", {
   con <- users_db()
   s <- aa_settings(max_failed_logins = 3, lockout_minutes = 5)
 
@@ -183,11 +183,11 @@ test_that("пороги берутся из настроек", {
   expect_gt(remaining, 4 * 60)
   expect_lte(remaining, 5 * 60)
 
-  # по настройкам по умолчанию тех же 3 попыток недостаточно
+  # with the default settings the same 3 attempts are not enough
   expect_identical(aa_login_lock_remaining(con, "u"), 0L)
 })
 
-test_that("логины с общим началом длиннее login_max делят один ключ (документированное поведение)", {
+test_that("logins sharing a prefix longer than login_max share one key (documented behavior)", {
   con <- users_db()
   s <- aa_settings(login_max = 10)
 
@@ -196,13 +196,13 @@ test_that("логины с общим началом длиннее login_max д
   expect_gt(aa_login_lock_remaining(con, paste0(strrep("a", 10), "y"), s), 0)
 })
 
-# ---- снятие блокировки --------------------------------------------------------------
+# ---- clearing a lockout --------------------------------------------------------------
 
-test_that("aa_clear_attempts снимает блокировку, успешные попытки и чужие логины остаются", {
+test_that("aa_clear_attempts clears the lockout, successful attempts and other logins stay", {
   con <- users_db()
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
   for (i in 1:5) aa_record_attempt(con, "ida", FALSE)
-  aa_record_attempt(con, "alsey", TRUE)   # успех идёт ПОСЛЕ неудач: счётчик и так обнулился бы
+  aa_record_attempt(con, "alsey", TRUE)   # the success comes AFTER the failures: the counter would be reset anyway
   texec(con, "DELETE FROM login_attempts WHERE login = 'alsey' AND success = 1")
 
   expect_gt(aa_login_lock_remaining(con, "alsey"), 0)
@@ -215,7 +215,7 @@ test_that("aa_clear_attempts снимает блокировку, успешны
   expect_gt(aa_login_lock_remaining(con, "ida"), 0)
 })
 
-test_that("aa_clear_attempts сохраняет успешные попытки и не трогает другой регистр", {
+test_that("aa_clear_attempts keeps successful attempts and leaves other case alone", {
   con <- users_db()
   aa_record_attempt(con, "alsey", TRUE)
   for (i in 1:3) aa_record_attempt(con, "alsey", FALSE)
@@ -229,9 +229,9 @@ test_that("aa_clear_attempts сохраняет успешные попытки 
   expect_equal(aa_clear_attempts(con, NA_character_), 0)
 })
 
-# ---- общий лимит --------------------------------------------------------------------
+# ---- global limit --------------------------------------------------------------------
 
-test_that("общий лимит: 29 неудач за минуту по разным логинам ещё не лимит, 30 лимит", {
+test_that("global limit: 29 failures a minute across logins is not yet the limit, 30 is", {
   con <- users_db()
 
   for (i in 1:29) add_attempt(con, paste0("spray", i), FALSE, seconds_ago = 5)
@@ -241,7 +241,7 @@ test_that("общий лимит: 29 неудач за минуту по раз�
   expect_true(aa_global_throttled(con))
 })
 
-test_that("общий лимит не считает старые неудачи и успешные входы", {
+test_that("the global limit does not count old failures or successful logins", {
   con <- users_db()
 
   for (i in 1:40) add_attempt(con, paste0("old", i), FALSE, seconds_ago = 120)
@@ -250,7 +250,7 @@ test_that("общий лимит не считает старые неудачи
   expect_false(aa_global_throttled(con))
 })
 
-test_that("общий лимит берётся из настроек", {
+test_that("the global limit comes from the settings", {
   con <- users_db()
   s <- aa_settings(max_failed_logins_per_minute = 2)
 
@@ -262,9 +262,9 @@ test_that("общий лимит берётся из настроек", {
   expect_false(aa_global_throttled(con))
 })
 
-# ---- шлюз входа ---------------------------------------------------------------------
+# ---- login gate ---------------------------------------------------------------------
 
-test_that("шлюз пропускает вход, пока нет блокировок", {
+test_that("the gate lets login through while there are no lockouts", {
   con <- users_db()
 
   gate <- aa_login_gate(con, "alsey")
@@ -276,7 +276,7 @@ test_that("шлюз пропускает вход, пока нет блокир�
   expect_identical(names(gate), c("allowed", "reason", "seconds", "message"))
 })
 
-test_that("шлюз сообщает о блокировке логина с минутами на нужном языке", {
+test_that("the gate reports a login lockout with minutes in the right language", {
   con <- users_db()
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
 
@@ -285,28 +285,30 @@ test_that("шлюз сообщает о блокировке логина с м�
   expect_false(gate$allowed)
   expect_identical(gate$reason, "locked")
   expect_gt(gate$seconds, 14 * 60)
-  expect_identical(gate$message, "Слишком много неудачных попыток входа. Повторите через 15 мин.")
+  expect_identical(gate$message, aa_text(aa_settings(), "locked", 15L))
 
-  en <- aa_login_gate(con, "alsey", aa_settings(texts = aa_texts("en")))
-  expect_identical(en$message, "Too many failed sign-in attempts. Try again in 15 min.")
+  ru <- aa_settings(texts = aa_texts("ru"))
+  gate_ru <- aa_login_gate(con, "alsey", ru)
+  expect_identical(gate_ru$message, aa_text(ru, "locked", 15L))
+  expect_false(identical(gate_ru$message, gate$message))
 
-  # другой логин при этом входит
+  # another login can still sign in
   expect_true(aa_login_gate(con, "ida")$allowed)
 })
 
-test_that("минуты в сообщении округляются вверх и не бывают нулевыми", {
+test_that("minutes in the message are rounded up and never zero", {
   con <- users_db()
   for (i in 1:4) add_attempt(con, "u", FALSE, minutes_ago = 14)
-  add_attempt(con, "u", FALSE, seconds_ago = 14 * 60 + 40)   # блокировка заканчивается меньше чем через минуту
+  add_attempt(con, "u", FALSE, seconds_ago = 14 * 60 + 40)   # the lockout ends in less than a minute
 
   gate <- aa_login_gate(con, "u")
 
   expect_false(gate$allowed)
   expect_lte(gate$seconds, 60)
-  expect_identical(gate$message, "Слишком много неудачных попыток входа. Повторите через 1 мин.")
+  expect_identical(gate$message, aa_text(aa_settings(), "locked", 1L))
 })
 
-test_that("при общем лимите вход закрыт для всех и это приоритетнее блокировки логина", {
+test_that("under the global limit login is closed for everyone and this takes priority over a login lockout", {
   con <- users_db()
   for (i in 1:30) add_attempt(con, paste0("spray", i), FALSE, seconds_ago = 5)
 
@@ -314,28 +316,28 @@ test_that("при общем лимите вход закрыт для всех 
 
   expect_false(gate$allowed)
   expect_identical(gate$reason, "throttled")
-  expect_identical(gate$message, "Слишком много попыток входа. Повторите через минуту.")
+  expect_identical(gate$message, aa_text(aa_settings(), "throttled"))
 
   for (i in 1:5) aa_record_attempt(con, "alsey", FALSE)
   expect_identical(aa_login_gate(con, "alsey")$reason, "throttled")
 })
 
-test_that("шлюз не запирает вход, если таблицы попыток нет (fail-open) и пишет причину в лог", {
+test_that("the gate does not lock login if the attempts table is missing (fail-open) and logs the reason", {
   con <- users_db()
   texec(con, "DROP TABLE login_attempts")
 
-  expect_message(gate <- aa_login_gate(con, "alsey"), "проверка блокировки входа недоступна")
+  expect_message(gate <- aa_login_gate(con, "alsey"), "login lockout check is unavailable")
 
   expect_true(gate$allowed)
 })
 
-test_that("шлюз отклоняет не SQLite подключение", {
+test_that("the gate rejects a non-SQLite connection", {
   expect_error(aa_login_gate(list(), "a"), class = "appauth_error_connection")
 })
 
-# ---- пользователи со статусами ----------------------------------------------------
+# ---- users with statuses ----------------------------------------------------
 
-test_that("обзор пользователей: состояния, статусы и секунды блокировки", {
+test_that("users overview: states, statuses and lockout seconds", {
   con <- users_db()
   raw_user(con, "boss", "admin")
   raw_user(con, "worker", "user", blocked = 1)
@@ -350,15 +352,15 @@ test_that("обзор пользователей: состояния, стату
   expect_identical(ov$login, c("boss", "worker", "viewer1", "both"))
   expect_identical(ov$state, c("ok", "blocked", "locked", "blocked"))
   expect_identical(ov$status[1], "")
-  expect_identical(ov$status[2], "Заблокирован администратором")
-  expect_identical(ov$status[3], "Вход заблокирован после неудачных попыток (ещё 15 мин.)")
-  # блокировка администратором приоритетнее, но секунды блокировки по попыткам тоже видны
-  expect_identical(ov$status[4], "Заблокирован администратором")
+  expect_identical(ov$status[2], aa_text(aa_settings(), "status_blocked"))
+  expect_identical(ov$status[3], aa_text(aa_settings(), "status_locked", 15L))
+  # a block by an administrator takes priority, but the attempt lockout seconds are visible too
+  expect_identical(ov$status[4], aa_text(aa_settings(), "status_blocked"))
   expect_gt(ov$lock_seconds[3], 14 * 60)
   expect_identical(ov$lock_seconds[1], 0L)
 })
 
-test_that("обзор пользователей на английском и с пустой таблицей", {
+test_that("users overview in another language and with an empty table", {
   con <- users_db()
 
   empty <- aa_users_overview(con)
@@ -366,11 +368,13 @@ test_that("обзор пользователей на английском и с
   expect_identical(names(empty), c("login", "role", "blocked", "state", "lock_seconds", "status", "created_at", "last_login_at", "created", "last_login", "has_email", "totp_on", "autologins"))
 
   raw_user(con, "worker", "user", blocked = 1)
-  en <- aa_users_overview(con, aa_settings(texts = aa_texts("en")))
-  expect_identical(en$status, "Blocked by an administrator")
+  ru <- aa_settings(texts = aa_texts("ru"))
+  ov_ru <- aa_users_overview(con, ru)
+  expect_identical(ov_ru$status, aa_text(ru, "status_blocked"))
+  expect_false(identical(ov_ru$status, aa_text(aa_settings(), "status_blocked")))
 })
 
-test_that("обзор пользователей не падает, если таблицы попыток нет", {
+test_that("users overview does not fail if the attempts table is missing", {
   con <- users_db()
   raw_user(con, "boss", "admin"); raw_user(con, "worker", "user", blocked = 1)
   texec(con, "DROP TABLE login_attempts")
@@ -381,7 +385,7 @@ test_that("обзор пользователей не падает, если т�
   expect_identical(ov$lock_seconds, c(0L, 0L))
 })
 
-test_that("обзор пользователей не раскрывает пароли и отклоняет не SQLite подключение", {
+test_that("users overview does not reveal passwords and rejects a non-SQLite connection", {
   con <- users_db()
   raw_user(con, "boss", "admin", password = "secret-hash")
 
@@ -389,7 +393,7 @@ test_that("обзор пользователей не раскрывает па�
   expect_error(aa_users_overview(list()), class = "appauth_error_connection")
 })
 
-test_that("aa_users_overview: email, 2FA и автовходы по пользователям", {
+test_that("aa_users_overview: email, 2FA and autologins per user", {
   con <- users_db()
   settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-tests")
   raw_user(con, "ivan")
@@ -414,19 +418,19 @@ test_that("aa_users_overview: email, 2FA и автовходы по пользо
   expect_identical(row("boss")$autologins, 1L)
   expect_identical(row("olga")$autologins, 0L)
 
-  # адрес и секрет в сводку не попадают
+  # the address and the secret are not in the summary
   expect_false(any(c("email", "totp_secret") %in% names(data)))
   expect_false(any(grepl("ivan@example.com", unlist(data), fixed = TRUE)))
 })
 
-test_that("aa_users_overview: пустая таблица и старая схема без email и 2FA", {
+test_that("aa_users_overview: an empty table and an old schema without email and 2FA", {
   skip_if_not_sqlite()
   con <- users_db()
   empty <- aa_users_overview(con)
   expect_identical(nrow(empty), 0L)
   expect_true(all(c("has_email", "totp_on", "autologins") %in% names(empty)))
 
-  # старая схема: колонок email и totp_enabled нет, сводка не падает, признаки равны нулю
+  # old schema: no email and totp_enabled columns, the overview does not fail, the flags are zero
   old <- new_db()
   DBI::dbExecute(old, "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT, password TEXT, role TEXT, blocked INTEGER DEFAULT 0, created_at TEXT, last_login_at TEXT)")
   DBI::dbExecute(old, "INSERT INTO users (login, password, role) VALUES ('ivan', 'x', 'user')")

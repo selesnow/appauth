@@ -2,28 +2,30 @@
 % Please edit documentation in R/protection.R
 \name{aa_record_attempt}
 \alias{aa_record_attempt}
-\title{Записать попытку входа}
+\title{Record a login attempt}
 \usage{
 aa_record_attempt(conn, login, success, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Введённый логин (точный, с учётом регистра).}
+\item{login}{The entered login (exact, case-sensitive).}
 
-\item{success}{\code{TRUE} для успешного входа (обнуляет счётчик неудач), \code{FALSE}
-для неудачной попытки.}
+\item{success}{\code{TRUE} for a successful login (resets the failure counter),
+\code{FALSE} for a failed attempt.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE}, если попытка записана, \code{FALSE}, если логин пустой (невидимо).
+\code{TRUE} if the attempt was recorded, \code{FALSE} if the login is empty
+(invisibly).
 }
 \description{
-Сохраняет результат попытки входа для защиты от подбора. Попытки с пустым
-логином не записываются. Вызывать нужно только для попыток, сделанных НЕ
-во время блокировки: попытки во время блокировки не записываются, чтобы не
-продлевать её.
+Stores the result of a login attempt for brute-force protection. Attempts
+with an empty login are not recorded. Call it only for attempts made NOT
+during a lockout: attempts during a lockout are not recorded so as not to
+extend it.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

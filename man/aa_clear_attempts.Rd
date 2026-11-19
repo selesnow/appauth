@@ -2,24 +2,25 @@
 % Please edit documentation in R/protection.R
 \name{aa_clear_attempts}
 \alias{aa_clear_attempts}
-\title{Снять блокировку логина после неудачных попыток}
+\title{Clear a login lockout caused by failed attempts}
 \usage{
 aa_clear_attempts(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Введённый логин (точный, с учётом регистра).}
+\item{login}{The entered login (exact, case-sensitive).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Число удалённых записей (невидимо).
+The number of deleted records (invisibly).
 }
 \description{
-Удаляет неудачные попытки входа логина (успешные остаются), поэтому логин
-сразу можно использовать снова. Блокировку администратором вручную
-(\code{\link[=aa_set_blocked]{aa_set_blocked()}}) эта функция не снимает.
+Deletes the failed login attempts of a login (successful ones stay), so the
+login can be used again right away. A manual block by an administrator
+(\code{\link[=aa_set_blocked]{aa_set_blocked()}}) is not lifted by this function.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

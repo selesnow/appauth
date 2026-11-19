@@ -1,13 +1,13 @@
-#' Модуль двухфакторной аутентификации: интерфейс
+#' Two-factor authentication module: UI
 #'
-#' Блок для личного кабинета: статус двухфакторной аутентификации, подключение
-#' (секрет, QR-код и подтверждение кодом) и выключение. Ничего не показывает,
-#' пока в настройках не включено `totp_enabled`. Стили подключаются через
+#' A block for the account page: the two-factor authentication status, enabling
+#' (secret, QR code and confirmation with a code) and disabling. Shows nothing
+#' until `totp_enabled` is set in the settings. Styles are attached through
 #' [aa_app_head()].
 #'
-#' @param id Идентификатор модуля.
+#' @param id Module id.
 #'
-#' @returns Элемент интерфейса Shiny.
+#' @returns A Shiny UI element.
 #' @seealso [aa_totp_server()]
 #' @export
 #'
@@ -17,14 +17,14 @@ aa_totp_ui <- function(id) {
   shiny::uiOutput(shiny::NS(id, "main"))
 }
 
-#' QR-код для ссылки otpauth
+#' QR code for an otpauth link
 #'
-#' Нужен необязательный пакет `qrcode`. Если его нет или построить код не
-#' удалось, возвращается `NULL`, и пользователь вводит ключ вручную.
+#' Needs the optional `qrcode` package. If it is missing or the code could not
+#' be built, `NULL` is returned and the user enters the key manually.
 #'
-#' @param uri Ссылка `otpauth://`.
+#' @param uri An `otpauth://` link.
 #'
-#' @returns HTML с SVG или `NULL`.
+#' @returns HTML with SVG or `NULL`.
 #' @noRd
 aa_totp_qr_html <- function(uri) {
   if (!requireNamespace("qrcode", quietly = TRUE)) {
@@ -42,16 +42,16 @@ aa_totp_qr_html <- function(uri) {
   )
 }
 
-#' Кнопка копирования текста в буфер обмена
+#' Button that copies text to the clipboard
 #'
-#' Текст лежит в атрибуте `data-copy` и копируется скриптом из [aa_app_head()] (по
-#' HTTPS через буфер браузера, иначе через скрытое поле). Текст уже виден на странице,
-#' поэтому кнопка не раскрывает ничего нового.
+#' The text is stored in the `data-copy` attribute and copied by the script from [aa_app_head()] (over
+#' HTTPS through the browser clipboard, otherwise through a hidden field). The text is already visible on the page,
+#' so the button reveals nothing new.
 #'
-#' @param text Что копировать.
-#' @param settings Настройки (тексты кнопки).
+#' @param text What to copy.
+#' @param settings Settings (button texts).
 #'
-#' @returns Элемент интерфейса Shiny.
+#' @returns A Shiny UI element.
 #' @noRd
 aa_copy_button <- function(text, settings) {
   shiny::tags$button(
@@ -63,28 +63,28 @@ aa_copy_button <- function(text, settings) {
   )
 }
 
-#' Модуль двухфакторной аутентификации: сервер
+#' Two-factor authentication module: server
 #'
-#' Пользователь сам включает и выключает двухфакторную аутентификацию (TOTP):
+#' The user enables and disables two-factor authentication (TOTP) on their own:
 #'
-#' * **включение**: кнопка создаёт секрет ([aa_totp_setup()]), показывает QR-код
-#'   (если установлен пакет `qrcode`) и ключ для ручного ввода, а после ввода кода
-#'   из приложения ([aa_totp_enable()]) включает защиту и **один раз** показывает
-#'   10 резервных кодов. Остальные сессии пользователя при включении завершаются;
-#' * **выключение**: нужны пароль и код (или резервный код), иначе тот, кто
-#'   занял открытую сессию, мог бы снять защиту.
+#' * **enabling**: a button creates a secret ([aa_totp_setup()]), shows a QR code
+#'   (if the `qrcode` package is installed) and a key for manual entry, and after a code
+#'   from the authenticator app is entered ([aa_totp_enable()]) turns protection on and shows
+#'   10 recovery codes **once**. The user's other sessions are ended on enabling;
+#' * **disabling**: needs the password and a code (or a recovery code), otherwise whoever
+#'   took over an open session could remove the protection.
 #'
-#' Неверные коды считаются неудачными попытками входа ([aa_record_attempt()]),
-#' поэтому перебор кода в личном кабинете блокирует логин так же, как перебор
-#' пароля. События: `totp_enabled`, `totp_disabled`, `totp_failed`.
+#' Wrong codes count as failed login attempts ([aa_record_attempt()]),
+#' so guessing a code on the account page locks the login the same way as guessing
+#' a password. Events: `totp_enabled`, `totp_disabled`, `totp_failed`.
 #'
-#' @param id Идентификатор модуля, такой же, как в [aa_totp_ui()].
-#' @param conn Подключение к базе данных.
-#' @param auth Объект авторизации, результат [aa_auth_server()].
-#' @param settings Настройки, результат [aa_settings()] с `totp_enabled = TRUE`.
-#' @param on_event Хук событий `function(event, user, session_id, value)` или `NULL`.
+#' @param id Module id, the same as in [aa_totp_ui()].
+#' @param conn Database connection.
+#' @param auth Authentication object, the result of [aa_auth_server()].
+#' @param settings Settings, the result of [aa_settings()] with `totp_enabled = TRUE`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
 #'
-#' @returns Список с функцией `refresh()`, которая перерисовывает блок.
+#' @returns A list with a `refresh()` function that redraws the block.
 #' @seealso [aa_totp_ui()], [aa_auth_server()]
 #' @export
 #'
@@ -114,7 +114,7 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
       shiny::showNotification(text, type = type)
     }
 
-    # перебор кода в личном кабинете блокирует логин так же, как перебор пароля
+    # guessing a code on the account page locks the login the same way as guessing a password
     gate_open <- function(login) {
       gate <- aa_login_gate(conn, login, settings)
 
@@ -131,7 +131,7 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
     }
 
     output$main <- shiny::renderUI({
-      auth$user() # зависимость: после входа или выхода интерфейс перерисовывается
+      auth$user() # dependency: the UI is redrawn after sign-in or sign-out
       version()
 
       login <- acting_login()
@@ -232,7 +232,7 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
         return()
       }
 
-      # включение 2FA завершает остальные сессии: токен текущей остаётся
+      # enabling 2FA ends the other sessions: the current token stays
       keep <- auth$token()
       aa_revoke_user_tokens(conn, login, keep_hash = if (aa_is_string(keep)) aa_token_hash(keep) else NULL)
 
@@ -261,7 +261,7 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
         return()
       }
 
-      # код проверяется только при верном пароле: иначе чужая попытка тратила бы резервные коды
+      # the code is checked only with the right password: otherwise someone else's attempt would burn recovery codes
       password_ok <- !is.null(aa_authenticate(conn, login, input$disable_password))
       code_ok <- password_ok && isTRUE(aa_verify_second_factor(conn, login, input$disable_code, settings)$ok)
 

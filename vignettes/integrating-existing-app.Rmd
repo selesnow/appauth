@@ -1,8 +1,8 @@
 ---
-title: "Перевод существующего приложения на appauth"
+title: "Integrating into an existing app"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Перевод существующего приложения на appauth}
+  %\VignetteIndexEntry{Integrating into an existing app}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -12,104 +12,104 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 has_sqlite <- requireNamespace("RSQLite", quietly = TRUE)
 ```
 
-Для приложения, у которого уже есть своя авторизация: таблица `users`, самописная форма входа, возможно пароли в открытом виде. Цель: заменить самописный код вызовами пакета, не потеряв пользователей, пароли и открытые сессии.
+For an app that already has its own authentication: a `users` table, a hand-written login form, possibly plaintext passwords. The goal: replace the hand-written code with package calls without losing users, passwords or open sessions.
 
-# Что поддерживается
+# What is supported
 
-Пакет рассчитан на базы такого вида (это схемы Server Manager и приложения рекрутинга):
+The package is designed for databases of this shape:
 
-* таблица `users` с колонками `login`, `password`, `role`. Колонки `id` и `blocked` могут отсутствовать, они достраиваются;
-* пароли либо хеши scrypt (`$7$...`), либо открытый текст (его нужно перенести, см. ниже);
-* необязательные таблицы `auth_sessions` и `login_attempts` (если их нет, создаются).
+* a `users` table with the columns `login`, `password`, `role`. The `id` and `blocked` columns may be missing; they are added;
+* passwords are either scrypt hashes (`$7$...`) or plaintext (which must be migrated, see below);
+* optional `auth_sessions` and `login_attempts` tables (created if missing).
 
-**Базы кроме SQLite.** Достройка старых схем (колонки `id`, `blocked`, `email` и другие) рассчитана на базы Server Manager и рекрутинга, то есть на SQLite. Если вы переносите приложение на MySQL, PostgreSQL или DuckDB, создайте таблицы пакетом (`aa_init_db()` на пустой базе) и перенесите пользователей функциями `aa_create_user()`; таблица `users`, созданная вручную в MySQL с обычной collation, сравнивает логины без учёта регистра. Перенос открытых паролей в хеши `aa_migrate_plaintext_passwords()` работает по файлу и только для SQLite.
+**Databases other than SQLite.** Upgrading old schemas (the `id`, `blocked`, `email` columns and others) is designed for SQLite databases. If you move the app to MySQL, PostgreSQL or DuckDB, create the tables with the package (`aa_init_db()` on an empty database) and migrate the users with `aa_create_user()`; a `users` table created by hand in MySQL with an ordinary collation compares logins case-insensitively. Migrating plaintext passwords to hashes with `aa_migrate_plaintext_passwords()` works on a file and only for SQLite.
 
-**Не поддерживается** схема с другими именами колонок (например `username`/`pwd`). В этом случае сначала приведите таблицу к нужным именам миграцией приложения или заведите представление-копию, а уже потом подключайте пакет.
+**Not supported** is a schema with different column names (for example `username`/`pwd`). In that case first bring the table to the required names with an app migration, or create a view-copy, and only then plug in the package.
 
-Данные существующих таблиц пакет не меняет: он только добавляет недостающие колонки (`blocked`, `must_change`, `email`, `totp_secret`, `totp_enabled`, `totp_last_step`) и недостающие таблицы, а также служебную таблицу `appauth_migrations`. Это проверено на копиях баз Server Manager (dev и prod) и на схеме приложения рекрутинга.
+The package does not change the data in existing tables: it only adds missing columns (`blocked`, `must_change`, `email`, `totp_secret`, `totp_enabled`, `totp_last_step`) and missing tables, as well as the service table `appauth_migrations`.
 
-# План перехода
+# Migration plan
 
-Делайте переход **в отдельной ветке и на копии базы**. Рабочую базу трогайте только после проверки.
+Do the migration **in a separate branch and on a copy of the database**. Touch the production database only after verification.
 
-## Шаг 0. Резервная копия и проверка того, что есть
+## Step 0. Backup and inventory
 
-1. Остановите приложение и скопируйте файл базы (`app.db`) в безопасное место. Если в базе пароли в открытом виде, копия тоже содержит их: не кладите её в git и синхронизируемые папки, удалите после проверки.
-2. Посмотрите, как хранятся пароли:
+1. Stop the app and copy the database file (`app.db`) to a safe place. If the database has plaintext passwords, the copy contains them too: do not put it in git or synchronized folders, and delete it after verification.
+2. Look at how the passwords are stored:
 
 ```{r, eval = FALSE}
 conn <- DBI::dbConnect(RSQLite::SQLite(), "app.copy.db")
-aa_init_db(conn)                        # достроит схему на копии
-aa_check_default_accounts(conn)         # слабые пароли и пароли в открытом виде
+aa_init_db(conn)                        # completes the schema on the copy
+aa_check_default_accounts(conn)         # weak and plaintext passwords
 aa_list_users(conn)
 DBI::dbDisconnect(conn)
 ```
 
-`aa_check_default_accounts()` показывает пользователей, у которых пароль хранится открытым текстом, совпадает с логином (`root`/`root`) или входит в список распространённых слабых. Пароли функция не выводит.
+`aa_check_default_accounts()` shows the users whose password is stored as plaintext, equals the login (`root`/`root`) or is in the list of common weak ones. The function does not print the passwords.
 
-## Шаг 1. Перенос открытых паролей в хеши
+## Step 1. Migrating plaintext passwords to hashes
 
-Только если на шаге 0 нашлись пароли в открытом виде. Запускайте **при остановленном приложении**.
+Only if step 0 found plaintext passwords. Run it **while the app is stopped**.
 
 ```{r, eval = FALSE}
-# сначала посмотреть, что изменится (ничего не пишет)
+# first see what would change (writes nothing)
 aa_migrate_plaintext_passwords("app.copy.db", dry_run = TRUE)
 
-# выполнить: резервная копия рядом с базой, одна транзакция,
-# каждый новый хеш проверяется по исходному паролю до записи
+# run it: a backup next to the database, a single transaction,
+# each new hash is verified against the original password before writing
 res <- aa_migrate_plaintext_passwords("app.copy.db")
-res$migrated   # чьи пароли перенесены
-res$backup     # путь к резервной копии (в ней пароли открытым текстом!)
+res$migrated   # whose passwords were migrated
+res$backup     # path to the backup (it holds plaintext passwords!)
 ```
 
-После переноса пользователи входят со **старыми паролями**: введённый пароль проверяется по новому хешу. Функцию безопасно запускать повторно: хеши она пропускает. Резервную копию удалите после проверки.
+After the migration users sign in with their **old passwords**: the entered password is checked against the new hash. It is safe to run the function again: it skips hashes. Delete the backup after verification.
 
-Пока пароли хранятся открытым текстом, пакет не пустит с ними никого: открытый пароль не принимается как пароль. Это сделано намеренно.
+While passwords are stored as plaintext, the package will let nobody in with them: a plaintext password is not accepted as a password. This is deliberate.
 
-## Шаг 2. Заменить код авторизации
+## Step 2. Replace the authentication code
 
-Подключите пакет по [быстрому старту](getting-started.html) и удалите свой код. Соответствие функций сверено с кодом Server Manager (файлы `R/passwords.R`, `R/login_protection.R`, `R/user_blocking.R`, `R/access.R`, `modules/mod_auth.R`, `modules/mod_tab_access.R`); в других приложениях названия могут отличаться, но задачи те же:
+Plug in the package following the [getting started guide](getting-started.html) and delete your own code. The table below maps typical hand-written function names to the package; the names in your app may differ, but the tasks are the same:
 
-| Было в Server Manager | Стало в пакете |
+| Typical custom code | In the package |
 | --- | --- |
 | `hash_password()`, `verify_password()`, `is_password_hash()` | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()` |
-| `authenticate_user()` (в `app.R` обёрнута в `check_user()`) | `aa_authenticate()` |
-| `validate_new_password()`, `validate_new_login()` | `aa_validate_password()`, `aa_validate_login()` (для формы целиком `aa_validate_new_user()`) |
+| `authenticate_user()` | `aa_authenticate()` |
+| `validate_new_password()`, `validate_new_login()` | `aa_validate_password()`, `aa_validate_login()` (for the whole form `aa_validate_new_user()`) |
 | `create_user()`, `create_first_admin()`, `set_user_password()` | `aa_create_user()`, `aa_create_first_admin()`, `aa_set_password()` |
 | `migrate_passwords_to_hash()` | `aa_migrate_plaintext_passwords()` |
-| `mod_auth_ui()`, `mod_auth_server()` (включая окно первого администратора) | `aa_auth_ui()`, `aa_auth_server()` |
-| JS `setAuthCookie`, `clearAuthCookie`, `readAuthCookie` и `input$auth_cookie` в `app.R` | `aa_app_head()` и автовход внутри `aa_auth_server()` |
-| `record_login_attempt()`, `login_lock_remaining()`, `login_global_throttled()`, `clear_login_attempts()` | `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`; модуль входа вызывает их сам через `aa_login_gate()` |
-| `login_security_settings()` (настройки из `config.yaml`) | `aa_settings_from_list(conf$security)` |
-| `normalize_login()` | не нужна: логин считается точно (см. «Что меняется») |
-| `ensure_login_attempts_table()`, `ensure_users_blocked_column()`, `prepare_login_protection()`, `prepare_user_blocking()` | `aa_init_db()` и `aa_prepare_db()` (или `aa_session_connection(prepare = TRUE)`) |
-| `cleanup_security_tables()` | `aa_cleanup()` (вызывается при подготовке базы и сторожем сессии) |
-| `find_session_user()`, поиск и отзыв токена в `app.R` и `mod_auth.R` | `aa_find_session_user()`, `aa_issue_token()`, `aa_revoke_token()` |
-| `user_session_valid(conn, login)` и проверка раз в 30 секунд в `app.R` | `aa_session_guard()` (проверяет и роль, и токен; вручную `aa_user_session_valid(conn, login, role, token)`) |
+| `mod_auth_ui()`, `mod_auth_server()` (including the first administrator window) | `aa_auth_ui()`, `aa_auth_server()` |
+| JS `setAuthCookie`, `clearAuthCookie`, `readAuthCookie` and `input$auth_cookie` in `app.R` | `aa_app_head()` and auto-login inside `aa_auth_server()` |
+| `record_login_attempt()`, `login_lock_remaining()`, `login_global_throttled()`, `clear_login_attempts()` | `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`; the login module calls them itself through `aa_login_gate()` |
+| `login_security_settings()` (settings from `config.yaml`) | `aa_settings_from_list(conf$security)` |
+| `normalize_login()` | not needed: the login is compared exactly (see "What changes") |
+| `ensure_login_attempts_table()`, `ensure_users_blocked_column()`, `prepare_login_protection()`, `prepare_user_blocking()` | `aa_init_db()` and `aa_prepare_db()` (or `aa_session_connection(prepare = TRUE)`) |
+| `cleanup_security_tables()` | `aa_cleanup()` (called when preparing the database and by the session guard) |
+| `find_session_user()`, token lookup and revocation in `app.R` and the auth module | `aa_find_session_user()`, `aa_issue_token()`, `aa_revoke_token()` |
+| `user_session_valid(conn, login)` and the check every 30 seconds in `app.R` | `aa_session_guard()` (checks both the role and the token; manually `aa_user_session_valid(conn, login, role, token)`) |
 | `perform_logout()` | `auth$logout(reload = TRUE)` |
-| `user_can()` | `aa_can()` с `aa_permissions_from_matrix()` |
+| `user_can()` | `aa_can()` with `aa_permissions_from_matrix()` |
 | `require_permission()` | `aa_require()` |
-| `is_user_blocked()`, `set_user_blocked()`, `delete_user_account()` | `aa_get_user()` (поле `blocked`), `aa_set_blocked()`, `aa_delete_user()` |
-| `check_can_block_user()`, `check_can_delete_user()` | `aa_check_can_block()`, `aa_check_can_delete()`, а также `aa_check_can_change_role()` |
+| `is_user_blocked()`, `set_user_blocked()`, `delete_user_account()` | `aa_get_user()` (the `blocked` field), `aa_set_blocked()`, `aa_delete_user()` |
+| `check_can_block_user()`, `check_can_delete_user()` | `aa_check_can_block()`, `aa_check_can_delete()`, and also `aa_check_can_change_role()` |
 | `users_overview()` | `aa_users_overview()` |
-| Пользовательская часть `mod_access_ui()`/`mod_access_server()` (таблица, карточка, добавление, роль, пароль, блокировка, удаление) | `aa_users_ui()` и `aa_users_server()` |
-| `dbConnect` на каждую сессию без закрытия | `aa_session_connection()` |
+| The user-facing part of `mod_access_ui()`/`mod_access_server()` (table, card, add, role, password, blocking, deletion) | `aa_users_ui()` and `aa_users_server()` |
+| `dbConnect` per session without closing | `aa_session_connection()` |
 
-Остаются в приложении (в пакет они не идут): `is_safe_task_name()`, `task_exists_in_scheduler()` и другие прикладные проверки, редактор матрицы прав и переключатели логов в `mod_access_server()`, запись в лог (`write_action_log`).
+These stay in the app (they do not go into the package): application-specific checks such as `is_safe_task_name()`, the permission matrix editor and log switches in the access module, and writing to the log (`write_action_log`).
 
-### Не потеряйте открытые сессии
+### Do not lose open sessions
 
-Если у приложения уже был автовход по cookie, пользователям не придётся входить заново, если задать то же имя cookie:
+If the app already had cookie auto-login, users will not have to sign in again if you set the same cookie name:
 
 ```{r, eval = FALSE}
 auth <- aa_auth_server("auth", conn, settings, cookie_name = "auth_token")
 ```
 
-Токены в базе хранятся как sha256 в виде текста, как и в Server Manager, поэтому выданные раньше токены продолжат работать.
+Tokens in the database are stored as sha256 text, so tokens issued earlier will keep working as long as your old code stored them the same way.
 
-### Логирование
+### Logging
 
-Пакет пишет события в хук. Подключите его к вашей функции записи в лог:
+The package reports events to a hook. Connect it to your log-writing function:
 
 ```{r, eval = FALSE}
 log_event <- function(event, user, session_id, value) {
@@ -117,7 +117,7 @@ log_event <- function(event, user, session_id, value) {
 }
 ```
 
-Каталог событий: `aa_events()`. Если в старом логе использовались свои названия действий (`'User add'`, `'Login failed'`), сделайте соответствие в хуке одной таблицей, чтобы старые отчёты не сломались:
+The event catalog is `aa_events()`. If the old log used its own action names (`'User add'`, `'Login failed'`), map them in the hook with a single table so old reports do not break:
 
 ```{r, eval = FALSE}
 legacy_names <- c(
@@ -133,7 +133,7 @@ log_event <- function(event, user, session_id, value) {
 }
 ```
 
-То же короче готовым обработчиком (отбор событий, названия, переключатель записи и преобразование значения делает пакет, подробности в виньетке `extension-points`):
+The same in shorter form with the ready-made handler (the package does event selection, names, the write switch and value conversion; details in the `extension-points` vignette):
 
 ```{r, eval = FALSE}
 log_event <- aa_event_logger(
@@ -144,54 +144,54 @@ log_event <- aa_event_logger(
 )
 ```
 
-### Частая ошибка: настройки созданы в `app.R`, а функции лежат в `R/`
+### Common mistake: settings created in `app.R`, functions live in `R/`
 
-Приложение, которое запускается через `shiny::runApp(папка)`, загружает `app.R` в **собственное окружение**, а файлы из `R/` часто подключаются через `source()` в **глобальное**. Если в `app.R` создать `auth_settings <- aa_settings(...)`, функции из `R/` (обёртка проверки прав, хук событий, источник прав) этой переменной не увидят и получат `object 'auth_settings' not found`.
+An app launched with `shiny::runApp(folder)` loads `app.R` into its **own environment**, while files from `R/` are often attached with `source()` into the **global** one. If you create `auth_settings <- aa_settings(...)` in `app.R`, the functions from `R/` (the permission check wrapper, the event hook, the permission provider) will not see this variable and will fail with `object 'auth_settings' not found`.
 
-Проверка прав в пакете закрыта по умолчанию, поэтому ошибка превращается в «прав нет»: вкладка, которую регистрирует `aa_register_module()`, остаётся пустой, а в логе только сообщение пакета `источник прав завершился ошибкой`. Так это выглядело в Server Manager при первом внедрении.
+Permission checking in the package is closed by default, so the error turns into "no permissions": the tab registered by `aa_register_module()` stays empty, and the log contains only the package message `appauth: the permission provider failed`.
 
-Что делать: присваивать такие переменные глобально, как и конфиг (`auth_settings <<- ...`), либо передавать их функциям аргументами.
+What to do: assign such variables globally, like the config (`auth_settings <<- ...`), or pass them to functions as arguments.
 
-Это относится к приложениям, где файлы из `R/` подключаются явным `source()` в глобальное окружение (как в Server Manager). У приложения, которое полагается на автозагрузку Shiny, другая особенность: Shiny сам подключает `R/*.R` **до** выполнения `app.R`. Поэтому если в файле из `R/` на верхнем уровне вызывается функция пакета (например, `aa_permissions_from_matrix(...)`), то в самом этом файле нужен `library(appauth)`, иначе запуск через `runApp` упадёт с `could not find function`, хотя тест `testServer`, который загружает `app.R` целиком, будет зелёным. А при проверке приложения запускайте его через `runApp()` и обязательно откройте вкладки под администратором, см. виньетку `testing-your-app`.
+This applies to apps where files from `R/` are attached with an explicit `source()` into the global environment. An app that relies on Shiny's autoload has a different quirk: Shiny itself attaches `R/*.R` **before** running `app.R`. So if a file in `R/` calls a package function at the top level (for example `aa_permissions_from_matrix(...)`), that file itself needs `library(appauth)`, otherwise launching through `runApp` fails with `could not find function`, even though a `testServer` test, which loads `app.R` as a whole, stays green. When testing the app, run it through `runApp()` and be sure to open the tabs as an administrator, see the `testing-your-app` vignette.
 
-## Шаг 3. Проверка на копии
+## Step 3. Verification on the copy
 
-1. Запустите приложение на копии базы (путь через переменную среды или конфиг).
-2. Проверьте вход старыми паролями, неверный пароль, блокировку после серии неудач, вкладки по ролям, добавление, блокировку и удаление пользователя, выход и автовход.
-3. Прогоните существующие автотесты приложения. Пакет не меняет поведение прав и ролей, но меняет детали: см. раздел ниже.
-4. Только после этого переключите рабочее приложение и проверьте его так же.
+1. Run the app on the copy of the database (pass the path through an environment variable or config).
+2. Check signing in with old passwords, a wrong password, lockout after a series of failures, tabs by role, adding, blocking and deleting a user, logout and auto-login.
+3. Run the app's existing automated tests. The package does not change the behavior of permissions and roles, but it changes details: see the section below.
+4. Only then switch the production app and verify it the same way.
 
-## Шаг 4 (по желанию). Восстановление пароля по email
+## Step 4 (optional). Password reset by email
 
-Если у пользователей есть рабочие адреса, включите восстановление пароля: в самописной авторизации его обычно нет, а с `appauth` оно добавляется настройками. Адреса администратор вносит в карточке пользователя; у существующих пользователей колонка `email` после миграции пустая. Рецепт функции отправки, настройки и ограничения описаны в виньетке `extension-points` (раздел «Восстановление пароля по email»), а за nginx проверьте `reset_base_url` (виньетка `deployment`).
+If users have working addresses, enable password reset: hand-written authentication usually lacks it, while with `appauth` it is added by settings. The administrator enters addresses in the user card; for existing users the `email` column is empty after the migration. The sending function recipe, settings and limitations are described in the `extension-points` vignette (section "Password reset by email"), and behind nginx check `reset_base_url` (the `deployment` vignette).
 
-## Шаг 5 (по желанию). Двухфакторная аутентификация
+## Step 5 (optional). Two-factor authentication
 
-Для приложений с привилегированными ролями включите добровольную 2FA: `aa_settings(totp_enabled = TRUE, totp_key = ...)`, блок `aa_totp_ui()` и `aa_totp_server()` в профиле и просьба администраторам включить её. Ключ `totp_key` задайте переменной среды и не теряйте его, у существующих пользователей защита после миграции выключена. Рецепт и ограничения: виньетка `extension-points` (раздел «Двухфакторная аутентификация»).
+For apps with privileged roles, enable voluntary 2FA: `aa_settings(totp_enabled = TRUE, totp_key = ...)`, the `aa_totp_ui()` and `aa_totp_server()` block in the profile, and ask administrators to turn it on. Set `totp_key` through an environment variable and do not lose it; for existing users protection is off after the migration. Recipe and limitations: the `extension-points` vignette (section "Two-factor authentication").
 
-## Откат
+## Rollback
 
-Откат это возврат резервной копии базы и предыдущей версии кода. Миграции схемы только добавляют колонки и таблицы, поэтому старая версия приложения на новой базе тоже работает: лишние колонки она не использует. Исключение: если вы переносили пароли в хеши, старый код должен уметь проверять хеши scrypt.
+Rollback means restoring the database backup and the previous version of the code. Schema migrations only add columns and tables, so the old version of the app also works on the new database: it just does not use the extra columns. Exception: if you migrated passwords to hashes, the old code must be able to verify scrypt hashes.
 
-# Что меняется по сравнению с самописной авторизацией
+# What changes compared to hand-written authentication
 
-Поведение пакета строже, чем у типичной самописной авторизации. Учтите это при переходе:
+The package behaves more strictly than typical hand-written authentication. Keep this in mind during the migration:
 
-* **Логин сравнивается точно**, с учётом регистра и пробелов; так же считаются неудачные попытки (`normalize_login()` из Server Manager приводил логин к нижнему регистру и обрезал пробелы, теперь `ALSEY` и `alsey` имеют отдельные счётчики; старые записи попыток в нижнем регистре просто устареют через сутки). `Alsey` и `alsey` это разные пользователи. Существующие пары вроде `kiruka`/`Kiruka` сохраняются и работают как разные люди, а вот новый пользователь, чей логин совпадает с существующим без учёта регистра, создан быть не может.
-* **Открытые пароли не принимаются.** Их нужно перенести (шаг 1).
-* **Нельзя остаться без активного администратора**: ни блокировкой, ни удалением, ни сменой роли.
-* **Смена роли действует сразу**: открытая сессия пользователя с изменённой ролью завершается при ближайшей проверке, и он входит заново с новой ролью.
-* **Сброс пароля и «завершить все сессии» завершают открытые сессии** пользователя.
-* **Пароль, который задал администратор, по умолчанию временный** (настройка `must_change_default`): пользователь при входе обязан сменить его. Чтобы пароли оставались постоянными, поставьте `must_change_default = FALSE`.
-* **Роль администратора не получает прав автоматически**: только те, что есть в вашем источнике прав. Управлять пользователями она может всегда.
-* **Новые пароли**: от `password_min` (по умолчанию 6) до `password_max` символов. Правило действует только для новых и сбрасываемых паролей, существующие не затрагиваются.
-* **Слабые новые пароли** (из `aa_common_passwords()`, совпадающие с логином, из одного повторяющегося символа) по умолчанию принимаются с предупреждением (`password_policy = "warn"`, событие `weak_password_set`). Чтобы отклонять их, поставьте `password_policy = "reject"`, чтобы не проверять, `"off"`.
-* **Удаление пользователя требует подтверждения**: кнопка «Удалить аккаунт» открывает окно с кнопками «Да, удалить» и «Отмена». Если в автотестах приложения есть сценарий удаления, добавьте после `delete` нажатие `delete_confirm`.
-* **Даты создания и последнего входа** хранятся в колонках `created_at` и `last_login_at` (миграция 6, у существующих пользователей даты пустые) и показываются в таблице пользователей. Если приложение раньше хранило такие даты у себя (например, брало из логов), их можно убрать.
+* **The login is compared exactly**, including case and spaces; failed attempts are counted the same way (a typical `normalize_login()` lowercases the login and trims spaces; now `ALICE` and `alice` have separate counters; old lowercase attempt records simply expire after a day). `Alice` and `alice` are different users. Existing pairs such as `bob`/`Bob` are kept and work as different people, but a new user whose login matches an existing one case-insensitively cannot be created.
+* **Plaintext passwords are not accepted.** They must be migrated (step 1).
+* **You cannot be left without an active administrator**: neither by blocking, nor by deletion, nor by role change.
+* **A role change takes effect immediately**: the open session of a user whose role was changed ends at the next check, and they sign in again with the new role.
+* **Password reset and "end all sessions" end the user's open sessions.**
+* **A password set by an administrator is temporary by default** (the `must_change_default` setting): the user must change it at sign-in. To keep passwords permanent, set `must_change_default = FALSE`.
+* **The administrator role does not get permissions automatically**: only those in your permission provider. It can always manage users.
+* **New passwords**: from `password_min` (6 by default) to `password_max` characters. The rule applies only to new and reset passwords; existing ones are not affected.
+* **Weak new passwords** (from `aa_common_passwords()`, equal to the login, a single repeated character) are accepted with a warning by default (`password_policy = "warn"`, event `weak_password_set`). To reject them, set `password_policy = "reject"`; to skip the check, `"off"`.
+* **Deleting a user requires confirmation**: the "Delete account" button opens a dialog with the "Yes, delete" and "Cancel" buttons. If the app's automated tests have a deletion scenario, add a `delete_confirm` click after `delete`.
+* **Creation and last login dates** are stored in the `created_at` and `last_login_at` columns (migration 6; for existing users the dates are empty) and shown in the user table. If the app used to keep such dates itself (for example, taken from logs), they can be removed.
 
-# Пример на старой схеме
+# Example on an old schema
 
-Так выглядит база со старой схемой (таблица без `id` и `blocked`, пароль в открытом виде): после подготовки схемы и переноса паролей вход работает.
+This is what a database with an old schema looks like (a table without `id` and `blocked`, a plaintext password): after the schema is prepared and the passwords are migrated, sign-in works.
 
 ```{r, eval = has_sqlite}
 library(appauth)
@@ -202,14 +202,14 @@ DBI::dbExecute(conn, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT,
 DBI::dbExecute(conn, "INSERT INTO users VALUES ('worker', 'plain-secret', 'user')")
 
 aa_init_db(conn)
-is.null(aa_authenticate(conn, "worker", "plain-secret"))   # открытый пароль не принимается
+is.null(aa_authenticate(conn, "worker", "plain-secret"))   # a plaintext password is not accepted
 aa_check_default_accounts(conn)
 DBI::dbDisconnect(conn)
 
 aa_migrate_plaintext_passwords(db, backup = FALSE)$migrated
 
 conn <- DBI::dbConnect(RSQLite::SQLite(), db)
-aa_authenticate(conn, "worker", "plain-secret")             # старый пароль работает
+aa_authenticate(conn, "worker", "plain-secret")             # the old password works
 DBI::dbDisconnect(conn)
 unlink(db)
 ```

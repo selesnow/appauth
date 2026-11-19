@@ -1,25 +1,25 @@
-# Приложение с другой моделью авторизации: английский интерфейс, свои роли и
-# права, которые хранятся в базе на каждого пользователя.
+# An application with a different authorization model: custom roles and
+# permissions stored per user in the database.
 #
-# Что показывает (ядро appauth не привязано к одной схеме прав):
-#   * свои роли owner / editor / viewer, роль администратора owner;
-#   * источник прав `function(user)` вместо матрицы: права читаются из таблицы
-#     user_permissions, владелец (owner) получает все права и управление
-#     пользователями (право "users");
-#   * слот карточки пользователя: свой блок "Permissions" с галочками прав;
-#   * английские тексты, свои названия кнопок, своё имя cookie;
-#   * пароль от администратора по умолчанию постоянный (must_change_default = FALSE).
+# What it shows (the appauth core is not tied to one permission scheme):
+#   * custom roles owner / editor / viewer, with owner as the administrator role;
+#   * a `function(user)` permission source instead of a matrix: permissions are read
+#     from the user_permissions table, the owner gets all permissions and user
+#     management (the "users" permission);
+#   * a user card slot: a custom "Permissions" block with permission checkboxes;
+#   * custom texts, custom button labels, a custom cookie name;
+#   * a password set by the administrator is permanent by default (must_change_default = FALSE).
 #
-# Запуск: shiny::runApp("custom-permissions-app")
-# База по умолчанию временная. Постоянную задаёт APPAUTH_EXAMPLE_DB.
+# Run: shiny::runApp("custom-permissions-app")
+# The default database is temporary. A permanent one is set with APPAUTH_EXAMPLE_DB.
 
 library(shiny)
 library(appauth)
 
 all_permissions <- c("reports", "export")
 
-# Вместо письма пример пишет ссылку восстановления пароля в консоль; в настоящем
-# приложении здесь отправка почты, например через пакет emayili
+# Instead of an email, the example writes the password reset link to the console;
+# a real application sends an email here, for example with the emayili package
 send_reset <- function(email, link, login) {
   message(sprintf("[reset] %s (%s): %s", login, email, link))
 }
@@ -32,8 +32,8 @@ settings <- aa_settings(
   reset_enabled = TRUE,
   send_reset = send_reset,
   reset_base_url = Sys.getenv("APPAUTH_EXAMPLE_URL", "http://127.0.0.1:3838"),
-  # двухфакторная аутентификация: ключ шифрования секретов в настоящем приложении берут
-  # из переменной среды и держат вне репозитория; здесь значение для примера
+  # two-factor authentication: in a real application the secret encryption key is taken
+  # from an environment variable and kept out of the repository; this value is for the example
   totp_enabled = TRUE,
   totp_key = Sys.getenv("APPAUTH_EXAMPLE_TOTP_KEY", "example-only-key-change-me-0123456789"),
   totp_issuer = "Reports portal",
@@ -56,7 +56,7 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   conn <- aa_session_connection(db_path, prepare = TRUE, settings = settings)
 
-  # собственная таблица приложения рядом с таблицами appauth
+  # the application's own table next to the appauth tables
   DBI::dbExecute(conn, "
     CREATE TABLE IF NOT EXISTS user_permissions (
       login      TEXT NOT NULL,
@@ -64,9 +64,9 @@ server <- function(input, output, session) {
       PRIMARY KEY (login, permission)
     )")
 
-  # источник прав: любая функция function(user) -> character()
+  # permission source: any function(user) -> character()
   provider <- function(user) {
-    # владелец получает все права и управление пользователями
+    # the owner gets all permissions and user management
     if (identical(user$role, settings$admin_role)) {
       return(c(all_permissions, "users"))
     }
@@ -85,7 +85,7 @@ server <- function(input, output, session) {
   aa_password_server("password", conn, auth, settings, on_event = log_event)
   aa_totp_server("totp", conn, auth, settings, on_event = log_event)
 
-  # слот карточки пользователя: блок прав приложения
+  # user card slot: the application's permissions block
   card_ui <- function(login, ns) {
     current <- DBI::dbGetQuery(
       conn, "SELECT permission FROM user_permissions WHERE login = ?",
@@ -102,7 +102,7 @@ server <- function(input, output, session) {
 
   card_server <- function(input, output, session, login) {
     observeEvent(input$save_permissions, {
-      # только владелец, роль берём из серверного состояния сессии
+      # owner only, the role is taken from the server-side session state
       user <- isolate(auth$user())
       req(identical(user$role, settings$admin_role), login())
 
@@ -121,7 +121,7 @@ server <- function(input, output, session) {
     })
   }
 
-  # вкладка пользователей и её серверная часть доступны только с правом "users"
+  # the users tab and its server part are available only with the "users" permission
   aa_register_module(auth, "users", provider, function() {
     aa_users_server(
       "users", conn, auth, settings, on_event = log_event,

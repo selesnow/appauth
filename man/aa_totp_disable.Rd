@@ -2,23 +2,24 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_disable}
 \alias{aa_totp_disable}
-\title{Выключить двухфакторную аутентификацию}
+\title{Disable two-factor authentication}
 \usage{
 aa_totp_disable(conn, login)
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 }
 \value{
-\code{TRUE}, если у пользователя что-то было сброшено, иначе \code{FALSE}
-(невидимо).
+\code{TRUE} if something was reset for the user, otherwise \code{FALSE}
+(invisibly).
 }
 \description{
-Стирает секрет и резервные коды пользователя. Функция \strong{ничего не проверяет}:
-модуль \code{\link[=aa_totp_server]{aa_totp_server()}} перед вызовом требует пароль и код, а сброс
-администратором (\code{\link[=aa_users_server]{aa_users_server()}}) разрешён только администратору.
+Erases the user's secret and recovery codes. The function \strong{checks nothing}:
+the \code{\link[=aa_totp_server]{aa_totp_server()}} module requires a password and a code before calling it, and reset
+by an administrator (\code{\link[=aa_users_server]{aa_users_server()}}) is allowed only to an administrator.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

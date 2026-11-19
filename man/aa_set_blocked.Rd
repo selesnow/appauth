@@ -2,7 +2,7 @@
 % Please edit documentation in R/users.R
 \name{aa_set_blocked}
 \alias{aa_set_blocked}
-\title{Заблокировать или разблокировать пользователя}
+\title{Block or unblock a user}
 \usage{
 aa_set_blocked(
   conn,
@@ -13,31 +13,32 @@ aa_set_blocked(
 )
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{blocked}{\code{TRUE} заблокировать, \code{FALSE} разблокировать.}
+\item{blocked}{\code{TRUE} to block, \code{FALSE} to unblock.}
 
-\item{acting_login}{Логин того, кто блокирует (текущий администратор), либо
-\code{NULL} (например, при вызове из скрипта).}
+\item{acting_login}{Login of the person blocking (the current administrator),
+or \code{NULL} (for example, when called from a script).}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-Число изменённых пользователей (невидимо).
+The number of changed users (invisibly).
 }
 \description{
-Ручная блокировка закрывает пользователю вход (и по паролю, и по токену
-автовхода) без удаления учётной записи, пока администратор не снимет её.
-При блокировке \strong{отзываются все токены автовхода} пользователя, а уже
-открытая у него сессия закрывается при ближайшей проверке модулем входа.
+A manual block closes login for the user (both by password and by autologin
+token) without deleting the account, until an administrator lifts it. When
+blocking, \strong{all autologin tokens} of the user are revoked, and a session
+already open for the user is closed at the login module's next check.
 }
 \details{
-Блокировка выполняется только если \code{\link[=aa_check_can_block]{aa_check_can_block()}} разрешает её
-(нельзя заблокировать себя и последнего активного администратора), иначе
-ошибка класса \code{appauth_error_user}. Разблокировка проверок не требует и
-отозванные токены не восстанавливает, пользователю нужен новый вход.
+Blocking is performed only if \code{\link[=aa_check_can_block]{aa_check_can_block()}} allows it (you cannot
+block yourself or the last active administrator), otherwise an error of class
+\code{appauth_error_user}. Unblocking needs no checks and does not restore
+revoked tokens; the user has to log in again.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

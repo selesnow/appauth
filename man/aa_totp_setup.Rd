@@ -2,26 +2,27 @@
 % Please edit documentation in R/totp.R
 \name{aa_totp_setup}
 \alias{aa_totp_setup}
-\title{Начать подключение двухфакторной аутентификации}
+\title{Start setting up two-factor authentication}
 \usage{
 aa_totp_setup(conn, login, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Подключение к базе SQLite (\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
+\item{conn}{A connection to the SQLite database
+(\code{DBI::dbConnect(RSQLite::SQLite(), ...)}).}
 
-\item{login}{Логин.}
+\item{login}{Login.}
 
-\item{settings}{Настройки, результат \code{\link[=aa_settings]{aa_settings()}} с \code{totp_enabled = TRUE}.}
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 }
 \value{
-Список: \code{secret} (base32, для ручного ввода) и \code{uri} (ссылка
-\verb{otpauth://}, из неё строится QR-код).
+A list: \code{secret} (base32, for manual entry) and \code{uri} (an
+\verb{otpauth://} link, the QR code is built from it).
 }
 \description{
-Создаёт новый секрет и сохраняет его в базе в зашифрованном виде, но \strong{не
-включает} 2FA: она включится только после \code{\link[=aa_totp_enable]{aa_totp_enable()}} с верным кодом
-из приложения. Повторный вызов заменяет ожидающий секрет. Если 2FA уже
-включена, ошибка класса \code{appauth_error_user}.
+Creates a new secret and stores it in the database in encrypted form, but \strong{does not
+enable} 2FA: it is enabled only after \code{\link[=aa_totp_enable]{aa_totp_enable()}} with a correct code
+from the app. A repeated call replaces the pending secret. If 2FA is already
+enabled, an error of class \code{appauth_error_user} is raised.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {
