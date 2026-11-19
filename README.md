@@ -75,6 +75,7 @@ shinyApp(ui, server)
 | События | `aa_events()` |
 | Модули интерфейса | `aa_app_head()`, `aa_auth_ui()` и `aa_auth_server()`, `aa_users_ui()` и `aa_users_server()`, `aa_password_ui()` и `aa_password_server()`, `aa_totp_ui()` и `aa_totp_server()` |
 | Помощники приложения | `aa_session_guard()`, `aa_register_module()` |
+| Навыки для ИИ-агентов | `aa_install_skills()` |
 
 Справка по каждой функции: `?aa_authenticate` и так далее.
 
@@ -90,6 +91,23 @@ shinyApp(ui, server)
 * `architecture-and-security` — устройство, модель угроз, гарантии и ограничения.
 
 Два рабочих примера лежат в `inst/examples` (`system.file("examples", package = "appauth")`).
+
+## Навыки для ИИ-агентов
+
+В пакет встроены два навыка на английском языке: `appauth` (справочник функций, схема базы, события) и `appauth-secure-shiny` (внедрение, перенос старой авторизации, аудит безопасности). Они помогают агентам (Claude Code, Codex, Posit Assistant) писать и проверять код с `appauth`.
+
+```r
+# Claude Code: .claude/skills в текущем проекте
+aa_install_skills()
+
+# Codex, Posit Assistant: .agents/skills
+aa_install_skills(agent = "agents")
+
+# после обновления пакета
+aa_install_skills(overwrite = TRUE)
+```
+
+Исходники навыков лежат в `inst/skills` (`system.file("skills", package = "appauth")`).
 
 ## Базы данных
 
