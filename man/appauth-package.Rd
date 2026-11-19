@@ -34,5 +34,10 @@ Authors:
   \item Alexey Seleznev \email{selesnow@gmail.com} (\href{https://orcid.org/0000-0003-0410-7385}{ORCID})
 }
 
+Other contributors:
+\itemize{
+  \item Netpeak [copyright holder]
+}
+
 }
 \keyword{internal}
