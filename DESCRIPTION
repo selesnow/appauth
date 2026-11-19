@@ -11,7 +11,7 @@ Description: Provides login, user management and access control for 'shiny'
     cookie-based auto-login, brute-force protection, blocking and deleting users
     while keeping the last administrator, password recovery by email with
     one-time links, two-factor authentication with time-based one-time
-    passwords, sign-in with 'Google' (OpenID Connect) with optional disabling
+    passwords, sign-in with 'Google' ('OpenID' Connect) with optional disabling
     of password login, server-side permission checks, ready-made user
     interface modules with extension points, and versioned database schema
     migrations.
