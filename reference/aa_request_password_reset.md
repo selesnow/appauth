@@ -65,5 +65,5 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   DBI::dbDisconnect(conn)
 }
 #> Link for boss:
-#>     https://apps.example.com/my_app/?reset=3184c24dc560f23dc0d04233b18d218b1eb91ad0f21fb0e603ab058cea93e554
+#>     https://apps.example.com/my_app/?reset=bed2f66a1f478ea16c72d03a45f306f9c996a2cf5e83bc912a190d93fbddd761
 ```

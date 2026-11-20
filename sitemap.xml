@@ -1,5 +1,8 @@
 <urlset xmlns = 'http://www.sitemaps.org/schemas/sitemap/0.9'>
 <url><loc>https://alexey-seleznev.pro/appauth/404.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/LICENSE-text.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/LICENSE.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/TODO.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/articles/architecture-and-security.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/articles/deployment.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/articles/extension-points.html</loc></url>
@@ -9,14 +12,12 @@
 <url><loc>https://alexey-seleznev.pro/appauth/articles/testing-your-app.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/authors.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/index.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/LICENSE-text.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/LICENSE.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/news/index.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_active_autologins.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_app_head.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_authenticate.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_auth_server.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_auth_ui.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_authenticate.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_can.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_change_own_password.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_check_can_block.html</loc></url>
@@ -29,8 +30,8 @@
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_create_first_admin.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_create_user.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_delete_user.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_events.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_event_logger.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_events.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_find_session_user.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_get_email.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_get_user.html</loc></url>
@@ -38,8 +39,8 @@
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_hash_password.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_init_db.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_install_skills.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_issue_token.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_is_password_hash.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_issue_token.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_list_users.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_login_gate.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_login_lock_remaining.html</loc></url>
@@ -60,15 +61,15 @@
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_schema_version.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_session_connection.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_session_guard.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_settings.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_settings_from_list.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_set_blocked.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_set_email.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_set_password.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_set_role.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_settings.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_settings_from_list.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_text.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_texts.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_text_keys.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_texts.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_code.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_disable.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_enable.html</loc></url>
@@ -78,11 +79,11 @@
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_ui.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_totp_uri.html</loc></url>
+<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_user_session_valid.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_users_exist.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_users_overview.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_users_server.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_users_ui.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/reference/aa_user_session_valid.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_validate_login.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_validate_new_user.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_validate_password.html</loc></url>
@@ -91,6 +92,5 @@
 <url><loc>https://alexey-seleznev.pro/appauth/reference/aa_weak_password_warning.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/appauth-package.html</loc></url>
 <url><loc>https://alexey-seleznev.pro/appauth/reference/index.html</loc></url>
-<url><loc>https://alexey-seleznev.pro/appauth/TODO.html</loc></url>
 </urlset>
 
