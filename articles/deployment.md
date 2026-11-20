@@ -1,0 +1,248 @@
+# Deployment
+
+What you need to do around the app so that the protection the package
+provides works in practice. The package itself does not configure the
+Shiny server or the network.
+
+## HTTPS
+
+Passwords and auto-login tokens travel between the browser and the
+server. Without HTTPS anyone who can see the traffic can intercept them.
+
+- The app must be served over `https://`. If TLS is terminated at nginx,
+  Shiny itself can listen on `127.0.0.1` only.
+- The auto-login cookie is written with `SameSite=Lax`, and over HTTPS
+  also with `Secure` (the browser will not send it over HTTP). `Secure`
+  is set automatically when the page is opened over `https://`.
+- The app port must not be reachable from the outside network bypassing
+  nginx (close it on the firewall).
+
+### nginx example
+
+This is a template for whoever configures the proxy: substitute your own
+paths, addresses and certificates. The package’s automated tests do not
+check it. The key point is that Shiny uses websockets, and they must be
+passed through:
+
+    server {
+        listen 443 ssl;
+        server_name apps.example.com;
+
+        ssl_certificate     /etc/ssl/apps.crt;
+        ssl_certificate_key /etc/ssl/apps.key;
+
+        location /myapp/ {
+            proxy_pass         http://127.0.0.1:3838/;
+            proxy_http_version 1.1;
+            proxy_set_header   Upgrade $http_upgrade;
+            proxy_set_header   Connection "upgrade";
+            proxy_set_header   Host $host;
+            proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_read_timeout 3600s;
+        }
+    }
+
+    server {
+        listen 80;
+        server_name apps.example.com;
+        return 301 https://$host$request_uri;
+    }
+
+## Brute-force protection and nginx
+
+Lockout is counted **per login**, not per IP: behind nginx Shiny sees
+the proxy address, not the client’s. Consequences:
+
+- an attacker cannot bypass the lockout by changing address;
+- but they can deliberately lock someone else’s login (for
+  `lockout_minutes`). An administrator removes such a lock in the user
+  card, but you always need a spare administrator;
+- the global limit `max_failed_logins_per_minute` stops mass guessing
+  across many logins.
+
+If the app is reachable from the internet, additionally limit the
+request rate at the nginx level (`limit_req`).
+
+## First run
+
+On an empty database, whoever opens the app first creates the
+administrator. Therefore:
+
+- create the administrator yourself right after deployment, while the
+  app is not reachable by outsiders;
+- or create it in advance with a script:
+  `aa_create_first_admin(conn, "admin", password)`; the function works
+  only on an empty table, and with concurrent requests exactly one
+  administrator is created.
+
+Weak passwords such as `root`/`root` after a migration will be found by
+`aa_check_default_accounts(conn)`.
+
+## Configuration and secrets
+
+- Keep files with secrets (`.Renviron`, keys, service account files) out
+  of the repository and in `.gitignore`. The package neither stores nor
+  reads secrets.
+- A `config.yaml` with security settings contains no secrets and may be
+  in git. It is better to pass database paths through environment
+  variables.
+- The SQLite database file contains password hashes and token hashes.
+  Only the app’s account should have access to it; do not put it in
+  shared or synchronized folders.
+- If passwords or keys were ever in the git history, consider them
+  compromised: change them; removing them from the history is not enough
+  on its own.
+
+## Backups
+
+- Copy the database file while the app is not writing to it (at night,
+  by stopping the service, or with SQLite tools:
+  `VACUUM INTO 'backup.db'` from `sqlite3`).
+- Make a copy before updating the app or migrating the schema.
+  [`aa_init_db()`](https://alexey-seleznev.pro/appauth/reference/aa_init_db.md)
+  applies migrations in a single transaction and is safe on production
+  databases, but the copy is needed in case of a bug in the app itself.
+- A copy with plaintext passwords (after
+  [`aa_migrate_plaintext_passwords()`](https://alexey-seleznev.pro/appauth/reference/aa_migrate_plaintext_passwords.md))
+  is dangerous: delete it after verification.
+
+## Password reset by email and nginx
+
+If `reset_enabled` is on, the link in the email is built from
+`reset_base_url`. It must match what the user sees in the browser: the
+`https://` scheme, the host name and the prefix under which the app is
+published in nginx. The package rejects addresses that do not start with
+`https://`, except for `http://127.0.0.1` and `http://localhost` in
+local development, because a recovery token in an `http://` link can be
+intercepted. If the address is wrong, the user will get a link that
+leads past the app.
+
+- The link token is single-use and lives for `reset_ttl_minutes`
+  minutes, but while it is valid it is visible in the nginx access log
+  (`$request_uri`). Do not hand logs to outsiders, and if needed write
+  only the path without parameters to the log (`$uri` instead of
+  `$request_uri` in `log_format`).
+- Emails are sent from the app session, so the process needs mail
+  credentials (environment variables, not a file in the repository).
+- The limits `reset_max_per_hour` and `reset_max_per_minute` protect
+  users from a flood of emails; additionally limit requests at the nginx
+  level (`limit_req`).
+
+## Two-factor authentication: key and time
+
+- The **`totp_key`** encrypts the secrets in the database. Set it
+  through a service environment variable (not in the repository and not
+  in `config.yaml` next to the database) and store it separately from
+  database backups: whoever has both the database and the key gets the
+  secrets. If the key is lost or replaced, the secrets cannot be
+  decrypted: users need to enable 2FA again, and an administrator resets
+  it in the user card.
+- **Server time** must be synchronized (NTP): the code is bound to
+  30-second steps, and the allowed drift is configured with
+  `totp_window` (1 step by default).
+- The **QR code** is built by the optional `qrcode` package; install it
+  into the server library, otherwise users will only be shown the key
+  for manual entry.
+
+## Updating the package and the schema
+
+- Update the package on the server through your usual deployment process
+  (for example CI installing it into the shared library). The app picks
+  up the new version when the service is restarted.
+- The database schema updates itself:
+  `aa_session_connection(..., prepare = TRUE)` or `aa_prepare_db(conn)`
+  at startup applies missing migrations and cleans up stale records. The
+  schema version is shown by `aa_schema_version(conn)`.
+- Migrations only add columns and tables, so the previous version of the
+  app keeps working on an updated database.
+- After updating the package, read `NEWS.md`: it describes what changed.
+
+## Other databases
+
+Besides SQLite (the default) the package works with MySQL / MariaDB
+(`RMariaDB`), PostgreSQL (`RPostgres`) and DuckDB (`duckdb`). The driver
+is installed separately, the app creates the connection, and
+`aa_session_connection(connect = function() ...)` closes it together
+with the session.
+
+- The schema is created and updated by the same migrations
+  ([`aa_init_db()`](https://alexey-seleznev.pro/appauth/reference/aa_init_db.md),
+  [`aa_prepare_db()`](https://alexey-seleznev.pro/appauth/reference/aa_prepare_db.md)).
+  In MySQL and PostgreSQL they run under a lock, so starting several app
+  instances at the same time is safe. The database user needs the
+  privileges `CREATE`, `ALTER`, `INDEX`, `SELECT`, `INSERT`, `UPDATE`,
+  `DELETE`.
+- Create a separate schema (database) for the authentication tables: the
+  package creates the tables `users`, `auth_sessions`, `login_attempts`,
+  `password_resets`, `totp_recovery`, `oauth_states` and
+  `appauth_migrations`.
+- In MySQL DDL cannot be rolled back: if a migration was interrupted,
+  restart the app and the migrations will finish the missing parts.
+- DuckDB opens the file from a single process, so an app running in
+  several R processes will not work.
+- Take the database password from environment variables, not from code.
+- Backups and privileges: for server databases they are set up with the
+  database’s own tools (dumps, roles); password and token hashes are
+  stored in the `users` and `auth_sessions` tables, so only the app’s
+  account needs access to them.
+- Package tests against your own database:
+  `Rscript dev/run-tests-db.R mysql|postgres|duckdb|sqlite` in the
+  package sources (the test database must be empty: its tables are
+  dropped).
+
+## Windows: database file locking
+
+On Windows a SQLite file cannot be renamed or deleted while a connection
+to it is open. If the app opens a connection for every session and does
+not close it, it holds the file until the R process stops, and updating
+or copying the database fails.
+
+- Use
+  [`aa_session_connection()`](https://alexey-seleznev.pro/appauth/reference/aa_session_connection.md):
+  the connection is closed when the session ends.
+- If you open the connection yourself, close it:
+  `session$onSessionEnded(function() DBI::dbDisconnect(conn))`.
+- Do not keep the database in a folder synchronized by a cloud drive:
+  synchronization also locks the file.
+
+## Service and restarts
+
+- Run the app under a service manager (systemd, nssm and the like) from
+  a dedicated account with access only to its own folders.
+- When the service restarts, open sessions are not lost: users with
+  auto-login sign in via the cookie, the others enter their password
+  again.
+- Stale login attempts and tokens are cleaned at startup
+  (`prepare = TRUE`) and once an hour in
+  [`aa_session_guard()`](https://alexey-seleznev.pro/appauth/reference/aa_session_guard.md)
+  while the app has signed-in users, so no separate job is needed for
+  this.
+
+## Linux and Docker
+
+The package does not call Windows commands and works on Linux. It needs
+the system library `libsodium` (for the `sodium` package) and the SQLite
+drivers that `RSQLite` installs. Keep the database file on a mounted
+volume, not inside the image, otherwise it will be lost when the
+container is recreated.
+
+## Pre-launch checklist
+
+- The app is available only over HTTPS, the Shiny port is closed from
+  outside.
+- The first administrator was created by you, and a spare administrator
+  exists.
+- [`aa_check_default_accounts()`](https://alexey-seleznev.pro/appauth/reference/aa_check_default_accounts.md)
+  finds no weak passwords or plaintext passwords.
+- Secrets and the database are outside git; a database backup is set up
+  and its restore has been tested.
+- Connections are closed together with the session.
+- Events (`on_event`) are written to a log that someone reads.
+- Roles and permissions have been checked under each role, and action
+  handlers refuse without the permission.
+- If two-factor authentication is on: `totp_key` is set through an
+  environment variable and stored separately from the database, server
+  time is synchronized, administrators have 2FA enabled and recovery
+  codes saved.
+- If password reset is on: `reset_base_url` opens in the browser, a test
+  email arrives, and the link in it works only once.

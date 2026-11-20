@@ -1,0 +1,232 @@
+# appauth
+
+![appauth logo](reference/figures/logo.png)
+
+The `appauth` package gives Shiny applications secure authentication and
+user management: login, passwords, brute-force protection, blocking,
+sessions, permissions and ready-made UI modules. It replaces
+hand-written login, password and session code.
+
+The package works with SQLite (the default), DuckDB, MySQL / MariaDB and
+PostgreSQL; the application supplies the database connection. See the
+“Databases” section below.
+
+Interface texts default to English. Russian is available with
+`aa_texts("ru")`, and any string can be replaced.
+
+## Why use it
+
+Authentication is easy to write in a hurry, and it almost always ends up
+with the same holes: plaintext passwords, SQL injection in the login
+check, no brute-force protection, auto-login tokens stored as is,
+permissions enforced only by hiding buttons. `appauth` solves these
+once, in the same way everywhere and with automated tests (more than
+1400 checks), and leaves everything that differs between applications
+(the permission matrix, the set of tabs, logging switches) to the
+application.
+
+A detailed comparison with existing packages such as `shinyauthr` and
+`shinymanager` has not been done. The reason for a separate package is
+practical: `appauth` connects to the databases of already running
+applications without moving data, can safely convert plaintext passwords
+to hashes, and all of its guarantees (see the
+`architecture-and-security` vignette) are backed by automated tests and
+browser checks.
+
+## Features
+
+- Passwords stored only as hashes (scrypt); plaintext passwords are not
+  accepted; a one-off safe migration of plaintext passwords to hashes.
+- Login and password sign-in, creation of the first administrator,
+  cookie auto-login (the token is stored in the database only as
+  sha256), logout.
+- Brute-force protection: a login is locked after a series of failures,
+  plus a global failure limit per minute.
+- Manual blocking and deletion of users, role changes, password reset,
+  ending all sessions. You cannot block or delete yourself or the last
+  active administrator, or remove that administrator’s role.
+- Forced logout: a blocked, deleted, role-changed or password-reset user
+  loses the open session within the check interval (30 seconds by
+  default).
+- Changing your own password, a mandatory change of a temporary password
+  set by an administrator, and logout on all devices
+  (`auth$logout_all()`).
+- Password recovery by email: a one-time link from the email, email rate
+  limits, the form response does not reveal whether a user exists (off
+  by default; the email is sent by an application function).
+- Two-factor authentication (TOTP): optional, a code from an
+  authenticator app and 10 recovery codes, the secret is encrypted in
+  the database, wrong codes lock the login, reset by an administrator
+  (off by default).
+- Sign-in with Google (OpenID Connect): only for existing users by
+  email, with an organisation domain check, no auto-creation; password
+  login can be disabled (off by default).
+- Server-side permission checks
+  ([`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md),
+  [`aa_require()`](https://alexey-seleznev.pro/appauth/reference/aa_require.md)),
+  with permissions from a “permission -\> roles” matrix or from any
+  custom source.
+- Ready-made modules: login, users (with slots for custom blocks),
+  password change; styles with variables and a light theme.
+- A single place for logging: the `on_event` hook and the
+  [`aa_events()`](https://alexey-seleznev.pro/appauth/reference/aa_events.md)
+  event catalogue.
+- Versioned schema migrations.
+- Interface texts in English (default) and Russian, any string can be
+  replaced.
+
+## Quick start
+
+See the `getting-started` vignette for details and the ready-to-run
+examples in `inst/examples`.
+
+``` r
+
+library(shiny)
+library(appauth)
+
+settings <- aa_settings()                                            # 1. settings
+
+ui <- fluidPage(aa_app_head(), aa_auth_ui("auth"), uiOutput("main")) # 2. UI
+
+server <- function(input, output, session) {
+  conn <- aa_session_connection("app.db", prepare = TRUE)            # 3. database
+  auth <- aa_auth_server("auth", conn, settings)                     # 4. login
+  aa_session_guard(auth, conn, settings)                             # 5. forced logout
+
+  output$main <- renderUI({
+    req(auth$logged_in())
+    p("Signed in as ", auth$user()$login)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+The first run on an empty database offers to create an administrator.
+
+## Functions
+
+| Topic | Functions |
+|----|----|
+| Settings and texts | [`aa_settings()`](https://alexey-seleznev.pro/appauth/reference/aa_settings.md), [`aa_settings_from_list()`](https://alexey-seleznev.pro/appauth/reference/aa_settings_from_list.md), [`aa_texts()`](https://alexey-seleznev.pro/appauth/reference/aa_texts.md), [`aa_text()`](https://alexey-seleznev.pro/appauth/reference/aa_text.md), [`aa_text_keys()`](https://alexey-seleznev.pro/appauth/reference/aa_text_keys.md) |
+| Database | [`aa_init_db()`](https://alexey-seleznev.pro/appauth/reference/aa_init_db.md), [`aa_prepare_db()`](https://alexey-seleznev.pro/appauth/reference/aa_prepare_db.md), [`aa_schema_version()`](https://alexey-seleznev.pro/appauth/reference/aa_schema_version.md), [`aa_cleanup()`](https://alexey-seleznev.pro/appauth/reference/aa_cleanup.md), [`aa_session_connection()`](https://alexey-seleznev.pro/appauth/reference/aa_session_connection.md) |
+| Passwords | [`aa_hash_password()`](https://alexey-seleznev.pro/appauth/reference/aa_hash_password.md), [`aa_verify_password()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_password.md), [`aa_is_password_hash()`](https://alexey-seleznev.pro/appauth/reference/aa_is_password_hash.md), [`aa_validate_password()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_password.md), [`aa_validate_login()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_login.md), [`aa_migrate_plaintext_passwords()`](https://alexey-seleznev.pro/appauth/reference/aa_migrate_plaintext_passwords.md), [`aa_check_default_accounts()`](https://alexey-seleznev.pro/appauth/reference/aa_check_default_accounts.md), [`aa_common_passwords()`](https://alexey-seleznev.pro/appauth/reference/aa_common_passwords.md) |
+| Users | [`aa_get_user()`](https://alexey-seleznev.pro/appauth/reference/aa_get_user.md), [`aa_list_users()`](https://alexey-seleznev.pro/appauth/reference/aa_list_users.md), [`aa_users_exist()`](https://alexey-seleznev.pro/appauth/reference/aa_users_exist.md), [`aa_users_overview()`](https://alexey-seleznev.pro/appauth/reference/aa_users_overview.md), [`aa_active_autologins()`](https://alexey-seleznev.pro/appauth/reference/aa_active_autologins.md), [`aa_create_user()`](https://alexey-seleznev.pro/appauth/reference/aa_create_user.md), [`aa_create_first_admin()`](https://alexey-seleznev.pro/appauth/reference/aa_create_first_admin.md), [`aa_validate_new_user()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_new_user.md), [`aa_authenticate()`](https://alexey-seleznev.pro/appauth/reference/aa_authenticate.md), [`aa_set_password()`](https://alexey-seleznev.pro/appauth/reference/aa_set_password.md), [`aa_change_own_password()`](https://alexey-seleznev.pro/appauth/reference/aa_change_own_password.md), [`aa_set_role()`](https://alexey-seleznev.pro/appauth/reference/aa_set_role.md), [`aa_set_blocked()`](https://alexey-seleznev.pro/appauth/reference/aa_set_blocked.md), [`aa_delete_user()`](https://alexey-seleznev.pro/appauth/reference/aa_delete_user.md), [`aa_check_can_block()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_block.md), [`aa_check_can_delete()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_delete.md), [`aa_check_can_change_role()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_change_role.md) |
+| Password recovery | [`aa_set_email()`](https://alexey-seleznev.pro/appauth/reference/aa_set_email.md), [`aa_get_email()`](https://alexey-seleznev.pro/appauth/reference/aa_get_email.md), [`aa_request_password_reset()`](https://alexey-seleznev.pro/appauth/reference/aa_request_password_reset.md), [`aa_reset_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_token_login.md), [`aa_reset_password_with_token()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_password_with_token.md) |
+| Two-factor authentication | [`aa_totp_setup()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.md), [`aa_totp_enable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enable.md), [`aa_totp_disable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_disable.md), [`aa_totp_enabled()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enabled.md), [`aa_verify_second_factor()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_second_factor.md), [`aa_recovery_codes_left()`](https://alexey-seleznev.pro/appauth/reference/aa_recovery_codes_left.md), [`aa_totp_secret()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_secret.md), [`aa_totp_uri()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_uri.md), [`aa_totp_code()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_code.md) |
+| Login protection | [`aa_login_gate()`](https://alexey-seleznev.pro/appauth/reference/aa_login_gate.md), [`aa_record_attempt()`](https://alexey-seleznev.pro/appauth/reference/aa_record_attempt.md), [`aa_login_lock_remaining()`](https://alexey-seleznev.pro/appauth/reference/aa_login_lock_remaining.md), [`aa_global_throttled()`](https://alexey-seleznev.pro/appauth/reference/aa_global_throttled.md), [`aa_clear_attempts()`](https://alexey-seleznev.pro/appauth/reference/aa_clear_attempts.md) |
+| Sessions | [`aa_issue_token()`](https://alexey-seleznev.pro/appauth/reference/aa_issue_token.md), [`aa_find_session_user()`](https://alexey-seleznev.pro/appauth/reference/aa_find_session_user.md), [`aa_revoke_token()`](https://alexey-seleznev.pro/appauth/reference/aa_revoke_token.md), [`aa_revoke_sessions()`](https://alexey-seleznev.pro/appauth/reference/aa_revoke_sessions.md), [`aa_user_session_valid()`](https://alexey-seleznev.pro/appauth/reference/aa_user_session_valid.md) |
+| Permissions | [`aa_permissions_from_matrix()`](https://alexey-seleznev.pro/appauth/reference/aa_permissions_from_matrix.md), [`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md), [`aa_require()`](https://alexey-seleznev.pro/appauth/reference/aa_require.md) |
+| Events | [`aa_events()`](https://alexey-seleznev.pro/appauth/reference/aa_events.md) |
+| UI modules | [`aa_app_head()`](https://alexey-seleznev.pro/appauth/reference/aa_app_head.md), [`aa_auth_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_ui.md) and [`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md), [`aa_users_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_users_ui.md) and [`aa_users_server()`](https://alexey-seleznev.pro/appauth/reference/aa_users_server.md), [`aa_password_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_password_ui.md) and [`aa_password_server()`](https://alexey-seleznev.pro/appauth/reference/aa_password_server.md), [`aa_totp_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_ui.md) and [`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md) |
+| App helpers | [`aa_session_guard()`](https://alexey-seleznev.pro/appauth/reference/aa_session_guard.md), [`aa_register_module()`](https://alexey-seleznev.pro/appauth/reference/aa_register_module.md) |
+| AI agent skills | [`aa_install_skills()`](https://alexey-seleznev.pro/appauth/reference/aa_install_skills.md) |
+
+Help for each function:
+[`?aa_authenticate`](https://alexey-seleznev.pro/appauth/reference/aa_authenticate.md)
+and so on.
+
+## Documentation
+
+Vignettes (`browseVignettes("appauth")`):
+
+- `getting-started` - quick start and core concepts;
+- `integrating-existing-app` - how to move an existing application off
+  hand-written authentication, including plaintext passwords;
+- `extension-points` - permissions, roles, events, card slots, texts,
+  styling;
+- `testing-your-app` - how to test an application that uses `appauth`;
+- `deployment` - HTTPS and nginx, cookies, backups, database file
+  locking on Windows;
+- `architecture-and-security` - design, threat model, guarantees and
+  limitations.
+
+Two working examples are in `inst/examples`
+(`system.file("examples", package = "appauth")`).
+
+## Skills for AI agents
+
+The package ships two skills in English: `appauth` (function reference,
+database schema, events) and `appauth-secure-shiny` (adoption, migrating
+old authentication, security audit). They help agents (Claude Code,
+Codex, Posit Assistant) write and review code that uses `appauth`.
+
+``` r
+
+# Claude Code: .claude/skills in the current project
+aa_install_skills()
+
+# Codex, Posit Assistant: .agents/skills
+aa_install_skills(agent = "agents")
+
+# after updating the package
+aa_install_skills(overwrite = TRUE)
+```
+
+The skill sources are in `inst/skills`
+(`system.file("skills", package = "appauth")`).
+
+## Databases
+
+| Database | Driver | Notes |
+|----|----|----|
+| SQLite (default) | `RSQLite` | Existing databases connect without any migration of data. |
+| MySQL / MariaDB | `RMariaDB` | Login, role and hash columns are created with a binary collation that does not ignore trailing spaces (`utf8mb4_0900_bin`, in MariaDB `utf8mb4_nopad_bin`), so `Alice` and `alice` remain different logins. DDL cannot be rolled back, so migrations are idempotent and run under a `GET_LOCK` lock. |
+| PostgreSQL | `RPostgres` | Auto-increment via `GENERATED BY DEFAULT AS IDENTITY`, migrations under an advisory lock. |
+| DuckDB | `duckdb` | The file is opened by a single process: not suitable for an application running in several R processes. |
+
+The application creates the connection; the package does the rest:
+
+``` r
+
+# SQLite
+conn <- aa_session_connection("app.db", prepare = TRUE)
+
+# MySQL / MariaDB, PostgreSQL, DuckDB: a function that opens the connection
+conn <- aa_session_connection(
+  prepare = TRUE,
+  connect = function() DBI::dbConnect(
+    RMariaDB::MariaDB(), host = "db.example.com", dbname = "app",
+    user = "app", password = Sys.getenv("APP_DB_PASSWORD")
+  )
+)
+```
+
+Dates are stored as UTC text (`YYYY-MM-DD HH:MM:SS`) in all databases
+and time is computed by R, so queries are the same everywhere. BigQuery
+and other analytical warehouses are not supported: they lack the unique
+constraints and atomic updates that one-time tokens and
+last-administrator protection rely on. In the cloud, use managed
+PostgreSQL or MySQL.
+
+Tests can run on any supported database:
+`Rscript dev/run-tests-db.R duckdb` (see the script header).
+
+## Principles
+
+- The package contains only what must be identical in all applications
+  (security). The role and permission matrix, logging switches and the
+  contents of the access tab stay with the application.
+- The package writes nothing to the application logs itself; it reports
+  events to a hook.
+- The database connection belongs to the application; the package works
+  with SQLite, DuckDB, MySQL / MariaDB and PostgreSQL and does not call
+  operating system commands.
+
+## Limitations
+
+Known limitations (the cookie is not `HttpOnly`, lockout is per login,
+BigQuery and other analytical warehouses are not supported, two-factor
+authentication is optional and TOTP only, single sign-on is Google only,
+no independent audit has been done) are listed in the
+`architecture-and-security` vignette.
+
+## Development
+
+Automated tests:
+[`devtools::test()`](https://devtools.r-lib.org/reference/test.html);
+full check:
+[`devtools::check()`](https://devtools.r-lib.org/reference/check.html).
+Module checks in a real browser (Chrome and Playwright) are described in
+`dev/e2e/README.md`. Change history is in `NEWS.md`.

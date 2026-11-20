@@ -1,0 +1,629 @@
+# Architecture and security
+
+## Who this document is for
+
+This document describes how authentication works in the `appauth`
+package, which threats it protects against, which decisions were made
+and why, and what remains the responsibility of the application. It is
+written for a developer who is going to add the package to a Shiny app,
+review the security of an existing app, or work on the package itself.
+No knowledge of the application the package was originally extracted
+from is required.
+
+The document describes the **intended behaviour of the package**.
+Functions are documented individually in the help pages
+([`?appauth`](https://alexey-seleznev.pro/appauth/reference/appauth-package.md))
+and in the other vignettes. For that reason there are no usage examples
+here, only the design and its rationale.
+
+## What the package does and does not do
+
+**Does (the core, identical in every application):**
+
+- stores passwords only as hashes; plain-text passwords are never
+  accepted;
+- login and password sign-in, cookie auto-login, sign-out and forced
+  sign-out;
+- brute-force protection (per-login lockout and a global attempt limit);
+- blocking and deleting users, with protection against losing the last
+  administrator;
+- server-side permission checks (not just hiding buttons in the UI);
+- password recovery by email: a one-time link from the email (off by
+  default);
+- two-factor authentication (TOTP): optional, a code from an
+  authenticator app plus backup codes (off by default);
+- the auth table schema (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL)
+  and its versioned migrations;
+- UI modules: sign-in (including the first-administrator creation
+  dialog) and user management.
+
+**Does not (the application or infrastructure is responsible):**
+
+- which permissions exist and which roles can do what (the application
+  defines the permission matrix);
+- which actions are logged and where (the package reports events through
+  a hook, and the application does the writing);
+- transport protection (HTTPS), proxy settings, server file permissions,
+  secret storage;
+- validation of the data the application accepts from the user in its
+  own functions (file names, commands, the application’s own SQL);
+- sending emails (the email with the recovery link is sent by an
+  application function, for example via `emayili`), creating an OAuth
+  client in the Google Cloud Console, and publishing the app on a domain
+  with HTTPS (sign-in with Google is impossible without a domain).
+
+The boundary follows one principle: *the package contains what must be
+identical in all applications, because a mistake there creates a
+vulnerability everywhere; the application contains what legitimately
+differs.*
+
+## Basic concepts
+
+| Concept | Meaning |
+|----|----|
+| User | a record in the `users` table: login, password hash, role, blocked flag |
+| Role | a string from a configurable list (by default `admin`, `user`, `viewer`) |
+| Permission | the name of an application feature (for example `Run tasks`) that a role may or may not have |
+| Permission source | a function that returns a user’s permissions; by default it is built from a “permission -\> roles” matrix |
+| Administrator | a user with the `admin_role` role; user management is available only to them regardless of the permission matrix |
+| Auto-login token | a random string in the browser cookie that lets the user sign in without a password |
+| Attempt lockout | a temporary block of sign-in for a login after a series of failed attempts |
+| Manual block | a permanent block of a user’s sign-in by an administrator until the administrator lifts it |
+| Event | a notification from the package to the application about a significant action (failed sign-in, block, deletion, etc.) |
+
+## System overview
+
+     Browser                      Application server (R, Shiny)                    Database
+     -------                      -----------------------------                    --------
+     sign-in form --password-->  aa_auth_server()  --check-->  users            (hash, role, blocked)
+     cookie with token ------->  auto-login        --lookup->  auth_sessions    (sha256 of token, expiry, revoked)
+     tabs and buttons -------->  aa_can()/aa_require() in each  login_attempts  (login, success, time)
+                                 application handler
+     "Access" tab ------------>  aa_users_server()  --changes--> users, auth_sessions, login_attempts
+                                 `-> on_event(...) --> the application writes its own log
+
+### Data
+
+The package owns seven tables. Their names and columns are fixed, so
+existing compatible databases can be connected without migrating data.
+
+- **`users`**: `id` (auto-increment), `login` (unique, not empty),
+  `password` (hash), `role`, `blocked` (0 or 1, default 0),
+  `must_change` (0 or 1, default 0: an administrator set the password
+  and the user must change it at sign-in). The columns `totp_secret`
+  (the TOTP secret **in encrypted form**), `totp_enabled` (0 or 1) and
+  `totp_last_step` (the last accepted time step, protection against code
+  reuse) appeared in version 0.5.0. The `email` column (since version
+  0.4.0) stores the password recovery address in lower case; it allows
+  NULL, and uniqueness applies only to addresses that are set.
+- **`auth_sessions`**: `id`, `user_login`, `token_hash`, `created_at`,
+  `expires_at`, `revoked`. The database stores the **sha256 of the
+  token**; the token itself exists only in the browser cookie. Stealing
+  the database does not yield usable tokens.
+- **`login_attempts`**: `id`, `login` (the exact login as typed,
+  case-sensitive, truncated to `login_max` characters), `success`,
+  `attempted_at` (UTC). Index on `(login, attempted_at)`.
+- **`password_resets`**: `id`, `user_login`, `token_hash`, `created_at`,
+  `expires_at`, `used`. The database stores the **sha256 of the token**
+  from the email; the token itself exists only in the email. The token
+  is single-use and lives for `reset_ttl_minutes` minutes (60 by
+  default).
+- **`totp_recovery`**: `id`, `user_login`, `code_hash`, `used`,
+  `created_at`. The database stores the **sha256 of the backup code**;
+  the codes themselves are shown to the user once, when 2FA is enabled.
+- **`oauth_states`** (since version 0.7.0): parameters of the sign-in
+  with Google (`state_hash` only as sha256, `nonce`, `code_verifier`,
+  `created_at`, `expires_at`, `used`); a record lives for 10 minutes and
+  is used once.
+- **`appauth_migrations`**: an internal table of schema migration
+  versions.
+
+### Databases
+
+Table and column names are the same in all supported databases (SQLite,
+DuckDB, MySQL / MariaDB, PostgreSQL); the differences are collected in a
+single source file, `R/dialect.R`:
+
+- **Time** is stored as text `YYYY-MM-DD HH:MM:SS` in UTC and computed
+  in R (not by database functions), so comparing deadlines works the
+  same everywhere and does not depend on the database server’s clock or
+  time zone.
+- **Logins, roles and hashes** are compared exactly. In MySQL, where
+  ordinary string comparison is case-insensitive, such columns are
+  created with a binary collation that does not ignore trailing spaces
+  (`utf8mb4_0900_bin`, in MariaDB `utf8mb4_nopad_bin`), so `Alice`,
+  `alice` and `alice` remain different logins.
+- **Single use of tokens** (password reset, Google `state`, 2FA backup
+  codes) is ensured by an atomic `UPDATE ... WHERE used = 0`: of two
+  simultaneous requests only one succeeds. This is exactly why stores
+  without such updates and unique constraints (BigQuery and similar) are
+  not suitable.
+- **Migrations** are idempotent. In MySQL and PostgreSQL they run under
+  a lock (`GET_LOCK`, `pg_advisory_xact_lock`) so that several app
+  instances starting at once do not conflict. In MySQL DDL cannot be
+  rolled back, so if a migration is interrupted, a rerun completes what
+  is missing.
+- **DuckDB** opens the file from a single process and does not allow
+  altering a table that has an index, so `users` is created with all
+  columns at once.
+
+### Trust boundaries
+
+Everything that comes from the browser is untrusted: in Shiny the client
+can send **any value of any input**, including a button it does not see
+in the UI. Therefore:
+
+- the role and the signed-in flag are taken only from the server-side
+  session state set by the package’s sign-in code, never from an input;
+- every action checks the permission on the server at the start of the
+  handler;
+- server modules of tabs are registered only for roles that have the
+  permission for the tab, so other roles have no handlers that could be
+  invoked with a forged request.
+
+## Threat model
+
+### What we protect
+
+Password hashes, auto-login tokens, the user’s sign-in state,
+administration functions (creating and deleting users, changing roles
+and passwords), and through them any application functions available to
+roles.
+
+### Who we protect against
+
+1.  **An anonymous attacker on the network**: guesses passwords, forges
+    requests to the server, tries to sign in without a password.
+2.  **An authenticated user with low privileges** (`viewer`, `user`):
+    tries to perform actions they are not allowed (privilege escalation,
+    user management, access to other people’s data).
+3.  **Someone who obtained a copy of the database or a backup**: tries
+    to recover passwords and use tokens.
+4.  **Someone who intercepts traffic** (when HTTPS is absent).
+5.  **Operator mistakes**: deleting or blocking the last administrator,
+    leaving default passwords.
+
+### Threats and mitigations
+
+| Threat | Mitigation | Residual risk |
+|----|----|----|
+| SQL injection | All package SQL is parameterised; values from the UI are never substituted into the query text | The application’s own SQL is not covered by the package |
+| Theft of passwords from the database | Passwords are stored only as scrypt hashes (the `sodium` package) with a per-password salt; a plain-text password in the database is impossible | Weak passwords can be guessed offline; database encryption is not provided |
+| Password guessing | Login lockout after N failures within a window, a global limit of failures per minute across all logins | Lockout is per login, not per IP: someone can deliberately lock another person’s login |
+| Login enumeration | The same message for existing and non-existing logins, response time equalised by a dummy hash check, lockout is counted for non-existing logins too | The different message for a manually blocked account is shown only to someone who knows the correct password |
+| Sign-in without a password | There are no fallback sign-in paths: the password is checked only against the hash, there is no plain-text comparison |  |
+| Forged Shiny requests (calling actions without the required role) | A server-side permission check in every handler, module registration by permission, the role only from server-side state | The application must itself call the checks in its handlers |
+| Privilege escalation through user management | User management is available only to the administrator role regardless of the permission matrix; the validity of a role is checked on the server |  |
+| Theft of the auto-login token | The database holds only the sha256 of the token, the token is random (32 bytes), its lifetime is limited, tokens are revoked on block, password change and user deletion | The cookie is set from JavaScript and has no `HttpOnly`: XSS in the application can steal the token |
+| Interception of the token on the network | The cookie is written with `SameSite=Lax`, and on HTTPS also with `Secure` (the package does this itself); HTTPS is provided by the application (see the section on application responsibility) | Without HTTPS the token and password travel in plain text |
+| Use of someone else’s cookie after a user is deleted and a new one is created with the same login | Deleting a user deletes their tokens and failed attempts |  |
+| The session of a blocked or deleted user keeps working | The live session is checked every 30 seconds and a forced sign-out follows; auto-login for such users is impossible | A window of up to 30 seconds between the block and closing an already open session |
+| Race when creating the first administrator | Creation with a single “insert if the table is empty” SQL statement; of two simultaneous sessions only one succeeds | The administrator creation dialog is available to anyone who opens the app on an empty database, so the app should not be exposed externally before the administrator is created |
+| Loss of access to the application | You cannot delete or block yourself or the last active administrator |  |
+| Enumeration of logins and addresses via the “Forgot your password?” form | The on-screen response is always the same (user found or not, has an address or not, blocked or not); the reason goes only into the `password_reset_requested` event | Response time may depend on whether an email was sent: if this matters, move sending the email in `send_reset` to the background |
+| Mass-mailing recovery emails to other users | No more than `reset_max_per_hour` emails per user per hour and `reset_max_per_minute` emails per minute overall | A user can be “spammed” up to the limit |
+| Reuse and guessing of the token from the email | A 256-bit token, only the hash in the database, single use, limited lifetime, a new request invalidates earlier links, a weak password does not consume the token, a race between two requests is resolved by atomically claiming the token |  |
+| Leak of the link from the email through the address bar | The module immediately removes `reset` from the page address; the link is single-use and short-lived | The address with the token stays in proxy logs while the link is valid: the key in them is no better protected than the logs themselves |
+| Guessing the second-factor code | The code is checked only after the correct password; a wrong code counts as a failed sign-in attempt, and the login is blocked under the same rules as for password guessing; a successful password is not recorded until the correct code, so it does not reset the counter | A window of 3 time steps of 30 seconds: with the default limit (5 failures in 15 minutes) the chance of guessing the code within one lockout is about 15 in a million |
+| Reuse of an observed code | The accepted time step is stored with an atomic query; the same code and all earlier steps no longer pass |  |
+| Theft of the database file | The TOTP secret is encrypted (sodium) with the `totp_key` key, which is stored outside the database; passwords and backup codes are stored only as hashes | Someone who steals both the database and the key obtains the secrets: keep the key separate from the database and its backups |
+| Loss of the phone | 10 backup codes (single use), and also a 2FA reset by an administrator in the user card (the user’s sessions are ended) | Backup codes should be stored separately from the phone |
+| Default passwords (`root/root`, login = password) | The package creates no default users; the hygiene function finds accounts with obviously weak passwords | The check must be run and the passwords changed |
+
+### Outside the threat model
+
+Single sign-on, protection of the user’s mailbox and of the device with
+the authenticator app (whoever receives the email can change the
+password), protection against malicious code on the user’s computer,
+physical access to the server, attacks at the network and infrastructure
+level.
+
+## Flows
+
+### Password sign-in
+
+1.  The **global limit** of failed attempts in the last minute across
+    all logins is checked. If exceeded, sign-in is temporarily closed
+    for everyone and the password is not checked.
+2.  The **login lockout** is checked. The login is treated **exactly**,
+    as in the sign-in itself: case and spaces are preserved (truncation
+    only to `login_max` characters), so `Alice` and `alice` are
+    different logins with separate counters. If the login is blocked,
+    the password is not checked and the attempt is not recorded, so the
+    lockout is not extended.
+3.  The **password check** runs. The user is looked up by login and the
+    password is verified against the hash. If the user does not exist,
+    the check is performed against a dummy hash so that the response
+    time does not reveal whether the login exists.
+4.  If the password is correct but the account is **manually blocked**,
+    a message about this is shown, the attempt is counted neither as
+    successful nor as failed, and no token is issued.
+5.  Otherwise the result of the attempt is recorded. A successful
+    sign-in **resets** the failure counter (by the monotonic record
+    number, not by time, because time is stored with one-second
+    precision). A failure after which the limit has accumulated puts the
+    login into lockout and reports it.
+6.  If the user has `must_change` set (an administrator set the
+    password), the **change password form** is shown instead of signing
+    in: no token is issued and the user does not get into the app until
+    they set their own password. The form asks only for the new
+    password: the temporary password is known to the administrator, so
+    confirming it would not prove ownership. The same form is used after
+    a Google sign-in when `must_change` is set; the old password is not
+    needed there either. The old password does not work after the
+    change.
+7.  On success an **auto-login token** is issued: 32 random bytes
+    encoded in base64, sha256 stored in the database, a default lifetime
+    of 30 days, passed to the browser in a cookie.
+
+Parameters (defaults): 5 failures within a 15-minute window lock the
+login for 15 minutes from the last failure, a global limit of 30
+failures per minute, a password of 6 to 128 characters (the restriction
+applies only to new and reset passwords; existing ones are not
+affected).
+
+### First run
+
+If the `users` table has no records, the administrator creation form is
+shown instead of the sign-in form. The user is **always created with the
+administrator role** by a single SQL statement that inserts the record
+only if the table is empty. After creation the user is signed in.
+
+### Cookie auto-login
+
+The browser sends the token, the server computes its sha256 and looks up
+the record: the token is not revoked, not expired, and the user exists,
+is not blocked and is not required to change the password. Blocked and
+deleted users, as well as users required to change their password, do
+not sign in by cookie. Auto-login is disabled with an application
+setting (`autologin = FALSE`).
+
+### Sign-out and forced sign-out
+
+Sign-out revokes the browser token, records an event, clears the cookie,
+resets the session state and **reloads the page**, so that no handlers
+registered for the previous user are left in the session. Every 30
+seconds (\[aa_session_guard()\]) it is checked that the user exists, is
+not blocked, their role in the database has not changed and the token of
+this session is not revoked; otherwise a forced sign-out is performed
+with a reason (`deleted`, `blocked`, `role_changed`, `token_revoked`).
+The guard also deletes stale sign-in attempts and tokens once an hour.
+
+### Changing your own password
+
+The user confirms the current password and sets a new one (under the
+rules from the settings, different from the current one). The tokens of
+other sessions are revoked, the token of the current one stays, and
+`must_change` is cleared. A wrong current password, a weak password or
+the same password are rejected with a clear message.
+
+### Password recovery by email
+
+Enabled with the `reset_enabled = TRUE` setting; it requires the
+`send_reset(email, link, login)` function and the application address
+`reset_base_url`. The user must have an email set (an administrator sets
+it in the user card or when creating the user).
+
+1.  On the sign-in form the “Forgot your password?” link opens a “Login
+    or email” field. The user enters a value and **always sees the same
+    response**.
+2.  The package looks up the user (the login is compared exactly, the
+    address case-insensitively). No email is sent if the user does not
+    exist, has no address, is blocked, or a limit is exceeded
+    (`reset_max_per_hour` per user, `reset_max_per_minute` overall). The
+    reason is recorded in the `password_reset_requested` event.
+3.  Otherwise a random token (32 bytes) is created, its sha256 and
+    lifetime are written to the database, the user’s earlier unused
+    links are invalidated, and the application function sends an email
+    with the link `<reset_base_url>/?reset=<token>`. If sending fails,
+    the token is invalidated.
+4.  On opening the link the sign-in module reads the `reset` parameter,
+    **removes it from the address bar** and, if the token is valid
+    (exists, unused, not expired, the user is not blocked), shows the
+    new password form. Otherwise a message and the regular sign-in form
+    are shown (event `password_reset_failed`).
+5.  The new password is checked against the rules from the settings. A
+    weak password in `reject` mode is rejected and **does not consume
+    the token**. Then the token is claimed with an atomic query (of two
+    simultaneous requests only one succeeds), the password is written,
+    all auto-login tokens are revoked, the other links are invalidated,
+    and the attempt lockout and the must-change requirement are cleared.
+    Event `password_reset_done`.
+6.  There is no automatic sign-in after the change: the user signs in
+    with the new password in the usual way.
+
+An administrator who resets a password manually, or a user who changes
+their own password, also invalidates unused links.
+
+### Two-factor authentication
+
+Enabled with the `totp_enabled = TRUE` setting; it requires an
+encryption key `totp_key` (a string of at least 16 characters, kept
+outside the database and outside the repository). The protection is
+**optional**: each user enables it themselves in the account block
+([`aa_totp_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_ui.md)
+and
+[`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md)),
+and whoever has it enabled enters a code at sign-in.
+
+**Setup.** A button creates a secret (160 bits) and stores it encrypted;
+2FA is not yet on. The user scans the QR code (if the optional `qrcode`
+package is installed) or enters the key manually. After a correct code
+from the app the protection is enabled, the user is shown 10 backup
+codes once, and their other sessions are ended.
+
+**Sign-in.**
+
+1.  The password is checked as usual. If the user has 2FA enabled, **no
+    auto-login token is issued and the successful sign-in attempt is not
+    recorded**: otherwise it would reset the failure counter and the
+    code could be guessed indefinitely.
+2.  The code form is shown. Before every check the shared sign-in guard
+    ([`aa_login_gate()`](https://alexey-seleznev.pro/appauth/reference/aa_login_gate.md))
+    is called: a blocked login or the global limit closes the form.
+3.  A code from the app (6 digits) or a backup code is accepted. A code
+    from the app passes once (the time step is remembered), within a
+    window of +/-`totp_window` steps (1 by default). A backup code is
+    single-use.
+4.  A wrong code is recorded as a failed attempt (event `totp_failed`).
+    When the login gets blocked, the code form is closed and the user
+    has to start again from the password once the lockout ends.
+5.  After a correct code a successful attempt is recorded, a token is
+    issued, and then (if the password is temporary) the change password
+    form is shown.
+
+Signing in by auto-login cookie does not ask for the second factor: the
+cookie was issued after it was passed and is valid for `session_days`
+days, effectively a “trusted device”. Password recovery by email does
+not bypass 2FA: after the password change the code is still required.
+
+**Disabling.** The user needs the password and a code (or a backup
+code); otherwise someone who took over another person’s open session
+could remove the protection. The code is checked only when the password
+is correct, so a third party’s attempt does not consume backup codes.
+Wrong attempts count as failed sign-in attempts.
+
+**Loss of the phone.** Backup codes, or a 2FA reset by an administrator
+in the user card (the secret and backup codes are erased, the user’s
+sessions are ended, event `totp_reset`).
+
+### Permission checks
+
+- The permission source returns the user’s permissions; by default it is
+  built from the “permission -\> roles” matrix. An unknown permission
+  means denial (fail-closed behaviour).
+- The check in a handler takes the role from the server-side state. On
+  denial the action is aborted, the user gets a notification, and the
+  `access_denied` event is reported to the package.
+- Registration of tab server modules is performed only for roles that
+  have the permission for the tab.
+
+### User management (administrator only)
+
+- **Adding**: the login and password are checked against the rules; the
+  user is created with a valid role.
+- **Changing the role**: the validity of the role is checked on the
+  server, and the administrator role cannot be removed from the last
+  active administrator.
+- **2FA reset**: the administrator erases the user’s secret and backup
+  codes and ends their sessions (event `totp_reset`).
+- **Email**: the administrator sets, changes or removes the password
+  recovery address (format and uniqueness are checked on the server),
+  event `email_changed`.
+- **Password reset**: a new hash is written, **all tokens of the user
+  are revoked** (open sessions will be ended by the guard), and
+  `must_change` is set by default.
+- **End all sessions**: all tokens of the user are revoked; the guard
+  ends their open sessions.
+- **Manual block**: the `blocked` flag is set and **all tokens are
+  revoked**. You cannot block yourself or the last active administrator.
+- **Lifting the attempt lockout**: the login’s failed attempts are
+  deleted. Unblocking manually lifts it as well.
+- **Deletion**: you cannot delete yourself or the last active
+  administrator; together with the record, the tokens, password recovery
+  links, 2FA backup codes and failed attempts are deleted.
+
+### Application start
+
+At start the application calls the schema preparation: missing tables
+and columns are created, migrations are applied, and stale data is
+removed (attempts older than a day, tokens expired or revoked more than
+30 days ago, used and expired password recovery links older than a day).
+A preparation error does not stop the application: lockout protection
+does not work if the table is missing, but password sign-in keeps
+working (see the section on decisions).
+
+## Guarantees
+
+These are the properties the package must preserve across all changes.
+Each is covered by an automated test.
+
+1.  A plain-text password is never accepted or compared; a value in the
+    `password` column that is not a hash does not pass verification.
+2.  Package SQL contains only parameters; user values are never
+    substituted into the query text.
+3.  Messages about invalid credentials are the same for existing and
+    non-existing logins.
+4.  Attempts during a lockout are not recorded and do not extend the
+    lockout.
+5.  Lockout and sign-in treat the login identically and exactly: a
+    different spelling of the login (case, spaces) does not sign in at
+    all, so it cannot be used to bypass a lockout, and failed attempts
+    under a non-existent spelling do not lock out the real user. The
+    login of a new user cannot match an existing one even up to case.
+6.  A successful sign-in resets the failure counter regardless of the
+    records having been made within the same second.
+7.  A blocked or deleted user does not sign in by password or by cookie,
+    and their tokens are invalid.
+8.  Password reset, blocking and deletion revoke or delete the user’s
+    tokens.
+9.  A new user with a login that previously belonged to another person
+    does not get access via the other person’s cookie and does not
+    inherit their lockout.
+10. You cannot be left without an active administrator through blocking,
+    deletion or a role change.
+11. The first administrator is created only on an empty table, including
+    under simultaneous requests.
+12. Migrations are repeatable: a rerun changes nothing, and existing
+    data (users, hashes, tokens) is not modified.
+13. An unknown permission means denial.
+
+## Decisions and their reasons
+
+| Decision | Reason | Trade-off |
+|----|----|----|
+| scrypt hashing ([`sodium::password_store`](https://docs.ropensci.org/sodium/reference/password.html)) | Modern, resistant to brute force on specialised hardware, the hash contains the salt and parameters, available in `sodium` with no external dependencies | Sign-in is slightly slower than with a plain hash; that is the protection |
+| The auto-login token is stored as sha256 | A database leak does not reveal working tokens, and the tokens are random and long, so a slow hash is not needed |  |
+| Lockout by login, not by IP | Behind a reverse proxy the application sees the proxy address, not the client’s | Someone can deliberately lock another person’s login. Mitigation: a short lockout, event recording, an unlock button for the administrator |
+| The login is compared and counted in lockouts exactly (case-sensitive, without lower-casing) | SQLite compares logins the same way, and real data is stored this way: a production database may contain distinct users `alice` and `Alice`; lower-casing would give them a shared counter and let failures against a non-existent `Bob` lock out the real `bob` | A new user cannot be given a login that differs from an existing one only by case; existing pairs are preserved |
+| Attempts during a lockout are not recorded | Otherwise a legitimate user extends the lockout and an attacker keeps it up indefinitely |  |
+| The counter is reset by record number, not by time | Time is stored with one-second precision, and quick events were lost (a bug found by tests) |  |
+| The lockout check fails open, the password check fails closed | Unavailability of the attempts table must not lock out all users, but the password check is never skipped | If the table could not be created, brute-force protection does not work; the error is written to the application log |
+| The cookie is set from JavaScript | Shiny cannot set cookies from server code without extra infrastructure | No `HttpOnly`. `SameSite=Lax` and `Secure` (on HTTPS) are set by the package itself; HTTPS itself is the application’s responsibility |
+| Forced sign-out is checked on a timer | Shiny does not receive events from the database other than its own queries | Up to 30 seconds between the block and closing an open session |
+| Page reload on sign-out | Otherwise the module handlers of the previous user stay registered in this session | The page is redrawn |
+| User management only for the administrator regardless of the permission matrix | Otherwise granting this permission to a role would let it raise its own privileges | The permission for the user management tab cannot be delegated |
+| The permission source is plugged in as a function and not hard-wired into the config structure | Applications store permissions differently (YAML, database, per user) | The application is responsible for the correctness of its source |
+| A single event hook instead of writing to logs | The package does not impose a log schema, and applications have different ones | The application must implement the hook, otherwise events go nowhere |
+| Password recovery is off by default and the email is sent by an application function | Not every application has email and user addresses; the package should not pull in SMTP and sending credentials | The application writes the sending function and is responsible for delivering the email |
+| A link with the token in the address rather than a code from the email | No separate code entry form and no need to protect the code against guessing; the token cannot be guessed | `reset_base_url` is needed, and the token is visible in proxy logs until used |
+| TOTP is implemented in the package (HMAC-SHA1 from `openssl`, verified against the RFC 4226 and 6238 reference vectors), with no new dependencies | New packages would have to be installed into the shared server library; the algorithm is short and verifiable | Only TOTP is supported (no SMS, push or hardware keys) |
+| QR code through the optional `qrcode` package | Does not inflate the mandatory dependencies | Without the package the user enters the key manually |
+| The secret is encrypted with the application key (`totp_key`), not hashed | The server must know the secret to verify codes | Losing or replacing the key makes the secrets unreadable: users have to set up 2FA again (an administrator resets it in the user card) |
+| The successful sign-in attempt is recorded only after the code | Otherwise the password would reset the failure counter and the code could be guessed without limit |  |
+| 2FA is optional | Forcing it on for roles requires a “first sign-in without 2FA” scenario and emergency access | Administrators may remain without a second factor if they do not enable it themselves |
+| SQLite by default, plus DuckDB, MySQL / MariaDB and PostgreSQL through a dialect layer (`R/dialect.R`) | Most applications use SQLite, and existing databases should connect without migration; the other databases are for applications that already have a server | Time is computed by R and written as UTC text rather than a database type; DDL cannot be rolled back in MySQL; BigQuery is not supported: no unique constraints or atomic updates |
+
+## Known limitations
+
+These limitations are known and accepted. They should be taken into
+account when assessing an application’s risk.
+
+- **Cookie without `HttpOnly`**: vulnerable to token theft through XSS
+  in the application itself (the application must not render unchecked
+  HTML).
+- **Cookie and HTTPS**: the cookie is written with `SameSite=Lax`, and
+  `Secure` is set only if the page is opened over `https://`; without
+  HTTPS the token may travel in plain text, so the application should be
+  published only over HTTPS (see the `deployment` vignette).
+- **Lockout by login**: deliberately locking another person’s login for
+  the duration of the window is possible, including the administrator’s.
+  A spare administrator should exist for this.
+- **The password is checked only by length**: no list of forbidden
+  passwords is used.
+- **Single sign-on only through Google.** There are no other providers
+  (Microsoft, Okta, SAML). Signing in with Google is equivalent to
+  access to the person’s Google account: whoever controls it can sign in
+  to the application, so the organisation (Workspace) protects access to
+  the account. The user must be created in the application in advance,
+  and their email in the database must match the Google address.
+  Changing a user’s email in Workspace without updating the address in
+  the application closes their Google sign-in, and handing the address
+  to another person opens the first user’s account to them, so addresses
+  must be kept up to date. The two-factor code of the application is not
+  requested when signing in with Google. Two-factor protection is
+  optional and only by TOTP codes: no SMS, push notifications, hardware
+  keys, and no forced enabling for roles.
+- **Losing the `totp_key` key** makes the stored secrets unreadable:
+  until an administrator resets 2FA, users with the protection enabled
+  cannot sign in (the code will not match).
+- **Server and phone clocks**: the code is tied to time, and a
+  discrepancy larger than the window (30 seconds by default) blocks
+  sign-in; time synchronisation (NTP) is required.
+- **The recovery email is a key to the account**: whoever controls the
+  user’s mailbox can change their password. Enable recovery only if the
+  email addresses can be trusted; for administrators you can leave the
+  address empty and keep manual reset.
+- **Up to 30 seconds** between blocking a user and closing their open
+  session.
+- **Only SQLite, DuckDB, MySQL / MariaDB and PostgreSQL are supported.**
+  BigQuery and other analytical stores are not suitable: single-use
+  tokens and protection of the last administrator require atomic updates
+  and unique constraints. DuckDB opens the file from a single process.
+  In MySQL logins are compared exactly only in columns created by the
+  package (binary collation): a `users` table created manually with an
+  ordinary collation must be recreated.
+- **No independent security audit has been performed**: the properties
+  are confirmed by automated tests and by fixing the bugs found, but not
+  by an external specialist.
+
+## Application responsibility
+
+The package is secure only when used correctly. The application must:
+
+1.  **Call the permission check at the start of every action handler**
+    and register tab server modules only for roles with the permission
+    for the tab. Hiding buttons in the UI is not protection.
+2.  **Validate the inputs of its own functions**: compare file, service
+    and task names against allow-lists, run OS commands without string
+    concatenation, and do not render unchecked HTML.
+3.  **Close the database connection when the session ends**
+    (`session$onSessionEnded`), otherwise connections accumulate, and on
+    Windows the database file cannot be renamed or deleted while the R
+    process is alive.
+4.  **Use HTTPS** (the `Secure` cookie flag on HTTPS and `SameSite=Lax`
+    are set by the package itself). The application must not be
+    reachable directly without a proxy that provides HTTPS.
+5.  **Not keep `config.yaml`, the database and secrets in the repository
+    and images**, and not serve the whole database through the UI (it
+    holds the tables of users, tokens and sign-in attempts).
+6.  **Implement the event hook** and persist sign-in, lockout and
+    access-denied events so that guessing attempts are visible.
+7.  **Not create default users**, and change the passwords found by the
+    weak-account check.
+8.  **Have a spare administrator** in case of deliberate lockout.
+9.  **Keep the `totp_key` key outside the database and the repository**
+    (an environment variable) and not lose it: without it the TOTP
+    secrets cannot be decrypted. Keep database backups separate from the
+    key.
+
+## Compatibility and migrations
+
+When the package is connected, versioned migrations run: missing tables
+and columns are created, existing data is not modified, and a rerun
+changes nothing. An older schema is recognised too (for example a
+`users` table without the `id` column or without `blocked`). Passwords
+that were stored in plain text are converted to hashes by a separate
+one-time function with a database backup and a transaction; until this
+step, signing in with such passwords is impossible, because the package
+does not accept plain-text passwords.
+
+## Lessons from bugs found
+
+The package was created from an application whose authentication had to
+be fixed during an audit. Each problem found became a requirement for
+the package and a test.
+
+| What was found | Lesson and protection in the package |
+|----|----|
+| SQL was built by string concatenation, sign-in without a password via `' OR '1'='1` | Only parameterised queries |
+| Passwords in plain text in the database, in backups, in git history and on a network drive | Only hashes, a migration with a backup, documentation about copies and history |
+| A button hidden in the UI was executed by a forged request, and the server module of the command line was reachable without signing in | Permission checks in every handler, module registration by permission |
+| A user could delete themselves and the last administrator | Unified validity checks for blocking and deletion |
+| A new user with the same login signed in by the previous owner’s cookie | Deleting tokens and attempts together with the user |
+| The attempt counter was not reset if a success and new failures fell within the same second | Reset by record number |
+| The database connection was not closed when the session ended and kept the file locked | Closing connections in the application, a regression test on renaming the database file |
+| A new variant of the default settings lost a permission that was present in the hand-edited working config, and the button disappeared for everyone | A test “all permissions used by the code are in the default settings”, appending missing settings without overwriting existing ones |
+| An inline table row colour was not displayed because the app theme overrides it | Styling rows with CSS classes and checking in a real browser, not only against the table description |
+
+## Document history
+
+- The users table shows whether a password recovery email is set,
+  whether 2FA is enabled, and how many active auto-logins the user has
+  (version 0.6.0,
+  [`aa_active_autologins()`](https://alexey-seleznev.pro/appauth/reference/aa_active_autologins.md)).
+  An auto-login is a token in a cookie: the number shows on how many
+  devices sign-in is remembered, not how many tabs are open.
+- Added TOTP two-factor authentication (version 0.5.0): `totp_*` columns
+  in `users`, the `totp_recovery` table (migration 8), the `aa_totp_*`
+  module, the `totp_*` events and `recovery_code_used`.
+- Added password recovery by email (version 0.4.0): the `users.email`
+  column, the `password_resets` table (migration 7), single-use links,
+  limits, the `password_reset_*` events and `email_changed`.
+- Added: changing your own password, mandatory password change for
+  passwords set by an administrator (`must_change`), ending all of a
+  user’s sessions, session token checking by the guard, periodic cleanup
+  of stale records, sign-in on Enter.
+- First version: a description of the intended behaviour of the package
+  before code was extracted from the application. The document is
+  refined as the package is implemented and verified.

@@ -1,0 +1,668 @@
+# Extension points
+
+The package contains what must be identical across all applications:
+passwords, login protection, sessions, blocking, and permission checks.
+Everything that differs between applications is plugged in through
+extension points. This document describes each of them.
+
+| Point | Purpose | Where |
+|----|----|----|
+| Permission source | How the application decides what a role or user may do | [`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md), [`aa_require()`](https://alexey-seleznev.pro/appauth/reference/aa_require.md), [`aa_register_module()`](https://alexey-seleznev.pro/appauth/reference/aa_register_module.md) |
+| Roles | Which roles exist and which one is the administrator | `aa_settings(roles, admin_role)` |
+| Event hook | Where to write the log, what to notify about | `on_event` in all modules |
+| Card slots | A custom block in the user card | `aa_users_server(extra_card_ui, extra_card_server)` |
+| Texts | Language and wording | [`aa_texts()`](https://alexey-seleznev.pro/appauth/reference/aa_texts.md) |
+| Appearance | Colors, light theme, title, logo | [`aa_app_head()`](https://alexey-seleznev.pro/appauth/reference/aa_app_head.md), `aa_auth_server(title, logo)` |
+| Security parameters | Timeouts, limits, auto-login | [`aa_settings()`](https://alexey-seleznev.pro/appauth/reference/aa_settings.md) |
+
+## Permissions
+
+### The “permission -\> roles” matrix
+
+The format follows a typical application config: a permission name and
+the roles it is available to (a vector or a single string).
+
+``` r
+
+provider <- aa_permissions_from_matrix(list(
+  Tasks  = c("admin", "user", "viewer"),
+  Run    = c("admin", "user"),
+  Access = "admin"
+))
+
+provider(list(login = "ivan", role = "user"))
+#> [1] "Tasks" "Run"
+aa_can(list(login = "ivan", role = "user"), "Run", provider)
+#> [1] TRUE
+aa_can(list(login = "ivan", role = "user"), "Access", provider)
+#> [1] FALSE
+```
+
+Name permissions however you like: `"Tasks"`, `"Run"`, `"export"`. The
+package does not know them. The administrator role does **not** get
+permissions by itself: if needed, list it in the matrix.
+
+#### A matrix that changes on the fly
+
+If the application has a permission editor and the matrix changes
+without a restart, pass a function. It is read on every check:
+
+``` r
+
+provider <- aa_permissions_from_matrix(function() conf_rv()$access_matrix)
+```
+
+### A custom permission source
+
+Any `function(user)` that returns a vector of the user’s permission
+names will do. This is how you implement per-user permissions from a
+database, by group, or from an external system:
+
+``` r
+
+provider <- function(user) {
+  if (identical(user$role, "owner")) {
+    return(c("reports", "export", "users"))     # the owner can do everything
+  }
+
+  DBI::dbGetQuery(
+    conn, "SELECT permission FROM user_permissions WHERE login = ?",
+    params = list(user$login)
+  )$permission
+}
+```
+
+[`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md) is
+closed by default: if the function fails, returns non-strings, or
+returns `NA`, the permission is denied. A working example is in
+`examples/custom-permissions-app`.
+
+### Where to check a permission
+
+- **In the UI**: `aa_can(user, "Run", provider)` decides whether to show
+  a button or a tab. This is a convenience, not protection.
+- **On the server in every handler**:
+  `aa_require(auth, "Run", provider, on_event = ...)` as the first line.
+  Without the permission the handler stops silently, the user sees a
+  notification, and the hook receives `access_denied`.
+- **When registering modules**:
+  `aa_register_module(auth, "Access", provider, function() mod_server(...))`
+  attaches the server part of a tab only for those who have the
+  permission.
+
+## Roles
+
+``` r
+
+settings <- aa_settings(
+  roles = c("owner", "editor", "viewer"),
+  admin_role = "owner"
+)
+settings$roles
+#> [1] "owner"  "editor" "viewer"
+```
+
+`admin_role` must be one of `roles`. Only this role manages users (the
+[`aa_users_server()`](https://alexey-seleznev.pro/appauth/reference/aa_users_server.md)
+module checks it on the server and verifies it against the database on
+every action, regardless of your matrix). The first administrator
+created also gets this role.
+
+## Events
+
+The package writes nothing to the application logs: for each event it
+calls the function `on_event(event, user, session_id, value)`, one for
+all modules.
+
+``` r
+
+log_event <- function(event, user, session_id, value) {
+  write_action_log(user = user, func = event, session_id = session_id, value = value)
+}
+
+aa_auth_server("auth", conn, settings, on_event = log_event)
+aa_users_server("users", conn, auth, settings, on_event = log_event)
+aa_require(auth, "Run", provider, on_event = log_event)
+```
+
+The hook receives:
+
+- `event`: the event key from the catalog;
+- `user`: the login the event is attributed to (for a failed login this
+  is the entered login, or `"anonymous"` if there is no login);
+- `session_id`: the Shiny session identifier;
+- `value`: a detail (see the catalog), always a string. Passwords and
+  tokens never appear in events.
+
+An error inside the hook never interrupts a package action: it is
+printed as a message, for example
+`appauth: session closed: ann (token_revoked)`.
+
+The event catalog (returned by
+[`aa_events()`](https://alexey-seleznev.pro/appauth/reference/aa_events.md)):
+
+``` r
+
+knitr::kable(aa_events())
+```
+
+| event | description | value |
+|:---|:---|:---|
+| login_success | Successful sign-in (by password, with Google or by an auto sign-in cookie) | cookie (auto sign-in) or google (Google sign-in) |
+| login_failed | Incorrect login or password | password_disabled if password sign-in is disabled |
+| login_locked | Sign-in attempt for a login locked after failed attempts | seconds until the lock ends |
+| login_blocked_user | Sign-in attempt by a user blocked by an administrator |  |
+| login_throttled | Rejected because of the overall per-minute limit of failed attempts |  |
+| login_unlocked | An administrator removed the sign-in attempts lock | login the lock was removed from |
+| logout | The user signed out on their own |  |
+| session_forced_logout | The session was ended forcibly | reason: deleted, blocked, role_changed, token_revoked |
+| first_admin_created | The first administrator was created |  |
+| user_added | An administrator added a user | login of the new user and the role |
+| user_removed | An administrator deleted a user | login of the deleted user |
+| user_role_changed | An administrator changed a user’s role | login and the new role |
+| password_changed | The user changed their own password |  |
+| sessions_revoked | An administrator ended all sessions of a user | user login |
+| password_reset | An administrator changed a user’s password | user login |
+| user_blocked | An administrator blocked a user | user login |
+| user_unblocked | An administrator unblocked a user | user login |
+| access_denied | Access denied: the role lacks the required permission | permission name |
+| password_reset_requested | Password recovery requested by email (the user always gets the same response) | result: sent, no_user, no_email, blocked, throttled, send_failed |
+| password_reset_done | Password changed using the link from the email |  |
+| password_reset_failed | Invalid or expired password recovery link |  |
+| email_changed | An administrator set, changed or removed a user’s email | user login |
+| totp_enabled | The user enabled two-factor authentication |  |
+| totp_disabled | The user disabled two-factor authentication |  |
+| totp_failed | Incorrect code when confirming sign-in or disabling 2FA |  |
+| totp_reset | An administrator reset a user’s 2FA | user login |
+| recovery_code_used | Sign-in confirmed with a recovery code |  |
+| google_login_failed | Failed Google sign-in (the user is shown a generic text) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; followed by a space and the email if known |
+| weak_password_set | A weak password was accepted (password_policy = “warn” mode) | login and reason: password_common, password_equals_login, password_repeated |
+
+The hook can be used for more than logging: for example, to send a
+Telegram notification on `login_locked` or `user_blocked`. The hook can
+also receive the application’s own events from your code; the package
+does not validate the names.
+
+### A ready-made handler for the log
+
+To avoid writing the hook by hand, build it with
+[`aa_event_logger()`](https://alexey-seleznev.pro/appauth/reference/aa_event_logger.md):
+you supply only the writer function
+`writer(action, user, session_id, value)`, while event filtering, the
+action names of your log, enabling of logging, and value conversion are
+handled by the package.
+
+``` r
+
+write_log <- function(action, user, session_id, value) {
+  # write to your table, file, or Telegram
+}
+
+log_event <- aa_event_logger(
+  write_log,
+  # which events to write and under which names (without actions, all events are written under their keys)
+  actions = c(login_failed = "Login failed", user_added = "User add", user_removed = "User delete"),
+  # a switch from the config: the function is called on every event, changes take effect immediately
+  enabled = function(event) isTRUE(conf_rv()$logging$action_log),
+  # for example, older logs stored only the login in value
+  format_value = function(event, user, value) sub(" \\(.*\\)$", "", value)
+)
+
+auth <- aa_auth_server("auth", conn, settings, on_event = log_event)
+```
+
+Event names are validated immediately: a typo in `actions` or `events`
+raises an error when the handler is created instead of silently skipping
+the event. A failure in `writer` does not interrupt a package action; it
+is printed as a message.
+
+## User card slots
+
+The user card (double-click on a row) shows the standard actions. A
+custom block is added with two functions:
+
+- `extra_card_ui(login, ns)` returns the block’s UI; wrap identifiers in
+  `ns()`;
+- `extra_card_server(input, output, session, login)` is called **once**
+  when the module starts, inside its namespace; `login` is a reactive
+  value with the login of the open card.
+
+``` r
+
+card_ui <- function(login, ns) {
+  div(
+    class = "aa-card-section",
+    h5("Permissions"),
+    checkboxGroupInput(ns("permissions"), NULL, choices = c("reports", "export")),
+    actionButton(ns("save_permissions"), "Save")
+  )
+}
+
+card_server <- function(input, output, session, login) {
+  observeEvent(input$save_permissions, {
+    # take the role from server state, not from input
+    req(identical(isolate(auth$user())$role, "owner"), login())
+    save_permissions(login(), input$permissions)
+  })
+}
+
+aa_users_server("users", conn, auth, settings,
+                extra_card_ui = card_ui, extra_card_server = card_server)
+```
+
+The slot handler must check the permission for the action itself: the
+slot is your code, and the package is not responsible for it. The
+`aa-card-section` class gives the block the standard styling.
+
+Build the rest of the “Access” tab content (the role permission editor,
+log switches) yourself:
+
+``` r
+
+tabPanel("Access", aa_users_ui("users"), my_permissions_editor(), my_log_switches())
+```
+
+## Account area: buttons next to the user badge
+
+Changing your own password and signing out on all devices are ordinary
+application buttons connected to package functions. It is convenient to
+keep them next to the user badge and the “Sign out” button:
+
+``` r
+
+# server: the password change module is attached once
+pw <- aa_password_server("password", conn, auth, settings, on_event = log_event)
+
+# UI: the user badge and buttons
+div(
+  span(icon("user"), user$login, paste0(" (", user$role, ")")),
+  actionButton("change_password", "Change password"),
+  actionButton("logout_all", "Sign out on all devices"),
+  actionButton("logout", "Sign out")
+)
+
+# password change: the module form in a dialog, closed after a successful change
+observeEvent(input$change_password, {
+  showModal(modalDialog(aa_password_ui("password"), title = "Change password",
+                        easyClose = TRUE, footer = modalButton("Close")))
+})
+observeEvent(pw$changed(), removeModal(), ignoreInit = TRUE)
+
+# sign out everywhere only after confirmation: the button also kicks out other devices
+observeEvent(input$logout_all, {
+  showModal(modalDialog(
+    "All your sessions on all devices will be ended.",
+    title = "Sign out on all devices?", easyClose = TRUE,
+    footer = tagList(modalButton("Cancel"),
+                     actionButton("logout_all_confirm", "Sign out everywhere", class = "btn-danger"))
+  ))
+})
+observeEvent(input$logout_all_confirm, {
+  removeModal()
+  auth$logout_all(reload = TRUE)
+})
+
+observeEvent(input$logout, auth$logout(reload = TRUE))
+```
+
+What happens:
+
+- [`aa_password_server()`](https://alexey-seleznev.pro/appauth/reference/aa_password_server.md)
+  checks the current password, rejects the same and weak passwords,
+  revokes the tokens of the other sessions and keeps the current one;
+  event `password_changed`.
+- `auth$logout_all()` revokes all of the user’s tokens and signs out
+  immediately; events `sessions_revoked` (the value is the login) and
+  `logout`. Open sessions on other devices are closed by
+  [`aa_session_guard()`](https://alexey-seleznev.pro/appauth/reference/aa_session_guard.md)
+  at its next check (within 30 seconds by default), so the guard must be
+  attached.
+- If auto-login is disabled (`autologin = FALSE`), sessions have no
+  tokens: “sign out everywhere” closes only the current session. Such a
+  setup needs your own session storage.
+
+A working example: `examples/minimal-app`.
+
+## Password recovery by email
+
+Disabled by default. Enabling it takes three things: a function that
+sends the email, the application address for the link, and user email
+addresses.
+
+``` r
+
+library(emayili)
+
+# sending function: the package does not send emails itself, it only supplies the address and the link
+send_reset <- function(email, link, login) {
+  msg <- envelope() %>%
+    from("My App <noreply@example.com>") %>%
+    to(email) %>%
+    subject("Password recovery") %>%
+    html(paste0(
+      "<p>Hello, ", htmltools::htmlEscape(login), "!</p>",
+      "<p>To set a new password, follow this <a href='", link, "'>link</a>. ",
+      "It is valid for 60 minutes and works only once.</p>",
+      "<p>If you did not request recovery, just ignore this email.</p>"
+    ))
+
+  smtp <- gmail(Sys.getenv("APP_EMAIL"), Sys.getenv("APP_EMAIL_PWD"))
+  smtp(msg)
+}
+
+settings <- aa_settings(
+  reset_enabled  = TRUE,
+  send_reset     = send_reset,
+  reset_base_url = "https://apps.example.com/my_app"   # the application address as users see it
+)
+```
+
+Nothing else needs to be attached:
+[`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md)
+shows the “Forgot your password?” link itself, reads the `reset`
+parameter from the address, shows the new password form, and reports the
+events `password_reset_requested`, `password_reset_done`, and
+`password_reset_failed`.
+
+- **User addresses** are set by the administrator in the user card (the
+  “Email for password recovery” block) or when adding a user;
+  programmatically this is
+  [`aa_set_email()`](https://alexey-seleznev.pro/appauth/reference/aa_set_email.md)
+  and the `email` argument of
+  [`aa_create_user()`](https://alexey-seleznev.pro/appauth/reference/aa_create_user.md).
+  Without an address no email is sent, and the user is left with a
+  password reset by the administrator.
+- **The response to the user is always the same**: whether the user was
+  found, whether they have an address, and whether the limit was
+  exceeded is visible only in the `password_reset_requested` event
+  (`value` holds the reason: `sent`, `no_user`, `no_email`, `blocked`,
+  `throttled`, `send_failed`).
+- **`reset_base_url`** must point to the application the way users open
+  it, including the nginx prefix and over HTTPS. `/?reset=<token>` is
+  appended to it.
+- **The `send_reset` function** runs in the user’s session, so a slow
+  send delays the response. If an error is thrown, the user will not see
+  it, but the reason (`send_failed`) goes to the event and the
+  application log.
+- **Limits**: `reset_max_per_hour` emails per user and
+  `reset_max_per_minute` for the whole application; excess requests are
+  silently ignored.
+- **Custom UI**: the logic is available without the module as
+  [`aa_request_password_reset()`](https://alexey-seleznev.pro/appauth/reference/aa_request_password_reset.md),
+  [`aa_reset_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_token_login.md),
+  and
+  [`aa_reset_password_with_token()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_password_with_token.md).
+
+The form texts are changed with the `forgot_*`, `reset_*`, and `email_*`
+keys
+([`aa_text_keys()`](https://alexey-seleznev.pro/appauth/reference/aa_text_keys.md)).
+
+## Two-factor authentication (TOTP)
+
+Disabled by default and **voluntary**: users enable protection
+themselves, and those who have it enabled enter a code at login. You
+need a secret encryption key and an account area block:
+
+``` r
+
+settings <- aa_settings(
+  totp_enabled = TRUE,
+  totp_key     = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters, kept outside the database and the repository
+  totp_issuer  = "Reports portal"              # the name the authenticator app will show
+)
+
+# server: the module is attached once (like password change)
+aa_totp_server("totp", conn, auth, settings, on_event = log_event)
+
+# UI: a block in the profile
+tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"))
+```
+
+Nothing else needs to be attached:
+[`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md)
+asks for the code itself after a correct password if the user has
+protection enabled.
+
+- **Setup**: the “Enable” button shows a QR code (if the optional
+  `qrcode` package is installed) and a key for manual entry; after a
+  correct code the protection is enabled, and the user is shown 10
+  recovery codes once. The user’s other sessions are ended at that
+  point.
+- **Login**: a code from the app (6 digits) or a recovery code. A code
+  from the app is accepted once; wrong codes count as failed login
+  attempts and lock the login just like password guessing. Auto-login by
+  cookie does not ask for a code.
+- **Disabling** requires the password and a code. **Lost phone**: a
+  recovery code or a 2FA reset by the administrator in the user card
+  (event `totp_reset`).
+- **The `totp_key` key** encrypts secrets in the database. If it is lost
+  or replaced, the secrets become unreadable, and users will have to set
+  up 2FA again (reset by the administrator). Store the key separately
+  from the database and backups.
+- **Events**: `totp_enabled`, `totp_disabled`, `totp_failed`,
+  `totp_reset`, `recovery_code_used`.
+- **Custom logic without modules**:
+  [`aa_totp_setup()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.md),
+  [`aa_totp_enable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enable.md),
+  [`aa_verify_second_factor()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_second_factor.md),
+  [`aa_totp_disable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_disable.md),
+  [`aa_totp_enabled()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enabled.md),
+  [`aa_recovery_codes_left()`](https://alexey-seleznev.pro/appauth/reference/aa_recovery_codes_left.md).
+  Call
+  [`aa_login_gate()`](https://alexey-seleznev.pro/appauth/reference/aa_login_gate.md)
+  before
+  [`aa_verify_second_factor()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_second_factor.md),
+  and
+  [`aa_record_attempt()`](https://alexey-seleznev.pro/appauth/reference/aa_record_attempt.md)
+  after a wrong code, otherwise the code can be guessed.
+- **Tests**: the code for the current step is computed by
+  `aa_totp_code(secret)`; a repeat of an already accepted code is
+  rejected, so in a test for a second login take the code of the next
+  step (`aa_totp_code(secret, Sys.time() + 30)`).
+
+The form texts are changed with the `totp_*` keys and `card_totp`
+([`aa_text_keys()`](https://alexey-seleznev.pro/appauth/reference/aa_text_keys.md)).
+
+## Sign-in with Google
+
+Sign-in with Google (OpenID Connect) is enabled through settings and
+creates nothing by itself: only a user who already exists in the
+database and has an email equal to the Google account address can sign
+in. The role comes from the database, a blocked user cannot sign in, and
+the application’s two-factor code is not requested.
+
+**What is needed in Google.** In the Google Cloud Console (a project in
+your Workspace organization), choose the **Internal** type on the
+consent screen, then create an OAuth client of type **Web application**
+and set the application address in “Authorized redirect URIs” exactly as
+users open it, for example `https://apps.example.com/`. The address must
+be on a domain with HTTPS: Google does not allow redirects to IP
+addresses. The Internal type admits only accounts of your Workspace
+organization; for accounts from other organizations the External type is
+needed (then the `google_domains` list and the user’s presence in the
+database act as the restriction).
+
+``` r
+
+settings <- aa_settings(
+  google_enabled       = TRUE,
+  google_client_id     = Sys.getenv("GOOGLE_OAUTH_CLIENT_ID"),
+  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),   # keep the secret outside the repository
+  google_redirect_uri  = "https://apps.example.com/",
+  google_domains       = c("example.com", "example.net"),            # allowed organization domains
+  password_login       = TRUE                                        # FALSE: Google only (requires google_enabled)
+)
+```
+
+After that the application changes nothing:
+[`aa_auth_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_ui.md)
+and
+[`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md)
+show the button and handle the return from Google themselves.
+
+If the user has `must_change` set, the Google sign-in does not create a
+session: the application shows the password change form and asks only
+for a new password. The old password is not requested because the user
+confirmed ownership of the Google account; after the change the user is
+signed in as usual.
+
+**The application is opened at several addresses** (for example, both by
+IP and by domain). Google returns the user only to
+`google_redirect_uri`, while the sign-in `state` is stored in the cookie
+of the address where sign-in was started (cookies for an IP and for a
+domain are different). Therefore, on a page with a different address the
+“Sign in with Google” button redirects to the return address, and
+sign-in starts there on its own (the `?google=1` parameter, no second
+click needed). Password login and cookie auto-login work independently
+on each address, and nothing needs to be configured. The `login_success`
+event arrives with the value `google`, and failures arrive as the
+`google_login_failed` event (the reason and email in `value`: `no_user`,
+`blocked`, `domain`, `bad_browser`, and others), while the user is shown
+a generic text. For sign-in the user must have an email set
+([`aa_set_email()`](https://alexey-seleznev.pro/appauth/reference/aa_set_email.md)
+or the user card).
+
+`password_login = FALSE` hides the password form and the “Forgot your
+password?” link, and password login attempts are rejected on the server.
+Before disabling the password, make sure at least one administrator has
+an email set and Google sign-in works for them: otherwise there will be
+no way to sign in after disabling.
+
+## A different database
+
+By default the application opens a SQLite file. For DuckDB, MySQL /
+MariaDB, or PostgreSQL, pass
+[`aa_session_connection()`](https://alexey-seleznev.pro/appauth/reference/aa_session_connection.md)
+a function that opens the connection (`db_path` is then not needed); the
+connection is closed together with the session:
+
+``` r
+
+conn <- aa_session_connection(
+  prepare = TRUE, settings = settings,
+  connect = function() DBI::dbConnect(
+    RPostgres::Postgres(),
+    host = "db.example.com", dbname = "app", user = "app",
+    password = Sys.getenv("APP_DB_PASSWORD")
+  )
+)
+```
+
+The rest of the application code
+([`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md),
+[`aa_users_server()`](https://alexey-seleznev.pro/appauth/reference/aa_users_server.md),
+[`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md))
+does not change. The driver is installed separately: `RMariaDB`,
+`RPostgres`, or `duckdb`. Other databases (including BigQuery) are
+rejected with the `appauth_error_connection` error. If the application
+opens the connection itself, pass it to the package functions as is: the
+package identifies the database by the connection class.
+
+## Texts
+
+All interface texts and messages are available in English and Russian
+(English is the default); any string can be replaced.
+
+``` r
+
+length(aa_text_keys())
+#> [1] 149
+texts <- aa_texts(login_button = "Log in", login_title = "Team sign-in")
+texts$login_button
+#> [1] "Log in"
+
+aa_text(texts, "locked", 15)          # value substitution: %d, %s
+#> [1] "Too many failed sign-in attempts. Try again in 15 min."
+```
+
+``` r
+
+settings <- aa_settings(texts = aa_texts(login_title = "Reports portal"))
+
+# Russian interface: aa_texts("ru")
+settings_ru <- aa_settings(texts = aa_texts("ru"))
+```
+
+The list of keys:
+[`aa_text_keys()`](https://alexey-seleznev.pro/appauth/reference/aa_text_keys.md).
+An unknown key or an empty value raises an error immediately instead of
+a silently empty label in the interface.
+
+## Appearance
+
+[`aa_app_head()`](https://alexey-seleznev.pro/appauth/reference/aa_app_head.md)
+attaches the styles and the script. Colors are changed with CSS
+variables, which must be overridden **after**
+[`aa_app_head()`](https://alexey-seleznev.pro/appauth/reference/aa_app_head.md):
+
+``` r
+
+ui <- fluidPage(
+  aa_app_head(),
+  tags$style(HTML(":root { --aa-primary: #0d9488; --aa-primary-hover: #0f766e; }")),
+  ...
+)
+```
+
+| Variable | What it colors |
+|----|----|
+| `--aa-primary`, `--aa-primary-hover` | The sign-in button, field focus |
+| `--aa-danger`, `--aa-warning` | Errors, highlighting of blocked and temporarily blocked rows |
+| `--aa-bg`, `--aa-card-bg`, `--aa-card-border` | The background of the sign-in page and the card |
+| `--aa-text`, `--aa-muted` | Text colors |
+| `--aa-input-bg`, `--aa-input-border` | Input fields |
+
+The light theme is enabled with the `aa-theme-light` class on `<body>`
+or on a parent. Table row highlighting is set with `!important`, since
+application themes often set the cell background with it.
+
+The title and logo of the sign-in form:
+`aa_auth_server("auth", conn, title = "My service", logo = "logo.png")`,
+with the image from the `www` folder.
+
+## Security parameters
+
+| [`aa_settings()`](https://alexey-seleznev.pro/appauth/reference/aa_settings.md) parameter | Default | Meaning |
+|----|----|----|
+| `max_failed_logins` | 5 | failures before a login is locked |
+| `lockout_minutes` | 15 | counting window and lock duration |
+| `max_failed_logins_per_minute` | 30 | overall limit of failures across all logins |
+| `password_min`, `password_max` | 6, 128 | length of a new password |
+| `password_policy` | `"warn"` | weak passwords: `"off"` do not check, `"warn"` accept with a warning, `"reject"` reject |
+| `login_max` | 64 | login length |
+| `autologin` | `TRUE` | auto-login by cookie |
+| `session_days` | 30 | token lifetime |
+| `session_check_seconds` | 30 | how often to check an open session |
+| `attempts_retention_hours`, `token_retention_days` | 24, 30 | how long to keep attempts and expired tokens |
+| `roles`, `admin_role` | `admin`, `user`, `viewer` / `admin` | roles |
+| `must_change_default` | `TRUE` | the default administrator password is temporary |
+| `reset_enabled` | `FALSE` | password recovery by email (requires `send_reset` and `reset_base_url`) |
+| `reset_ttl_minutes` | 60 | lifetime of the link from the email |
+| `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | email limit per user per hour and overall per minute |
+| `totp_enabled` | `FALSE` | two-factor authentication (TOTP), voluntary; requires `totp_key` |
+| `totp_key` | `NULL` | TOTP secret encryption key (a string of at least 16 characters), keep outside the database |
+| `totp_issuer`, `totp_window` | `"appauth"`, 1 | name in the authenticator app, allowed clock drift in steps of 30 seconds |
+
+It is convenient to keep settings in `config.yaml` and read them with
+[`aa_settings_from_list()`](https://alexey-seleznev.pro/appauth/reference/aa_settings_from_list.md):
+extra keys in the list are ignored, and the language and texts are set
+by a separate argument.
+
+The auto-login cookie name is set by
+`aa_auth_server(cookie_name = ...)`. Applications on the same host need
+different names: cookies are not isolated by port.
+
+## What remains with the application
+
+The package deliberately does not take on:
+
+- the permission matrix and its editor;
+- log switches and the log itself;
+- the set of tabs and application-specific checks (task names, paths,
+  commands);
+- additional user fields (department, projects): they live in the
+  application’s tables next to the package tables, and are shown in the
+  card through a slot.
+
+If the same enhancement was needed in three applications, that is a
+reason to move it into the package.
