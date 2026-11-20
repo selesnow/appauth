@@ -861,7 +861,8 @@ settings leave the rest of the behaviour unchanged.
   - in the `architecture-and-security` vignette the limitations and the
     cookie description were updated (`SameSite=Lax`, `Secure` on HTTPS);
   - all vignette examples are executed during the build, and
-    `devtools::check()` is clean.
+    [`devtools::check()`](https://devtools.r-lib.org/reference/check.html)
+    is clean.
 - The failure counter is kept per exact login, case-sensitively (`alice`
   and `Alice` are different people), and not per IP: behind nginx it is
   not visible.

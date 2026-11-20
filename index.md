@@ -224,6 +224,9 @@ no independent audit has been done) are listed in the
 
 ## Development
 
-Automated tests: `devtools::test()`; full check: `devtools::check()`.
+Automated tests:
+[`devtools::test()`](https://devtools.r-lib.org/reference/test.html);
+full check:
+[`devtools::check()`](https://devtools.r-lib.org/reference/check.html).
 Module checks in a real browser (Chrome and Playwright) are described in
 `dev/e2e/README.md`. Change history is in `NEWS.md`.
