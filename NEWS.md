@@ -1,3 +1,9 @@
+# 2026-11-20 | GEMINI CLI (Alsey)
+Updated the package hex logo: corrected letter casing to lowercase 'appauth',
+redesigned the emblem with a modern 3D faceted cyber shield and metallic lock,
+updated man/figures/logo.svg and man/figures/logo.png, regenerated pkgdown
+favicons and added dev/create_logo.R.
+
 # 2026-11-19 | CLAUDE CODE (Alsey)
 Implemented the remaining audit recommendations: transaction wrappers for
 login protection and user management, atomic Google sign-in with

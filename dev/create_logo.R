@@ -1,0 +1,289 @@
+# dev/create_logo.R
+# Script to generate modern, high-resolution SVG and PNG logos for appauth
+
+generate_appauth_logo <- function() {
+  svg_content <- '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-labelledby="title desc">
+  <title id="title">appauth</title>
+  <desc id="desc">Hexagonal logo for appauth R package - secure authentication and authorization for Shiny</desc>
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#081325"/>
+      <stop offset="35%" stop-color="#0b1e38"/>
+      <stop offset="70%" stop-color="#09182d"/>
+      <stop offset="100%" stop-color="#040913"/>
+    </linearGradient>
+
+    <!-- Outer Hexagon Border Gradient -->
+    <linearGradient id="hexBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="30%" stop-color="#14b8a6"/>
+      <stop offset="70%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+
+    <!-- Center Radial Glow -->
+    <radialGradient id="centerGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.30"/>
+      <stop offset="45%" stop-color="#0284c7" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#081325" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Shackle / Padlock Arch Gradient -->
+    <linearGradient id="shackleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="30%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="70%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+
+    <!-- Shield Left Facet -->
+    <linearGradient id="shieldLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0369a1" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#0f2b48" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#071424"/>
+    </linearGradient>
+
+    <!-- Shield Right Facet -->
+    <linearGradient id="shieldRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14b8a6" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#0f3c3d" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#051f22"/>
+    </linearGradient>
+
+    <!-- Shield Outer Rim Highlight -->
+    <linearGradient id="shieldRim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.5"/>
+    </linearGradient>
+
+    <!-- Keyhole Core Glow -->
+    <radialGradient id="keyCore" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#5eead4"/>
+      <stop offset="75%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Keyhole Gradient Fill -->
+    <linearGradient id="keyholeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+
+    <!-- Text "auth" Gradient -->
+    <linearGradient id="textAuthGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="hexShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.7"/>
+    </filter>
+
+    <filter id="shieldShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#020b18" flood-opacity="0.8"/>
+    </filter>
+
+    <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="coreGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="14" result="blur1"/>
+      <feGaussianBlur stdDeviation="6" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer Canvas Hexagon Background & Border -->
+  <g filter="url(#hexShadow)">
+    <path d="M 400,36 L 715,218 L 715,582 L 400,764 L 85,582 L 85,218 Z"
+          fill="url(#bgGrad)"
+          stroke="url(#hexBorderGrad)"
+          stroke-width="14"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Inner Hex Inset Guide Line (Technical Feel) -->
+  <path d="M 400,58 L 696,229 L 696,571 L 400,742 L 104,571 L 104,229 Z"
+        fill="none"
+        stroke="#38bdf8"
+        stroke-opacity="0.25"
+        stroke-width="2"
+        stroke-dasharray="16 10"/>
+
+  <!-- Radial Light Aura behind Shield -->
+  <ellipse cx="400" cy="350" rx="270" ry="210" fill="url(#centerGlow)"/>
+
+  <!-- Subtle Cyber Matrix / Circuit Traces -->
+  <g opacity="0.4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left circuit -->
+    <path d="M 150,270 L 210,270 L 250,310" fill="none" stroke="#2dd4bf" stroke-width="2"/>
+    <circle cx="150" cy="270" r="3.5" fill="#2dd4bf"/>
+    <path d="M 175,410 L 225,410 L 255,380" fill="none" stroke="#38bdf8" stroke-width="2"/>
+    <circle cx="175" cy="410" r="3.5" fill="#38bdf8"/>
+
+    <!-- Right circuit -->
+    <path d="M 650,270 L 590,270 L 550,310" fill="none" stroke="#2dd4bf" stroke-width="2"/>
+    <circle cx="650" cy="270" r="3.5" fill="#2dd4bf"/>
+    <path d="M 625,410 L 575,410 L 545,380" fill="none" stroke="#38bdf8" stroke-width="2"/>
+    <circle cx="625" cy="410" r="3.5" fill="#38bdf8"/>
+  </g>
+
+  <!-- Central Security Emblem (Padlock Shackle + 3D Faceted Shield) -->
+  <g filter="url(#shieldShadow)">
+    <!-- Padlock Shackle (Upper Arch) -->
+    <path d="M 330,265 L 330,205 C 330,145 360,130 400,130 C 440,130 470,145 470,205 L 470,265"
+          fill="none"
+          stroke="url(#shackleGrad)"
+          stroke-width="24"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+
+    <!-- Shackle Inner Metallic Highlight -->
+    <path d="M 330,265 L 330,205 C 330,145 360,130 400,130 C 440,130 470,145 470,205 L 470,265"
+          fill="none"
+          stroke="#ffffff"
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-opacity="0.45"/>
+
+    <!-- 3D Faceted Shield: Left Facet -->
+    <path d="M 400,275 L 265,255 L 265,360 Q 265,435 400,485 Z"
+          fill="url(#shieldLeft)"/>
+
+    <!-- 3D Faceted Shield: Right Facet -->
+    <path d="M 400,275 L 535,255 L 535,360 Q 535,435 400,485 Z"
+          fill="url(#shieldRight)"/>
+
+    <!-- Shield Outer Rim Highlight -->
+    <path d="M 400,275 L 265,255 L 265,360 Q 265,435 400,485 Q 535,435 535,360 L 535,255 Z"
+          fill="none"
+          stroke="url(#shieldRim)"
+          stroke-width="4.5"
+          stroke-linejoin="round"
+          filter="url(#neonGlow)"/>
+
+    <!-- Shield Center Ridge Line -->
+    <line x1="400" y1="275" x2="400" y2="485"
+          stroke="#5eead4"
+          stroke-width="2.5"
+          stroke-opacity="0.6"/>
+
+    <!-- Shield Top Chevron Highlight -->
+    <path d="M 268,258 L 400,277 L 532,258"
+          fill="none"
+          stroke="#e0f2fe"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-opacity="0.5"/>
+  </g>
+
+  <!-- Biometric / Tech Rings inside Shield -->
+  <g>
+    <!-- Outer radar dash ring -->
+    <circle cx="400" cy="372" r="54"
+            fill="none"
+            stroke="#38bdf8"
+            stroke-opacity="0.30"
+            stroke-width="1.8"
+            stroke-dasharray="8 6"/>
+
+    <!-- Inner tech tick ring -->
+    <circle cx="400" cy="372" r="40"
+            fill="none"
+            stroke="#2dd4bf"
+            stroke-opacity="0.45"
+            stroke-width="2"
+            stroke-dasharray="16 8"/>
+
+    <!-- Horizontal auth node indicators -->
+    <line x1="322" y1="372" x2="338" y2="372" stroke="#5eead4" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+    <line x1="462" y1="372" x2="478" y2="372" stroke="#5eead4" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+  </g>
+
+  <!-- Glowing Core Light Source -->
+  <circle cx="400" cy="372" r="28" fill="url(#keyCore)" filter="url(#coreGlow)"/>
+
+  <!-- Cyber Keyhole Glyph (Portal to Authenticated State) -->
+  <g filter="url(#neonGlow)">
+    <!-- Keyhole Slot -->
+    <path d="M 391,396 L 393,369 A 14,14 0 1,1 407,369 L 409,396 Z"
+          fill="url(#keyholeGrad)"/>
+    <!-- Keyhole Pin Highlight -->
+    <circle cx="400" cy="364" r="5" fill="#ffffff"/>
+  </g>
+
+  <!-- Geometric Divider Accent Line -->
+  <g opacity="0.75">
+    <line x1="300" y1="535" x2="365" y2="535" stroke="url(#shieldRim)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="382" cy="535" r="3" fill="#38bdf8"/>
+    <circle cx="400" cy="535" r="4.5" fill="#2dd4bf" filter="url(#neonGlow)"/>
+    <circle cx="418" cy="535" r="3" fill="#38bdf8"/>
+    <line x1="435" y1="535" x2="500" y2="535" stroke="url(#shieldRim)" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Package Title: "appauth" (All Lowercase, Crisp & High-Impact) -->
+  <text x="400" y="628"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, \'Helvetica Neue\', Arial, sans-serif"
+        font-size="78"
+        font-weight="900"
+        letter-spacing="4px"
+        filter="url(#hexShadow)">
+    <tspan fill="#ffffff">app</tspan><tspan fill="url(#textAuthGrad)">auth</tspan>
+  </text>
+
+  <!-- Subtitle: "SECURE SHINY" -->
+  <text x="400" y="668"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif"
+        font-size="15"
+        font-weight="700"
+        fill="#94a3b8"
+        letter-spacing="7px">
+    SECURE SHINY
+  </text>
+</svg>'
+
+  return(svg_content)
+}
+
+# Paths
+svg_file <- "man/figures/logo.svg"
+png_file <- "man/figures/logo.png"
+preview_outbox <- "C:/scripts/alsey/netpeak_core/nc_analytics_team/gemini_cli_tg_bot/data/outbox/194336771/appauth_logo_preview.png"
+
+# Backup old logo if not already backed up
+if (file.exists(svg_file) && !file.exists("man/figures/logo_old.svg")) {
+  file.copy(svg_file, "man/figures/logo_old.svg")
+}
+if (file.exists(png_file) && !file.exists("man/figures/logo_old.png")) {
+  file.copy(png_file, "man/figures/logo_old.png")
+}
+
+# Generate SVG
+svg_text <- generate_appauth_logo()
+writeLines(svg_text, svg_file, useBytes = TRUE)
+cat("Saved SVG to:", svg_file, "\n")
+
+# Render PNG via rsvg at 800x800 and 640x640
+rsvg::rsvg_png(svg_file, png_file, width = 640, height = 640)
+cat("Rendered PNG to:", png_file, "\n")
+
+# Copy / render preview to telegram outbox
+rsvg::rsvg_png(svg_file, preview_outbox, width = 800, height = 800)
+cat("Rendered Telegram Preview to:", preview_outbox, "\n")
