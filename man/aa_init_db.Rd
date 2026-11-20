@@ -7,8 +7,10 @@
 aa_init_db(conn)
 }
 \arguments{
-\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
-(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or
+PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres
+driver).}
 }
 \value{
 A list (invisibly): \code{applied} (migration versions applied in this
@@ -19,8 +21,10 @@ call), \code{version} (the current schema version) and \code{legacy} (\code{TRUE
 Applies versioned migrations: creates missing tables and columns and
 records the applied versions in the service table \code{appauth_migrations}.
 Existing data is not changed, a repeated run changes nothing.
-Old schemas are recognized too (for example, a \code{users} table without an \code{id} column or
-without \code{blocked}, a database without session and login attempt tables): what is missing
+Old schemas are recognized too (for example, a \code{users} table without an \code{id}
+column or
+without \code{blocked}, a database without session and login attempt tables): what
+is missing
 is completed, users, passwords and tokens stay as they were.
 }
 \details{

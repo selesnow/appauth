@@ -5,7 +5,7 @@ description: Documentation, function reference, database schema, events and exam
 
 # The `appauth` R package reference
 
-`appauth` gives Shiny apps secure authentication and user management: login, password hashes (scrypt), brute-force protection, lockouts, auto-login tokens, checks of open sessions, server-side permission checks and ready-made UI modules. It works with SQLite (default), DuckDB, MySQL / MariaDB and PostgreSQL (since 0.8.0); the app supplies the database connection. BigQuery and other analytical warehouses are not supported. The function reference in `references` was built from appauth 0.8.0.
+`appauth` gives Shiny apps secure authentication and user management: login, password hashes (scrypt), brute-force protection, lockouts, auto-login tokens, checks of open sessions, server-side permission checks and ready-made UI modules. It works with SQLite (default), DuckDB, MySQL / MariaDB and PostgreSQL (since 0.8.0); the app supplies the database connection. BigQuery and other analytical warehouses are not supported. The function reference in `references` was built from appauth 0.10.1.
 
 ## The main rule
 

@@ -19,7 +19,8 @@ A list: \code{secret} (base32, for manual entry) and \code{uri} (an
 \verb{otpauth://} link, the QR code is built from it).
 }
 \description{
-Creates a new secret and stores it in the database in encrypted form, but \strong{does not
+Creates a new secret and stores it in the database in encrypted form, but
+\strong{does not
 enable} 2FA: it is enabled only after \code{\link[=aa_totp_enable]{aa_totp_enable()}} with a correct code
 from the app. A repeated call replaces the pending secret. If 2FA is already
 enabled, an error of class \code{appauth_error_user} is raised.
@@ -29,7 +30,8 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
   aa_init_db(conn)
   aa_create_first_admin(conn, "boss", "boss-password")
-  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-example")
+  settings <- aa_settings(totp_enabled = TRUE, totp_key =
+  "a-long-random-key-for-the-example")
   setup <- aa_totp_setup(conn, "boss", settings)
   setup$uri
   DBI::dbDisconnect(conn)

@@ -15,7 +15,8 @@ aa_totp_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 
-\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or
+\code{NULL}.}
 }
 \value{
 A list with a \code{refresh()} function that redraws the block.
@@ -25,23 +26,30 @@ The user enables and disables two-factor authentication (TOTP) on their own:
 }
 \details{
 \itemize{
-\item \strong{enabling}: a button creates a secret (\code{\link[=aa_totp_setup]{aa_totp_setup()}}), shows a QR code
-(if the \code{qrcode} package is installed) and a key for manual entry, and after a code
-from the authenticator app is entered (\code{\link[=aa_totp_enable]{aa_totp_enable()}}) turns protection on and shows
-10 recovery codes \strong{once}. The user's other sessions are ended on enabling;
-\item \strong{disabling}: needs the password and a code (or a recovery code), otherwise whoever
+\item \strong{enabling}: a button creates a secret (\code{\link[=aa_totp_setup]{aa_totp_setup()}}), shows a QR
+code
+(if the \code{qrcode} package is installed) and a key for manual entry, and
+after a code
+from the authenticator app is entered (\code{\link[=aa_totp_enable]{aa_totp_enable()}}) turns protection
+on and shows
+10 recovery codes \strong{once}. The user's other sessions are ended on
+enabling;
+\item \strong{disabling}: needs the password and a code (or a recovery code),
+otherwise whoever
 took over an open session could remove the protection.
 }
 
 Wrong codes count as failed login attempts (\code{\link[=aa_record_attempt]{aa_record_attempt()}}),
-so guessing a code on the account page locks the login the same way as guessing
+so guessing a code on the account page locks the login the same way as
+guessing
 a password. Events: \code{totp_enabled}, \code{totp_disabled}, \code{totp_failed}.
 }
 \examples{
 \dontrun{
 auth <- aa_auth_server("auth", conn, settings)
 shiny::observe({
-  if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event = log_event)
+  if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event
+  = log_event)
 })
 }
 }

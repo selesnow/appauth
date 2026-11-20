@@ -1,3 +1,7 @@
+aa_home_dir <- function() {
+  path.expand("~")
+}
+
 #' Install skills for AI agents
 #'
 #' The package ships two skills for AI agents (Claude Code, Codex and others),
@@ -38,9 +42,15 @@ aa_install_skills <- function(
   aa_check_flag(overwrite, "overwrite")
 
   if (is.null(path)) {
-    base <- if (global) path.expand("~") else "."
-    path <- file.path(base, if (agent == "claude") ".claude" else ".agents", "skills")
-  } else if (!(is.character(path) && length(path) == 1 && !is.na(path) && nzchar(path))) {
+    base <- if (global) aa_home_dir() else "."
+    path <- file.path(
+      base,
+      if (agent == "claude") ".claude" else ".agents",
+      "skills"
+    )
+  } else if (
+    !(is.character(path) && length(path) == 1 && !is.na(path) && nzchar(path))
+  ) {
     rlang::abort(
       "`path` must be a string with a directory path.",
       class = "appauth_error_settings"
@@ -67,7 +77,8 @@ aa_install_skills <- function(
       c(
         paste0(
           "Skill already installed: ",
-          paste0("`", targets[exists], "`", collapse = ", "), "."
+          paste0("`", targets[exists], "`", collapse = ", "),
+          "."
         ),
         i = "Pass `overwrite = TRUE` to replace it."
       ),
@@ -85,7 +96,12 @@ aa_install_skills <- function(
     )
   }
 
-  cli_msg <- paste0("Skills installed: ", paste(basename(skills), collapse = ", "), " -> ", path)
+  cli_msg <- paste0(
+    "Skills installed: ",
+    paste(basename(skills), collapse = ", "),
+    " -> ",
+    path
+  )
   rlang::inform(cli_msg)
 
   invisible(targets)

@@ -23,7 +23,8 @@ aa_users_server(
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or
+\code{NULL}.}
 
 \item{extra_card_ui, extra_card_server}{Card extension slots, see the section
 "Extension slots".}
@@ -36,13 +37,16 @@ A list with a \code{refresh()} function that redraws the table
 User management for an administrator: adding, role change, password
 reset, blocking and unblocking, clearing the login lock, deletion. The rules
 (one cannot block or delete oneself, one cannot be left without an active
-administrator) are checked on the server by the package functions; the UI merely does not
+administrator) are checked on the server by the package functions; the UI
+merely does not
 show forbidden buttons.
 }
 \details{
-The module does not depend on the app's permission matrix: only a user with the role
+The module does not depend on the app's permission matrix: only a user with
+the role
 \code{settings$admin_role} can manage users, and the role is additionally
-checked against the database on every action. The target of an action is taken from the server
+checked against the database on every action. The target of an action is
+taken from the server
 state of the open card, not from a value sent by the browser.
 }
 \section{Extension slots}{
@@ -61,7 +65,8 @@ with the login of the open card. Register the block handlers here.
 \dontrun{
 auth <- aa_auth_server("auth", conn)
 shiny::observe({
-  if (auth$logged_in()) aa_users_server("users", conn, auth, on_event = log_event)
+  if (auth$logged_in()) aa_users_server("users", conn, auth, on_event =
+  log_event)
 })
 }
 }

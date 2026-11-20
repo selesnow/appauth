@@ -17,13 +17,14 @@
 # aa_check_* and aa_validate_* functions do nothing; they return the problem
 # text or NULL, which is convenient to use in the interface.
 
-#' Abort an action with the problem text
-#'
-#' @param settings Settings, the result of [aa_settings()].
-#' @param problem The result of `aa_*_problem()`: a list with `reason` and `args`.
-#' @param call The environment for the error message.
-#'
-#' @noRd
+# Abort an action with the problem text
+#
+# @param settings Settings, the result of [aa_settings()].
+# @param problem The result of `aa_*_problem()`: a list with `reason` and
+# `args`.
+# @param call The environment for the error message.
+#
+# @noRd
 aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
   rlang::abort(
     aa_problem_text(settings, problem),
@@ -33,34 +34,35 @@ aa_abort_problem <- function(settings, problem, call = rlang::caller_env()) {
   )
 }
 
-#' User columns for a query
-#'
-#' The creation and last login dates appeared in the schema later than the other
-#' columns: if they are not in the table yet (the schema is not fully migrated),
-#' `NULL` is returned in their place.
-#'
-#' @param conn Database connection.
-#'
-#' @returns A string with the column list for `SELECT`.
-#' @noRd
+# User columns for a query
+#
+# The creation and last login dates appeared in the schema later than the other
+# columns: if they are not in the table yet (the schema is not fully migrated),
+# `NULL` is returned in their place.
+#
+# @param conn Database connection.
+#
+# @returns A string with the column list for `SELECT`.
+# @noRd
 aa_user_columns <- function(conn) {
   cols <- aa_table_columns(conn, "users")
 
   paste0(
     "login, role, blocked, ",
-    if ("created_at" %in% cols) "created_at" else "NULL AS created_at", ", ",
+    if ("created_at" %in% cols) "created_at" else "NULL AS created_at",
+    ", ",
     if ("last_login_at" %in% cols) "last_login_at" else "NULL AS last_login_at"
   )
 }
 
-#' Remember the time of a successful password login
-#'
-#' @param conn Database connection.
-#' @param login Login.
-#'
-#' @returns Invisibly `TRUE` if the date was recorded. An error does not
-#'   interrupt login.
-#' @noRd
+# Remember the time of a successful password login
+#
+# @param conn Database connection.
+# @param login Login.
+#
+# @returns Invisibly `TRUE` if the date was recorded. An error does not
+#   interrupt login.
+# @noRd
 aa_touch_last_login <- function(conn, login) {
   ok <- tryCatch(
     {
@@ -141,7 +143,15 @@ aa_get_user <- function(conn, login) {
 aa_list_users <- function(conn) {
   aa_check_conn(conn)
 
-  aa_query(conn, paste0("SELECT ", aa_user_columns(conn), " FROM users ORDER BY ", aa_users_order(conn)))
+  aa_query(
+    conn,
+    paste0(
+      "SELECT ",
+      aa_user_columns(conn),
+      " FROM users ORDER BY ",
+      aa_users_order(conn)
+    )
+  )
 }
 
 #' Does the database have at least one user
@@ -167,16 +177,25 @@ aa_users_exist <- function(conn) {
   aa_query(conn, "SELECT COUNT(*) AS n FROM users")$n > 0
 }
 
-#' Find a problem in a new user's data
-#'
-#' @inheritParams aa_create_user
-#' @param check_password Whether to check the password.
-#'
-#' @returns `NULL` or a list with `reason` and `args`.
-#' @noRd
-aa_new_user_problem <- function(conn, login, password, role, settings, check_password = TRUE) {
+# Find a problem in a new user's data
+#
+# @inheritParams aa_create_user
+# @param check_password Whether to check the password.
+#
+# @returns `NULL` or a list with `reason` and `args`.
+# @noRd
+aa_new_user_problem <- function(
+  conn,
+  login,
+  password,
+  role,
+  settings,
+  check_password = TRUE
+) {
   problem <- aa_login_problem(login, settings)
-  if (!is.null(problem)) return(problem)
+  if (!is.null(problem)) {
+    return(problem)
+  }
 
   if (check_password) {
     problem <- aa_password_problem(password, settings, login)
@@ -225,10 +244,19 @@ aa_new_user_problem <- function(conn, login, password, role, settings, check_pas
 #'   aa_validate_new_user(conn, "worker", "another-password", "user")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_validate_new_user <- function(conn, login, password, role, settings = aa_settings()) {
+aa_validate_new_user <- function(
+  conn,
+  login,
+  password,
+  role,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
-  aa_problem_text(settings, aa_new_user_problem(conn, login, password, role, settings))
+  aa_problem_text(
+    settings,
+    aa_new_user_problem(conn, login, password, role, settings)
+  )
 }
 
 #' Create a user
@@ -266,40 +294,57 @@ aa_validate_new_user <- function(conn, login, password, role, settings = aa_sett
 #'   )
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_create_user <- function(conn, login, password, role, settings = aa_settings(),
-                           must_change = FALSE, email = NULL) {
+aa_create_user <- function(
+  conn,
+  login,
+  password,
+  role,
+  settings = aa_settings(),
+  must_change = FALSE,
+  email = NULL
+) {
   aa_check_conn(conn)
+  call <- sys.call()
 
-  problem <- aa_new_user_problem(conn, login, password, role, settings)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
-
-  email <- aa_normalize_email(email)
-  if (nzchar(email)) {
-    problem <- aa_email_problem(conn, email)
-    if (!is.null(problem)) aa_abort_problem(settings, problem)
-  }
-
-  tryCatch(
-    aa_execute(
-      conn,
-      "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, ?)",
-      params = list(login, aa_hash_password(password), role, as.integer(isTRUE(must_change)), aa_utc())
-    ),
-    error = function(e) {
-      # on simultaneous creation the login uniqueness constraint fires
-      if (aa_is_unique_violation(e)) {
-        aa_abort_user(settings, "user_exists")
-      }
-
-      stop(e)
+  aa_write_section(conn, function() {
+    problem <- aa_new_user_problem(conn, login, password, role, settings)
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
     }
-  )
 
-  if (nzchar(email)) {
-    aa_set_email(conn, login, email, settings)
-  }
+    email <- aa_normalize_email(email)
+    if (nzchar(email)) {
+      problem <- aa_email_problem(conn, email)
+      if (!is.null(problem)) aa_abort_problem(settings, problem, call = call)
+    }
 
-  invisible(TRUE)
+    tryCatch(
+      aa_execute(
+        conn,
+        "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, ?)",
+        params = list(
+          login,
+          aa_hash_password(password),
+          role,
+          as.integer(isTRUE(must_change)),
+          aa_utc()
+        )
+      ),
+      error = function(e) {
+        if (aa_is_unique_violation(e)) {
+          aa_abort_user(settings, "user_exists", call = call)
+        }
+
+        stop(e)
+      }
+    )
+
+    if (nzchar(email)) {
+      aa_set_email(conn, login, email, settings)
+    }
+
+    invisible(TRUE)
+  })
 }
 
 #' Create the first user (administrator)
@@ -326,12 +371,21 @@ aa_create_user <- function(conn, login, password, role, settings = aa_settings()
 #'   aa_create_first_admin(conn, "second", "second-password")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_create_first_admin <- function(conn, login, password, settings = aa_settings()) {
+aa_create_first_admin <- function(
+  conn,
+  login,
+  password,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
   problem <- aa_login_problem(login, settings)
-  if (is.null(problem)) problem <- aa_password_problem(password, settings, login)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+  if (is.null(problem)) {
+    problem <- aa_password_problem(password, settings, login)
+  }
+  if (!is.null(problem)) {
+    aa_abort_problem(settings, problem)
+  }
 
   # PostgreSQL infers parameter types in a SELECT list only from an explicit cast
   p <- aa_text_param(conn)
@@ -340,11 +394,24 @@ aa_create_first_admin <- function(conn, login, password, settings = aa_settings(
     conn,
     paste0(
       "INSERT INTO users (login, password, role, created_at)
-       SELECT ", p, ", ", p, ", ", p, ", ", p, "
+       SELECT ",
+      p,
+      ", ",
+      p,
+      ", ",
+      p,
+      ", ",
+      p,
+      "
        FROM (SELECT 1 AS one) AS only_row
        WHERE NOT EXISTS (SELECT 1 FROM users)"
     ),
-    params = list(login, aa_hash_password(password), settings$admin_role, aa_utc())
+    params = list(
+      login,
+      aa_hash_password(password),
+      settings$admin_role,
+      aa_utc()
+    )
   )
 
   n == 1
@@ -447,33 +514,52 @@ aa_authenticate <- function(conn, login, password) {
 #'   aa_authenticate(conn, "boss", "new-boss-password")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_set_password <- function(conn, login, password, settings = aa_settings(),
-                            must_change = FALSE, keep_token = NULL) {
+aa_set_password <- function(
+  conn,
+  login,
+  password,
+  settings = aa_settings(),
+  must_change = FALSE,
+  keep_token = NULL
+) {
   aa_check_conn(conn)
+  call <- sys.call()
 
-  problem <- aa_password_problem(password, settings, login)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+  aa_write_section(conn, function() {
+    problem <- aa_password_problem(password, settings, login)
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
+    }
 
-  if (!aa_is_string(login)) {
-    return(invisible(0L))
-  }
+    if (!aa_is_string(login)) {
+      return(invisible(0L))
+    }
 
-  n <- aa_execute(
-    conn,
-    "UPDATE users SET password = ?, must_change = ? WHERE login = ?",
-    params = list(aa_hash_password(password), as.integer(isTRUE(must_change)), login)
-  )
-
-  if (n > 0) {
-    aa_revoke_user_tokens(
-      conn, login,
-      keep_hash = if (aa_is_string(keep_token)) aa_token_hash(keep_token) else NULL
+    n <- aa_execute(
+      conn,
+      "UPDATE users SET password = ?, must_change = ? WHERE login = ?",
+      params = list(
+        aa_hash_password(password),
+        as.integer(isTRUE(must_change)),
+        login
+      )
     )
-    # recovery links issued before the password change are no longer needed
-    aa_invalidate_resets(conn, login)
-  }
 
-  invisible(n)
+    if (n > 0) {
+      aa_revoke_user_tokens(
+        conn,
+        login,
+        keep_hash = if (aa_is_string(keep_token)) {
+          aa_token_hash(keep_token)
+        } else {
+          NULL
+        }
+      )
+      aa_invalidate_resets(conn, login)
+    }
+
+    invisible(n)
+  })
 }
 
 #' Can a user's role be changed
@@ -496,18 +582,23 @@ aa_set_password <- function(conn, login, password, settings = aa_settings(),
 #'   aa_check_can_change_role(conn, "boss", "user")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_check_can_change_role <- function(conn, login, role, settings = aa_settings()) {
+aa_check_can_change_role <- function(
+  conn,
+  login,
+  role,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
   aa_problem_text(settings, aa_role_change_problem(conn, login, role, settings))
 }
 
-#' Find a problem with a role change
-#'
-#' @inheritParams aa_check_can_change_role
-#'
-#' @returns `NULL` or a list with `reason` and `args`.
-#' @noRd
+# Find a problem with a role change
+#
+# @inheritParams aa_check_can_change_role
+#
+# @returns `NULL` or a list with `reason` and `args`.
+# @noRd
 aa_role_change_problem <- function(conn, login, role, settings) {
   if (!aa_is_string(login)) {
     return(list(reason = "user_not_specified", args = list()))
@@ -523,8 +614,11 @@ aa_role_change_problem <- function(conn, login, role, settings) {
     return(list(reason = "user_not_found", args = list()))
   }
 
-  if (identical(user$role, settings$admin_role) && !identical(role, settings$admin_role) &&
-      aa_active_admin_count(conn, settings, excluding = login) == 0) {
+  if (
+    identical(user$role, settings$admin_role) &&
+      !identical(role, settings$admin_role) &&
+      aa_active_admin_count(conn, settings, excluding = login) == 0
+  ) {
     return(list(reason = "cannot_change_last_admin_role", args = list()))
   }
 
@@ -559,28 +653,39 @@ aa_role_change_problem <- function(conn, login, role, settings) {
 #' }
 aa_set_role <- function(conn, login, role, settings = aa_settings()) {
   aa_check_conn(conn)
+  call <- sys.call()
 
-  problem <- aa_role_change_problem(conn, login, role, settings)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+  aa_write_section(conn, function() {
+    problem <- aa_role_change_problem(conn, login, role, settings)
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
+    }
 
-  n <- aa_execute(
-    conn,
-    "UPDATE users SET role = ? WHERE login = ?",
-    params = list(role, login)
-  )
-  n <- aa_rows_matched(conn, n, login)
+    n <- aa_execute(
+      conn,
+      "UPDATE users SET role = ? WHERE login = ?",
+      params = list(role, login)
+    )
+    n <- aa_rows_matched(conn, n, login)
 
-  invisible(n)
+    invisible(n)
+  })
 }
 
-#' Find a problem with blocking or deletion
-#'
-#' @param action `"block"` or `"delete"`.
-#' @inheritParams aa_check_can_block
-#'
-#' @returns `NULL` or a list with `reason` and `args`.
-#' @noRd
-aa_user_removal_problem <- function(conn, login, acting_login, settings, action) {
+# Find a problem with blocking or deletion
+#
+# @param action `"block"` or `"delete"`.
+# @inheritParams aa_check_can_block
+#
+# @returns `NULL` or a list with `reason` and `args`.
+# @noRd
+aa_user_removal_problem <- function(
+  conn,
+  login,
+  acting_login,
+  settings,
+  action
+) {
   if (!aa_is_string(login)) {
     return(list(reason = "user_not_specified", args = list()))
   }
@@ -596,9 +701,14 @@ aa_user_removal_problem <- function(conn, login, acting_login, settings, action)
   }
 
   # you cannot be left without active administrators
-  if (identical(user$role, settings$admin_role) &&
-      aa_active_admin_count(conn, settings, excluding = login) == 0) {
-    return(list(reason = paste0("cannot_", action, "_last_admin"), args = list()))
+  if (
+    identical(user$role, settings$admin_role) &&
+      aa_active_admin_count(conn, settings, excluding = login) == 0
+  ) {
+    return(list(
+      reason = paste0("cannot_", action, "_last_admin"),
+      args = list()
+    ))
   }
 
   NULL
@@ -625,10 +735,18 @@ aa_user_removal_problem <- function(conn, login, acting_login, settings, action)
 #'   aa_check_can_block(conn, "boss", acting_login = "boss")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_check_can_block <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
+aa_check_can_block <- function(
+  conn,
+  login,
+  acting_login = NULL,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
-  aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "block"))
+  aa_problem_text(
+    settings,
+    aa_user_removal_problem(conn, login, acting_login, settings, "block")
+  )
 }
 
 #' Can a user be deleted
@@ -649,10 +767,18 @@ aa_check_can_block <- function(conn, login, acting_login = NULL, settings = aa_s
 #'   aa_check_can_delete(conn, "boss", acting_login = "boss")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_check_can_delete <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
+aa_check_can_delete <- function(
+  conn,
+  login,
+  acting_login = NULL,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
-  aa_problem_text(settings, aa_user_removal_problem(conn, login, acting_login, settings, "delete"))
+  aa_problem_text(
+    settings,
+    aa_user_removal_problem(conn, login, acting_login, settings, "delete")
+  )
 }
 
 #' Block or unblock a user
@@ -684,31 +810,46 @@ aa_check_can_delete <- function(conn, login, acting_login = NULL, settings = aa_
 #'   aa_set_blocked(conn, "worker", FALSE)
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, settings = aa_settings()) {
+aa_set_blocked <- function(
+  conn,
+  login,
+  blocked = TRUE,
+  acting_login = NULL,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
   aa_check_flag(blocked, "blocked")
+  call <- sys.call()
 
-  if (blocked) {
-    problem <- aa_user_removal_problem(conn, login, acting_login, settings, "block")
-    if (!is.null(problem)) aa_abort_problem(settings, problem)
-  }
+  aa_write_section(conn, function() {
+    if (blocked) {
+      problem <- aa_user_removal_problem(
+        conn,
+        login,
+        acting_login,
+        settings,
+        "block"
+      )
+      if (!is.null(problem)) aa_abort_problem(settings, problem, call = call)
+    }
 
-  if (!aa_is_string(login)) {
-    return(invisible(0L))
-  }
+    if (!aa_is_string(login)) {
+      return(invisible(0L))
+    }
 
-  n <- aa_execute(
-    conn,
-    "UPDATE users SET blocked = ? WHERE login = ?",
-    params = list(as.integer(blocked), login)
-  )
-  n <- aa_rows_matched(conn, n, login)
+    n <- aa_execute(
+      conn,
+      "UPDATE users SET blocked = ? WHERE login = ?",
+      params = list(as.integer(blocked), login)
+    )
+    n <- aa_rows_matched(conn, n, login)
 
-  if (n > 0 && blocked) {
-    aa_revoke_user_tokens(conn, login)
-  }
+    if (n > 0 && blocked) {
+      aa_revoke_user_tokens(conn, login)
+    }
 
-  invisible(n)
+    invisible(n)
+  })
 }
 
 #' Delete a user
@@ -737,26 +878,48 @@ aa_set_blocked <- function(conn, login, blocked = TRUE, acting_login = NULL, set
 #'   aa_list_users(conn)
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_settings()) {
+aa_delete_user <- function(
+  conn,
+  login,
+  acting_login = NULL,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
+  call <- sys.call()
 
-  problem <- aa_user_removal_problem(conn, login, acting_login, settings, "delete")
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
-
-  n <- aa_execute(conn, "DELETE FROM users WHERE login = ?", params = list(login))
-
-  if (n > 0) {
-    aa_delete_user_tokens(conn, login)
-    aa_delete_user_resets(conn, login)
-    tryCatch(
-      aa_execute(conn, "DELETE FROM totp_recovery WHERE user_login = ?", params = list(login)),
-      error = function(e) NULL
+  aa_write_section(conn, function() {
+    problem <- aa_user_removal_problem(
+      conn,
+      login,
+      acting_login,
+      settings,
+      "delete"
     )
-    # the login attempts table may not exist; this must not block deletion
-    tryCatch(aa_clear_attempts(conn, login, settings), error = function(e) NULL)
-  }
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
+    }
 
-  invisible(n)
+    n <- aa_execute(
+      conn,
+      "DELETE FROM users WHERE login = ?",
+      params = list(login)
+    )
+
+    if (n > 0) {
+      aa_delete_user_tokens(conn, login)
+      aa_delete_user_resets(conn, login)
+      if ("totp_recovery" %in% DBI::dbListTables(conn)) {
+        aa_execute(
+          conn,
+          "DELETE FROM totp_recovery WHERE user_login = ?",
+          params = list(login)
+        )
+      }
+      aa_clear_attempts(conn, login, settings)
+    }
+
+    invisible(n)
+  })
 }
 
 #' Change your own password
@@ -788,27 +951,83 @@ aa_delete_user <- function(conn, login, acting_login = NULL, settings = aa_setti
 #'   aa_change_own_password(conn, "boss", "boss-password", "new-boss-password")
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_change_own_password <- function(conn, login, old_password, new_password,
-                                   settings = aa_settings(), keep_token = NULL) {
+aa_change_own_password <- function(
+  conn,
+  login,
+  old_password,
+  new_password,
+  settings = aa_settings(),
+  keep_token = NULL
+) {
   aa_check_conn(conn)
+  call <- sys.call()
 
-  current <- aa_authenticate(conn, login, old_password)
+  aa_write_section(conn, function() {
+    current <- aa_authenticate(conn, login, old_password)
 
-  if (is.null(current) || isTRUE(current$blocked[1] == 1)) {
-    aa_abort_user(settings, "password_wrong")
-  }
+    if (is.null(current) || isTRUE(current$blocked[1] == 1)) {
+      aa_abort_user(settings, "password_wrong", call = call)
+    }
 
-  problem <- aa_password_problem(new_password, settings, login)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+    problem <- aa_password_problem(new_password, settings, login)
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
+    }
 
-  if (identical(old_password, new_password)) {
-    aa_abort_user(settings, "password_same")
-  }
+    if (identical(old_password, new_password)) {
+      aa_abort_user(settings, "password_same", call = call)
+    }
 
-  aa_set_password(conn, current$login[1], new_password, settings,
-                  must_change = FALSE, keep_token = keep_token)
+    aa_set_password(
+      conn,
+      current$login[1],
+      new_password,
+      settings,
+      must_change = FALSE,
+      keep_token = keep_token
+    )
 
-  invisible(TRUE)
+    invisible(TRUE)
+  })
+}
+
+aa_set_own_password_after_sso <- function(
+  conn,
+  login,
+  new_password,
+  settings = aa_settings()
+) {
+  aa_check_conn(conn)
+  call <- sys.call()
+
+  aa_write_section(conn, function() {
+    user <- aa_query(
+      conn,
+      "SELECT login, blocked, must_change FROM users WHERE login = ?",
+      params = list(login)
+    )
+    if (
+      nrow(user) != 1 ||
+        isTRUE(user$blocked[1] == 1) ||
+        !isTRUE(user$must_change[1] == 1)
+    ) {
+      aa_abort_user(settings, "sso_change_expired", call = call)
+    }
+
+    problem <- aa_password_problem(new_password, settings, login)
+    if (!is.null(problem)) {
+      aa_abort_problem(settings, problem, call = call)
+    }
+
+    aa_set_password(
+      conn,
+      user$login[1],
+      new_password,
+      settings,
+      must_change = FALSE
+    )
+    invisible(TRUE)
+  })
 }
 
 #' End all sessions of a user

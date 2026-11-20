@@ -17,15 +17,15 @@ aa_totp_ui <- function(id) {
   shiny::uiOutput(shiny::NS(id, "main"))
 }
 
-#' QR code for an otpauth link
-#'
-#' Needs the optional `qrcode` package. If it is missing or the code could not
-#' be built, `NULL` is returned and the user enters the key manually.
-#'
-#' @param uri An `otpauth://` link.
-#'
-#' @returns HTML with SVG or `NULL`.
-#' @noRd
+# QR code for an otpauth link
+#
+# Needs the optional `qrcode` package. If it is missing or the code could not
+# be built, `NULL` is returned and the user enters the key manually.
+#
+# @param uri An `otpauth://` link.
+#
+# @returns HTML with SVG or `NULL`.
+# @noRd
 aa_totp_qr_html <- function(uri) {
   if (!requireNamespace("qrcode", quietly = TRUE)) {
     return(NULL)
@@ -42,24 +42,28 @@ aa_totp_qr_html <- function(uri) {
   )
 }
 
-#' Button that copies text to the clipboard
-#'
-#' The text is stored in the `data-copy` attribute and copied by the script from [aa_app_head()] (over
-#' HTTPS through the browser clipboard, otherwise through a hidden field). The text is already visible on the page,
-#' so the button reveals nothing new.
-#'
-#' @param text What to copy.
-#' @param settings Settings (button texts).
-#'
-#' @returns A Shiny UI element.
-#' @noRd
+# Button that copies text to the clipboard
+#
+# The text is stored in the `data-copy` attribute and copied by the script from
+# [aa_app_head()] (over
+# HTTPS through the browser clipboard, otherwise through a hidden field). The
+# text is already visible on the page,
+# so the button reveals nothing new.
+#
+# @param text What to copy.
+# @param settings Settings (button texts).
+#
+# @returns A Shiny UI element.
+# @noRd
 aa_copy_button <- function(text, settings) {
   shiny::tags$button(
     type = "button",
     class = "btn btn-default btn-sm aa-copy",
     `data-copy` = text,
     `data-done` = aa_text(settings, "copy_done"),
-    shiny::icon("copy"), " ", aa_text(settings, "copy_button")
+    shiny::icon("copy"),
+    " ",
+    aa_text(settings, "copy_button")
   )
 }
 
@@ -67,22 +71,30 @@ aa_copy_button <- function(text, settings) {
 #'
 #' The user enables and disables two-factor authentication (TOTP) on their own:
 #'
-#' * **enabling**: a button creates a secret ([aa_totp_setup()]), shows a QR code
-#'   (if the `qrcode` package is installed) and a key for manual entry, and after a code
-#'   from the authenticator app is entered ([aa_totp_enable()]) turns protection on and shows
-#'   10 recovery codes **once**. The user's other sessions are ended on enabling;
-#' * **disabling**: needs the password and a code (or a recovery code), otherwise whoever
+#' * **enabling**: a button creates a secret ([aa_totp_setup()]), shows a QR
+#' code
+#'   (if the `qrcode` package is installed) and a key for manual entry, and
+#'   after a code
+#'   from the authenticator app is entered ([aa_totp_enable()]) turns protection
+#'   on and shows
+#'   10 recovery codes **once**. The user's other sessions are ended on
+#'   enabling;
+#' * **disabling**: needs the password and a code (or a recovery code),
+#' otherwise whoever
 #'   took over an open session could remove the protection.
 #'
 #' Wrong codes count as failed login attempts ([aa_record_attempt()]),
-#' so guessing a code on the account page locks the login the same way as guessing
+#' so guessing a code on the account page locks the login the same way as
+#' guessing
 #' a password. Events: `totp_enabled`, `totp_disabled`, `totp_failed`.
 #'
 #' @param id Module id, the same as in [aa_totp_ui()].
 #' @param conn Database connection.
 #' @param auth Authentication object, the result of [aa_auth_server()].
-#' @param settings Settings, the result of [aa_settings()] with `totp_enabled = TRUE`.
-#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param settings Settings, the result of [aa_settings()] with `totp_enabled =
+#' TRUE`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or
+#' `NULL`.
 #'
 #' @returns A list with a `refresh()` function that redraws the block.
 #' @seealso [aa_totp_ui()], [aa_auth_server()]
@@ -92,10 +104,17 @@ aa_copy_button <- function(text, settings) {
 #' \dontrun{
 #' auth <- aa_auth_server("auth", conn, settings)
 #' shiny::observe({
-#'   if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event = log_event)
+#'   if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event
+#'   = log_event)
 #' })
 #' }
-aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL) {
+aa_totp_server <- function(
+  id,
+  conn,
+  auth,
+  settings = aa_settings(),
+  on_event = NULL
+) {
   aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -126,7 +145,10 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
     }
 
     wrong <- function(login) {
-      try(aa_record_attempt(conn, login, success = FALSE, settings = settings), silent = TRUE)
+      try(
+        aa_record_attempt(conn, login, success = FALSE, settings = settings),
+        silent = TRUE
+      )
       emit("totp_failed")
     }
 
@@ -145,34 +167,72 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
       body <- if (enabled) {
         shiny::tagList(
           shiny::p(
-            shiny::span(aa_text(settings, "totp_status_on"), class = "aa-status-ok"), ". ",
-            aa_text(settings, "totp_recovery_left", aa_recovery_codes_left(conn, login))
+            shiny::span(
+              aa_text(settings, "totp_status_on"),
+              class = "aa-status-ok"
+            ),
+            ". ",
+            aa_text(
+              settings,
+              "totp_recovery_left",
+              aa_recovery_codes_left(conn, login)
+            )
           ),
           shiny::h5(aa_text(settings, "totp_disable_title")),
-          shiny::passwordInput(ns("disable_password"), aa_text(settings, "password_label")),
-          shiny::textInput(ns("disable_code"), aa_text(settings, "totp_code_label")),
-          shiny::actionButton(ns("disable_btn"), aa_text(settings, "totp_disable_button"), class = "btn btn-danger")
+          shiny::passwordInput(
+            ns("disable_password"),
+            aa_text(settings, "password_label")
+          ),
+          shiny::textInput(
+            ns("disable_code"),
+            aa_text(settings, "totp_code_label")
+          ),
+          shiny::actionButton(
+            ns("disable_btn"),
+            aa_text(settings, "totp_disable_button"),
+            class = "btn btn-danger"
+          )
         )
       } else if (is.null(enrolling())) {
         shiny::tagList(
           shiny::p(aa_text(settings, "totp_status_off")),
-          shiny::actionButton(ns("start"), aa_text(settings, "totp_enable_button"), class = "btn btn-success")
+          shiny::actionButton(
+            ns("start"),
+            aa_text(settings, "totp_enable_button"),
+            class = "btn btn-success"
+          )
         )
       } else {
         setup <- enrolling()
         qr <- aa_totp_qr_html(setup$uri)
 
         shiny::tagList(
-          shiny::p(class = "aa-login-hint", aa_text(settings, "totp_setup_hint")),
-          if (!is.null(qr)) shiny::div(class = "aa-totp-qr", style = "max-width: 220px;", qr),
           shiny::p(
-            aa_text(settings, "totp_secret_label"), ": ",
-            shiny::tags$code(gsub("(.{4})", "\\1 ", setup$secret)), " ",
+            class = "aa-login-hint",
+            aa_text(settings, "totp_setup_hint")
+          ),
+          if (!is.null(qr)) {
+            shiny::div(class = "aa-totp-qr", style = "max-width: 220px;", qr)
+          },
+          shiny::p(
+            aa_text(settings, "totp_secret_label"),
+            ": ",
+            shiny::tags$code(gsub("(.{4})", "\\1 ", setup$secret)),
+            " ",
             aa_copy_button(setup$secret, settings)
           ),
           shiny::textInput(ns("code"), aa_text(settings, "totp_code_label")),
-          shiny::actionButton(ns("confirm"), aa_text(settings, "totp_confirm_button"), class = "btn btn-success"), " ",
-          shiny::actionButton(ns("cancel"), aa_text(settings, "button_cancel"), class = "btn btn-default")
+          shiny::actionButton(
+            ns("confirm"),
+            aa_text(settings, "totp_confirm_button"),
+            class = "btn btn-success"
+          ),
+          " ",
+          shiny::actionButton(
+            ns("cancel"),
+            aa_text(settings, "button_cancel"),
+            class = "btn btn-default"
+          )
         )
       }
 
@@ -222,7 +282,9 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
       codes <- tryCatch(
         aa_totp_enable(conn, login, input$code, settings),
         appauth_error_user = function(e) {
-          if (identical(e$reason, "totp_wrong")) wrong(login)
+          if (identical(e$reason, "totp_wrong")) {
+            wrong(login)
+          }
           message_text(conditionMessage(e))
           NULL
         }
@@ -234,7 +296,11 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
 
       # enabling 2FA ends the other sessions: the current token stays
       keep <- auth$token()
-      aa_revoke_user_tokens(conn, login, keep_hash = if (aa_is_string(keep)) aa_token_hash(keep) else NULL)
+      aa_revoke_user_tokens(
+        conn,
+        login,
+        keep_hash = if (aa_is_string(keep)) aa_token_hash(keep) else NULL
+      )
 
       enrolling(NULL)
       emit("totp_enabled")
@@ -262,8 +328,15 @@ aa_totp_server <- function(id, conn, auth, settings = aa_settings(), on_event = 
       }
 
       # the code is checked only with the right password: otherwise someone else's attempt would burn recovery codes
-      password_ok <- !is.null(aa_authenticate(conn, login, input$disable_password))
-      code_ok <- password_ok && isTRUE(aa_verify_second_factor(conn, login, input$disable_code, settings)$ok)
+      password_ok <- !is.null(aa_authenticate(
+        conn,
+        login,
+        input$disable_password
+      ))
+      code_ok <- password_ok &&
+        isTRUE(
+          aa_verify_second_factor(conn, login, input$disable_code, settings)$ok
+        )
 
       if (!code_ok) {
         wrong(login)

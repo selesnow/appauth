@@ -14,7 +14,8 @@ A Shiny UI element.
 }
 \description{
 The sign-in form (or the creation of the first administrator if there are
-no users yet). When the user is signed in, the module shows nothing. Styles are attached
+no users yet). When the user is signed in, the module shows nothing. Styles
+are attached
 through \code{\link[=aa_app_head]{aa_app_head()}}.
 }
 \examples{

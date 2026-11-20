@@ -21,6 +21,7 @@ the threat model.
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://alexey-seleznev.pro/appauth/}
   \item \url{https://github.com/selesnow/appauth}
   \item Report bugs at \url{https://github.com/selesnow/appauth/issues}
 }

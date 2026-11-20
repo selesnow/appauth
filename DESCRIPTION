@@ -1,6 +1,6 @@
 Package: appauth
 Title: Secure Authentication and User Management for 'shiny' Applications
-Version: 0.10.0
+Version: 0.10.1
 Authors@R:
     c(person("Alexey", "Seleznev", , "selesnow@gmail.com", role = c("aut", "cre"),
              comment = c(ORCID = "0000-0003-0410-7385")),
@@ -16,7 +16,8 @@ Description: Provides login, user management and access control for 'shiny'
     interface modules with extension points, and versioned database schema
     migrations.
 License: MIT + file LICENSE
-URL: https://github.com/selesnow/appauth
+URL: https://alexey-seleznev.pro/appauth/,
+    https://github.com/selesnow/appauth
 BugReports: https://github.com/selesnow/appauth/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -27,6 +28,7 @@ Imports:
     httr2,
     jose,
     jsonlite,
+    methods,
     openssl,
     rlang,
     RSQLite,

@@ -320,6 +320,8 @@ settings <- aa_settings(
 
 After that the application changes nothing: `aa_auth_ui()` and `aa_auth_server()` show the button and handle the return from Google themselves.
 
+If the user has `must_change` set, the Google sign-in does not create a session: the application shows the password change form and asks only for a new password. The old password is not requested because the user confirmed ownership of the Google account; after the change the user is signed in as usual.
+
 **The application is opened at several addresses** (for example, both by IP and by domain). Google returns the user only to `google_redirect_uri`, while the sign-in `state` is stored in the cookie of the address where sign-in was started (cookies for an IP and for a domain are different). Therefore, on a page with a different address the "Sign in with Google" button redirects to the return address, and sign-in starts there on its own (the `?google=1` parameter, no second click needed). Password login and cookie auto-login work independently on each address, and nothing needs to be configured. The `login_success` event arrives with the value `google`, and failures arrive as the `google_login_failed` event (the reason and email in `value`: `no_user`, `blocked`, `domain`, `bad_browser`, and others), while the user is shown a generic text. For sign-in the user must have an email set (`aa_set_email()` or the user card).
 
 `password_login = FALSE` hides the password form and the "Forgot your password?" link, and password login attempts are rejected on the server. Before disabling the password, make sure at least one administrator has an email set and Google sign-in works for them: otherwise there will be no way to sign in after disabling.

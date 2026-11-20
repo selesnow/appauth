@@ -20,7 +20,10 @@ library(appauth)
 conf <- yaml::read_yaml("config.yaml")
 settings <- aa_settings_from_list(conf$security)
 provider <- aa_permissions_from_matrix(function() conf$access_matrix)
-db_path <- Sys.getenv("APPAUTH_EXAMPLE_DB", file.path(tempdir(), "minimal-app.db"))
+db_path <- Sys.getenv(
+  "APPAUTH_EXAMPLE_DB",
+  file.path(tempdir(), "minimal-app.db")
+)
 
 # the only place where the app decides what to do with authentication events
 log_event <- function(event, user, session_id, value) {
@@ -38,7 +41,13 @@ server <- function(input, output, session) {
   # the connection is closed with the session, the schema is prepared on connect
   conn <- aa_session_connection(db_path, prepare = TRUE, settings = settings)
 
-  auth <- aa_auth_server("auth", conn, settings, on_event = log_event, title = "Sign in")
+  auth <- aa_auth_server(
+    "auth",
+    conn,
+    settings,
+    on_event = log_event,
+    title = "Sign in"
+  )
 
   # blocking, deletion, role change and password reset take effect within 30 seconds
   aa_session_guard(auth, conn, settings)
@@ -47,7 +56,13 @@ server <- function(input, output, session) {
   aa_register_module(auth, "Access", provider, function() {
     aa_users_server("users", conn, auth, settings, on_event = log_event)
   })
-  pw <- aa_password_server("password", conn, auth, settings, on_event = log_event)
+  pw <- aa_password_server(
+    "password",
+    conn,
+    auth,
+    settings,
+    on_event = log_event
+  )
 
   output$main <- renderUI({
     req(auth$logged_in())
@@ -61,7 +76,9 @@ server <- function(input, output, session) {
           if (aa_can(user, "Run", provider)) actionButton("run", "Run task")
         )
       },
-      if (aa_can(user, "Access", provider)) tabPanel("Access", aa_users_ui("users"))
+      if (aa_can(user, "Access", provider)) {
+        tabPanel("Access", aa_users_ui("users"))
+      }
     )
 
     tagList(
@@ -81,7 +98,9 @@ server <- function(input, output, session) {
   observeEvent(input$change_password, {
     showModal(modalDialog(
       aa_password_ui("password"),
-      title = "Change password", easyClose = TRUE, footer = modalButton("Close")
+      title = "Change password",
+      easyClose = TRUE,
+      footer = modalButton("Close")
     ))
   })
   observeEvent(pw$changed(), removeModal(), ignoreInit = TRUE)
@@ -90,10 +109,15 @@ server <- function(input, output, session) {
   observeEvent(input$logout_all, {
     showModal(modalDialog(
       "All your sessions on all devices will be ended; you will have to sign in again.",
-      title = "Sign out on all devices?", easyClose = TRUE,
+      title = "Sign out on all devices?",
+      easyClose = TRUE,
       footer = tagList(
         modalButton("Cancel"),
-        actionButton("logout_all_confirm", "Sign out everywhere", class = "btn-danger")
+        actionButton(
+          "logout_all_confirm",
+          "Sign out everywhere",
+          class = "btn-danger"
+        )
       )
     ))
   })

@@ -25,12 +25,15 @@ aa_users_ui <- function(id) {
 #' User management for an administrator: adding, role change, password
 #' reset, blocking and unblocking, clearing the login lock, deletion. The rules
 #' (one cannot block or delete oneself, one cannot be left without an active
-#' administrator) are checked on the server by the package functions; the UI merely does not
+#' administrator) are checked on the server by the package functions; the UI
+#' merely does not
 #' show forbidden buttons.
 #'
-#' The module does not depend on the app's permission matrix: only a user with the role
+#' The module does not depend on the app's permission matrix: only a user with
+#' the role
 #' `settings$admin_role` can manage users, and the role is additionally
-#' checked against the database on every action. The target of an action is taken from the server
+#' checked against the database on every action. The target of an action is
+#' taken from the server
 #' state of the open card, not from a value sent by the browser.
 #'
 #' @section Extension slots:
@@ -46,7 +49,8 @@ aa_users_ui <- function(id) {
 #' @param conn Database connection.
 #' @param auth Authentication object, the result of [aa_auth_server()].
 #' @param settings Settings, the result of [aa_settings()].
-#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or
+#' `NULL`.
 #' @param extra_card_ui,extra_card_server Card extension slots, see the section
 #'   "Extension slots".
 #'
@@ -59,11 +63,19 @@ aa_users_ui <- function(id) {
 #' \dontrun{
 #' auth <- aa_auth_server("auth", conn)
 #' shiny::observe({
-#'   if (auth$logged_in()) aa_users_server("users", conn, auth, on_event = log_event)
+#'   if (auth$logged_in()) aa_users_server("users", conn, auth, on_event =
+#'   log_event)
 #' })
 #' }
-aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL,
-                            extra_card_ui = NULL, extra_card_server = NULL) {
+aa_users_server <- function(
+  id,
+  conn,
+  auth,
+  settings = aa_settings(),
+  on_event = NULL,
+  extra_card_ui = NULL,
+  extra_card_server = NULL
+) {
   aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -99,9 +111,12 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         return(FALSE)
       }
 
-      current <- tryCatch(aa_get_user(conn, acting$login), error = function(e) NULL)
+      current <- tryCatch(aa_get_user(conn, acting$login), error = function(e) {
+        NULL
+      })
 
-      !is.null(current) && identical(current$role, settings$admin_role) &&
+      !is.null(current) &&
+        identical(current$role, settings$admin_role) &&
         !isTRUE(as.logical(current$blocked))
     }
 
@@ -142,8 +157,15 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         class = "aa-users",
         shiny::div(
           class = "aa-users-toolbar",
-          shiny::h4(aa_text(settings, "users_title"), style = "margin-right: auto;"),
-          shiny::actionButton(ns("add"), aa_text(settings, "users_add"), class = "btn btn-success")
+          shiny::h4(
+            aa_text(settings, "users_title"),
+            style = "margin-right: auto;"
+          ),
+          shiny::actionButton(
+            ns("add"),
+            aa_text(settings, "users_add"),
+            class = "btn btn-success"
+          )
         ),
         DT::DTOutput(ns("table")),
         shiny::p(class = "aa-users-hint", aa_text(settings, "users_hint"))
@@ -160,13 +182,21 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       mark <- function(x) ifelse(x == 1, "\u2713", "\u2013")
 
       shown <- data.frame(
-        data$login, data$role, data$status, data$created, data$last_login, mark(data$has_email),
+        data$login,
+        data$role,
+        data$status,
+        data$created,
+        data$last_login,
+        mark(data$has_email),
         stringsAsFactors = FALSE
       )
       labels <- c(
-        aa_text(settings, "col_login"), aa_text(settings, "col_role"),
-        aa_text(settings, "col_status"), aa_text(settings, "col_created"),
-        aa_text(settings, "col_last_login"), aa_text(settings, "col_email")
+        aa_text(settings, "col_login"),
+        aa_text(settings, "col_role"),
+        aa_text(settings, "col_status"),
+        aa_text(settings, "col_created"),
+        aa_text(settings, "col_last_login"),
+        aa_text(settings, "col_email")
       )
 
       if (isTRUE(settings$totp_enabled)) {
@@ -195,8 +225,14 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
           ),
           rowCallback = DT::JS(
             "function(row, data) {",
-            sprintf("  if (data[%d] === 'blocked') { $(row).addClass('aa-row-blocked'); }", state_col),
-            sprintf("  else if (data[%d] === 'locked') { $(row).addClass('aa-row-locked'); }", state_col),
+            sprintf(
+              "  if (data[%d] === 'blocked') { $(row).addClass('aa-row-blocked'); }",
+              state_col
+            ),
+            sprintf(
+              "  else if (data[%d] === 'locked') { $(row).addClass('aa-row-locked'); }",
+              state_col
+            ),
             "}"
           )
         ),
@@ -223,7 +259,10 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       acting <- acting_user()$login
       email <- aa_get_email(conn, login)
       totp_on <- isTRUE(settings$totp_enabled) && aa_totp_enabled(conn, login)
-      lock_seconds <- tryCatch(aa_login_lock_remaining(conn, login, settings), error = function(e) 0L)
+      lock_seconds <- tryCatch(
+        aa_login_lock_remaining(conn, login, settings),
+        error = function(e) 0L
+      )
       is_blocked <- isTRUE(as.logical(user$blocked))
       block_reason <- aa_check_can_block(conn, login, acting, settings)
       delete_reason <- aa_check_can_delete(conn, login, acting, settings)
@@ -241,14 +280,27 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
             shiny::strong(paste0(aa_text(settings, "card_account"), ": ")),
             if (is_blocked) {
               shiny::tagList(
-                shiny::span(aa_text(settings, "card_blocked"), class = "aa-status-blocked"), " ",
-                shiny::actionButton(ns("unblock"), aa_text(settings, "button_unblock"), class = "btn btn-success btn-sm")
+                shiny::span(
+                  aa_text(settings, "card_blocked"),
+                  class = "aa-status-blocked"
+                ),
+                " ",
+                shiny::actionButton(
+                  ns("unblock"),
+                  aa_text(settings, "button_unblock"),
+                  class = "btn btn-success btn-sm"
+                )
               )
             } else {
               shiny::tagList(
-                shiny::span(aa_text(settings, "card_active")), " ",
+                shiny::span(aa_text(settings, "card_active")),
+                " ",
                 if (is.null(block_reason)) {
-                  shiny::actionButton(ns("block"), aa_text(settings, "button_block"), class = "btn btn-danger btn-sm")
+                  shiny::actionButton(
+                    ns("block"),
+                    aa_text(settings, "button_block"),
+                    class = "btn btn-danger btn-sm"
+                  )
                 }
               )
             }
@@ -258,10 +310,19 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
             if (lock_seconds > 0) {
               shiny::tagList(
                 shiny::span(
-                  aa_text(settings, "card_signin_locked", max(1L, as.integer(ceiling(lock_seconds / 60)))),
+                  aa_text(
+                    settings,
+                    "card_signin_locked",
+                    max(1L, as.integer(ceiling(lock_seconds / 60)))
+                  ),
                   class = "aa-status-locked"
-                ), " ",
-                shiny::actionButton(ns("unlock"), aa_text(settings, "button_unlock"), class = "btn btn-warning btn-sm")
+                ),
+                " ",
+                shiny::actionButton(
+                  ns("unlock"),
+                  aa_text(settings, "button_unlock"),
+                  class = "btn btn-warning btn-sm"
+                )
               )
             } else {
               shiny::span(aa_text(settings, "card_signin_ok"))
@@ -272,8 +333,13 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
               shiny::strong(paste0(aa_text(settings, "card_totp"), ": ")),
               if (totp_on) {
                 shiny::tagList(
-                  shiny::span(aa_text(settings, "totp_status_on")), " ",
-                  shiny::actionButton(ns("reset_totp"), aa_text(settings, "totp_reset_button"), class = "btn btn-warning btn-sm")
+                  shiny::span(aa_text(settings, "totp_status_on")),
+                  " ",
+                  shiny::actionButton(
+                    ns("reset_totp"),
+                    aa_text(settings, "totp_reset_button"),
+                    class = "btn btn-warning btn-sm"
+                  )
                 )
               } else {
                 shiny::span(aa_text(settings, "totp_status_off"))
@@ -285,60 +351,119 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
             class = "aa-card-section",
             shiny::h5(aa_text(settings, "role_section")),
             shiny::fluidRow(
-              shiny::column(8, shiny::selectInput(
-                ns("role"), aa_text(settings, "role_label"),
-                choices = settings$roles, selected = user$role
-              )),
-              shiny::column(4, shiny::actionButton(
-                ns("change_role"), aa_text(settings, "role_button"),
-                class = "btn btn-warning w-100", style = "margin-top: 25px;"
-              ))
+              shiny::column(
+                8,
+                shiny::selectInput(
+                  ns("role"),
+                  aa_text(settings, "role_label"),
+                  choices = settings$roles,
+                  selected = user$role
+                )
+              ),
+              shiny::column(
+                4,
+                shiny::actionButton(
+                  ns("change_role"),
+                  aa_text(settings, "role_button"),
+                  class = "btn btn-warning w-100",
+                  style = "margin-top: 25px;"
+                )
+              )
             )
           ),
           shiny::div(
             class = "aa-card-section",
             shiny::h5(aa_text(settings, "email_section")),
             shiny::fluidRow(
-              shiny::column(8, shiny::textInput(
-                ns("email"), aa_text(settings, "email_label"),
-                value = if (is.na(email)) "" else email,
-                placeholder = aa_text(settings, "email_not_set")
-              )),
-              shiny::column(4, shiny::actionButton(
-                ns("save_email"), aa_text(settings, "email_button"),
-                class = "btn btn-warning w-100", style = "margin-top: 25px;"
-              ))
+              shiny::column(
+                8,
+                shiny::textInput(
+                  ns("email"),
+                  aa_text(settings, "email_label"),
+                  value = if (is.na(email)) "" else email,
+                  placeholder = aa_text(settings, "email_not_set")
+                )
+              ),
+              shiny::column(
+                4,
+                shiny::actionButton(
+                  ns("save_email"),
+                  aa_text(settings, "email_button"),
+                  class = "btn btn-warning w-100",
+                  style = "margin-top: 25px;"
+                )
+              )
             )
           ),
           shiny::div(
             class = "aa-card-section",
             shiny::h5(aa_text(settings, "reset_section")),
             shiny::fluidRow(
-              shiny::column(4, shiny::passwordInput(ns("new_password"), aa_text(settings, "reset_new_label"))),
-              shiny::column(4, shiny::passwordInput(ns("new_password_confirm"), aa_text(settings, "password_confirm_label"))),
-              shiny::column(4, shiny::actionButton(
-                ns("reset_password"), aa_text(settings, "reset_button"),
-                class = "btn btn-warning w-100", style = "margin-top: 25px;"
-              ))
+              shiny::column(
+                4,
+                shiny::passwordInput(
+                  ns("new_password"),
+                  aa_text(settings, "reset_new_label")
+                )
+              ),
+              shiny::column(
+                4,
+                shiny::passwordInput(
+                  ns("new_password_confirm"),
+                  aa_text(settings, "password_confirm_label")
+                )
+              ),
+              shiny::column(
+                4,
+                shiny::actionButton(
+                  ns("reset_password"),
+                  aa_text(settings, "reset_button"),
+                  class = "btn btn-warning w-100",
+                  style = "margin-top: 25px;"
+                )
+              )
             ),
-            shiny::checkboxInput(ns("reset_must_change"), aa_text(settings, "must_change_label"), value = settings$must_change_default)
+            shiny::checkboxInput(
+              ns("reset_must_change"),
+              aa_text(settings, "must_change_label"),
+              value = settings$must_change_default
+            )
           ),
           shiny::div(
             class = "aa-card-section",
-            shiny::actionButton(ns("revoke"), aa_text(settings, "button_revoke"), class = "btn btn-warning btn-sm")
+            shiny::actionButton(
+              ns("revoke"),
+              aa_text(settings, "button_revoke"),
+              class = "btn btn-warning btn-sm"
+            )
           ),
           if (is.function(extra_card_ui)) extra_card_ui(login, ns),
           if (is.null(delete_reason)) {
             shiny::div(
               class = "aa-card-section aa-card-danger",
-              shiny::h5(aa_text(settings, "delete_section"), class = "aa-status-blocked"),
-              shiny::p(aa_text(settings, "delete_warning"), class = "aa-login-hint", style = "text-align: left;"),
-              shiny::actionButton(ns("delete"), aa_text(settings, "delete_button"), class = "btn btn-danger")
+              shiny::h5(
+                aa_text(settings, "delete_section"),
+                class = "aa-status-blocked"
+              ),
+              shiny::p(
+                aa_text(settings, "delete_warning"),
+                class = "aa-login-hint",
+                style = "text-align: left;"
+              ),
+              shiny::actionButton(
+                ns("delete"),
+                aa_text(settings, "delete_button"),
+                class = "btn btn-danger"
+              )
             )
           } else {
             shiny::div(
               class = "aa-card-section",
-              shiny::p(aa_text(settings, "delete_unavailable", delete_reason), class = "aa-login-hint", style = "text-align: left; margin: 0;")
+              shiny::p(
+                aa_text(settings, "delete_unavailable", delete_reason),
+                class = "aa-login-hint",
+                style = "text-align: left; margin: 0;"
+              )
             )
           }
         )
@@ -363,7 +488,11 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     shiny::observeEvent(input$block, {
       require_admin()
       login <- target()
-      if (run_action(function() aa_set_blocked(conn, login, TRUE, acting_user()$login, settings))) {
+      if (
+        run_action(function() {
+          aa_set_blocked(conn, login, TRUE, acting_user()$login, settings)
+        })
+      ) {
         emit("user_blocked", login)
         notify(aa_text(settings, "done_blocked", login))
         version(version() + 1)
@@ -374,7 +503,11 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
     shiny::observeEvent(input$unblock, {
       require_admin()
       login <- target()
-      if (run_action(function() aa_set_blocked(conn, login, FALSE, acting_user()$login, settings))) {
+      if (
+        run_action(function() {
+          aa_set_blocked(conn, login, FALSE, acting_user()$login, settings)
+        })
+      ) {
         emit("user_unblocked", login)
         notify(aa_text(settings, "done_unblocked", login))
         version(version() + 1)
@@ -414,7 +547,11 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
 
       if (run_action(function() aa_set_email(conn, login, email, settings))) {
         emit("email_changed", login)
-        notify(aa_text(settings, if (cleared) "done_email_cleared" else "done_email_saved", login))
+        notify(aa_text(
+          settings,
+          if (cleared) "done_email_cleared" else "done_email_saved",
+          login
+        ))
         show_card(login)
       }
     })
@@ -430,7 +567,17 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
 
       must_change <- isTRUE(input$reset_must_change)
 
-      if (run_action(function() aa_set_password(conn, login, input$new_password, settings, must_change = must_change))) {
+      if (
+        run_action(function() {
+          aa_set_password(
+            conn,
+            login,
+            input$new_password,
+            settings,
+            must_change = must_change
+          )
+        })
+      ) {
         emit("password_reset", login)
         notify(aa_text(settings, "done_password_reset", login))
         warn_weak(input$new_password, login)
@@ -471,8 +618,16 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         size = "s",
         easyClose = FALSE,
         footer = shiny::tagList(
-          shiny::actionButton(ns("delete_cancel"), aa_text(settings, "button_cancel"), class = "btn btn-default"),
-          shiny::actionButton(ns("delete_confirm"), aa_text(settings, "delete_confirm_button"), class = "btn btn-danger")
+          shiny::actionButton(
+            ns("delete_cancel"),
+            aa_text(settings, "button_cancel"),
+            class = "btn btn-default"
+          ),
+          shiny::actionButton(
+            ns("delete_confirm"),
+            aa_text(settings, "delete_confirm_button"),
+            class = "btn btn-danger"
+          )
         ),
         shiny::p(aa_text(settings, "delete_confirm_text", login))
       ))
@@ -493,7 +648,11 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
       shiny::req(aa_is_string(login), identical(login, card_login()))
       delete_pending(NULL)
 
-      if (run_action(function() aa_delete_user(conn, login, acting_user()$login, settings))) {
+      if (
+        run_action(function() {
+          aa_delete_user(conn, login, acting_user()$login, settings)
+        })
+      ) {
         emit("user_removed", login)
         notify(aa_text(settings, "done_deleted", login))
         shiny::removeModal()
@@ -516,19 +675,39 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
         easyClose = TRUE,
         footer = shiny::tagList(
           shiny::modalButton(aa_text(settings, "button_close")),
-          shiny::actionButton(ns("add_confirm"), aa_text(settings, "add_button"), class = "btn btn-success")
+          shiny::actionButton(
+            ns("add_confirm"),
+            aa_text(settings, "add_button"),
+            class = "btn btn-success"
+          )
         ),
         shiny::textInput(ns("new_login"), aa_text(settings, "login_label")),
-        shiny::passwordInput(ns("new_user_password"), aa_text(settings, "password_label")),
-        shiny::passwordInput(ns("new_user_confirm"), aa_text(settings, "password_confirm_label")),
+        shiny::passwordInput(
+          ns("new_user_password"),
+          aa_text(settings, "password_label")
+        ),
+        shiny::passwordInput(
+          ns("new_user_confirm"),
+          aa_text(settings, "password_confirm_label")
+        ),
         shiny::selectInput(
-          ns("new_user_role"), aa_text(settings, "role_label"),
+          ns("new_user_role"),
+          aa_text(settings, "role_label"),
           choices = settings$roles,
           # by default a role without administrator rights, raising it must be deliberate
-          selected = (setdiff(settings$roles, settings$admin_role))[1] %||% settings$roles[1]
+          selected = (setdiff(settings$roles, settings$admin_role))[1] %||%
+            settings$roles[1]
         ),
-        shiny::textInput(ns("new_user_email"), aa_text(settings, "email_label"), placeholder = aa_text(settings, "email_not_set")),
-        shiny::checkboxInput(ns("new_user_must_change"), aa_text(settings, "must_change_label"), value = settings$must_change_default),
+        shiny::textInput(
+          ns("new_user_email"),
+          aa_text(settings, "email_label"),
+          placeholder = aa_text(settings, "email_not_set")
+        ),
+        shiny::checkboxInput(
+          ns("new_user_must_change"),
+          aa_text(settings, "must_change_label"),
+          value = settings$must_change_default
+        ),
         shiny::textOutput(ns("add_message"))
       ))
     })
@@ -549,9 +728,15 @@ aa_users_server <- function(id, conn, auth, settings = aa_settings(), on_event =
 
       created <- tryCatch(
         {
-          aa_create_user(conn, login, input$new_user_password, role, settings,
-                         must_change = isTRUE(input$new_user_must_change),
-                         email = input$new_user_email)
+          aa_create_user(
+            conn,
+            login,
+            input$new_user_password,
+            role,
+            settings,
+            must_change = isTRUE(input$new_user_must_change),
+            email = input$new_user_email
+          )
           TRUE
         },
         appauth_error_user = function(e) {

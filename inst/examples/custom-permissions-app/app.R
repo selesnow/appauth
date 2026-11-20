@@ -35,12 +35,22 @@ settings <- aa_settings(
   # two-factor authentication: in a real application the secret encryption key is taken
   # from an environment variable and kept out of the repository; this value is for the example
   totp_enabled = TRUE,
-  totp_key = Sys.getenv("APPAUTH_EXAMPLE_TOTP_KEY", "example-only-key-change-me-0123456789"),
+  totp_key = Sys.getenv(
+    "APPAUTH_EXAMPLE_TOTP_KEY",
+    "example-only-key-change-me-0123456789"
+  ),
   totp_issuer = "Reports portal",
-  texts = aa_texts("en", login_title = "Reports portal", login_button = "Sign in")
+  texts = aa_texts(
+    "en",
+    login_title = "Reports portal",
+    login_button = "Sign in"
+  )
 )
 
-db_path <- Sys.getenv("APPAUTH_EXAMPLE_DB", file.path(tempdir(), "custom-permissions-app.db"))
+db_path <- Sys.getenv(
+  "APPAUTH_EXAMPLE_DB",
+  file.path(tempdir(), "custom-permissions-app.db")
+)
 
 log_event <- function(event, user, session_id, value) {
   message(sprintf("[audit] %s user=%s value=%s", event, user, value))
@@ -57,12 +67,15 @@ server <- function(input, output, session) {
   conn <- aa_session_connection(db_path, prepare = TRUE, settings = settings)
 
   # the application's own table next to the appauth tables
-  DBI::dbExecute(conn, "
+  DBI::dbExecute(
+    conn,
+    "
     CREATE TABLE IF NOT EXISTS user_permissions (
       login      TEXT NOT NULL,
       permission TEXT NOT NULL,
       PRIMARY KEY (login, permission)
-    )")
+    )"
+  )
 
   # permission source: any function(user) -> character()
   provider <- function(user) {
@@ -72,14 +85,19 @@ server <- function(input, output, session) {
     }
 
     DBI::dbGetQuery(
-      conn, "SELECT permission FROM user_permissions WHERE login = ?",
+      conn,
+      "SELECT permission FROM user_permissions WHERE login = ?",
       params = list(user$login)
     )$permission
   }
 
   auth <- aa_auth_server(
-    "auth", conn, settings, on_event = log_event,
-    title = "Reports portal", cookie_name = "reports_portal_token"
+    "auth",
+    conn,
+    settings,
+    on_event = log_event,
+    title = "Reports portal",
+    cookie_name = "reports_portal_token"
   )
   aa_session_guard(auth, conn, settings)
   aa_password_server("password", conn, auth, settings, on_event = log_event)
@@ -88,15 +106,25 @@ server <- function(input, output, session) {
   # user card slot: the application's permissions block
   card_ui <- function(login, ns) {
     current <- DBI::dbGetQuery(
-      conn, "SELECT permission FROM user_permissions WHERE login = ?",
+      conn,
+      "SELECT permission FROM user_permissions WHERE login = ?",
       params = list(login)
     )$permission
 
     div(
       class = "aa-card-section",
       h5("Permissions"),
-      checkboxGroupInput(ns("permissions"), NULL, choices = all_permissions, selected = current),
-      actionButton(ns("save_permissions"), "Save permissions", class = "btn btn-primary btn-sm")
+      checkboxGroupInput(
+        ns("permissions"),
+        NULL,
+        choices = all_permissions,
+        selected = current
+      ),
+      actionButton(
+        ns("save_permissions"),
+        "Save permissions",
+        class = "btn btn-primary btn-sm"
+      )
     )
   }
 
@@ -107,25 +135,38 @@ server <- function(input, output, session) {
       req(identical(user$role, settings$admin_role), login())
 
       DBI::dbWithTransaction(conn, {
-        DBI::dbExecute(conn, "DELETE FROM user_permissions WHERE login = ?", params = list(login()))
+        DBI::dbExecute(
+          conn,
+          "DELETE FROM user_permissions WHERE login = ?",
+          params = list(login())
+        )
         for (permission in intersect(input$permissions, all_permissions)) {
           DBI::dbExecute(
-            conn, "INSERT INTO user_permissions (login, permission) VALUES (?, ?)",
+            conn,
+            "INSERT INTO user_permissions (login, permission) VALUES (?, ?)",
             params = list(login(), permission)
           )
         }
       })
 
       log_event("permissions_changed", user$login, session$token, login())
-      showNotification(paste("Permissions saved for", login()), type = "message")
+      showNotification(
+        paste("Permissions saved for", login()),
+        type = "message"
+      )
     })
   }
 
   # the users tab and its server part are available only with the "users" permission
   aa_register_module(auth, "users", provider, function() {
     aa_users_server(
-      "users", conn, auth, settings, on_event = log_event,
-      extra_card_ui = card_ui, extra_card_server = card_server
+      "users",
+      conn,
+      auth,
+      settings,
+      on_event = log_event,
+      extra_card_ui = card_ui,
+      extra_card_server = card_server
     )
   })
 
@@ -134,19 +175,36 @@ server <- function(input, output, session) {
     user <- auth$user()
 
     tabs <- list(
-      if (aa_can(user, "reports", provider)) tabPanel("Reports", p("Quarterly report for ", strong(user$login))),
+      if (aa_can(user, "reports", provider)) {
+        tabPanel("Reports", p("Quarterly report for ", strong(user$login)))
+      },
       if (aa_can(user, "export", provider)) {
         tabPanel("Export", actionButton("export", "Export to CSV"))
       },
-      if (aa_can(user, "users", provider)) tabPanel("Users", aa_users_ui("users")),
-      tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"), hr(), actionButton("logout", "Sign out"))
+      if (aa_can(user, "users", provider)) {
+        tabPanel("Users", aa_users_ui("users"))
+      },
+      tabPanel(
+        "Profile",
+        aa_password_ui("password"),
+        hr(),
+        aa_totp_ui("totp"),
+        hr(),
+        actionButton("logout", "Sign out")
+      )
     )
 
     do.call(tabsetPanel, Filter(Negate(is.null), tabs))
   })
 
   observeEvent(input$export, {
-    aa_require(auth, "export", provider, on_event = log_event, settings = settings)
+    aa_require(
+      auth,
+      "export",
+      provider,
+      on_event = log_event,
+      settings = settings
+    )
     showNotification("Export started", type = "message")
   })
 

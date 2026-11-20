@@ -59,8 +59,8 @@ a single repeated character): \code{"off"} do not check, \code{"warn"} (default)
 accept the password but show a warning, \code{"reject"} reject the password.
 Existing passwords are not affected.}
 
-\item{login_max}{Maximum login length (the login is also lowercased and
-trimmed when attempts are counted).}
+\item{login_max}{Maximum login length (the login is trimmed and compared
+exactly, case-sensitively, when attempts are counted).}
 
 \item{autologin}{Whether to use cookie-based auto sign-in. If \code{FALSE}, the
 user enters the password on every page load and no tokens are issued.}
@@ -98,8 +98,9 @@ request and is not visible to the user, the reason goes into the
 \code{password_reset_requested} event.}
 
 \item{reset_base_url}{Application address the link in the email points to,
-for example \code{"https://apps.example.com/my_app"}. \verb{?reset=<token>} is
-appended to it.}
+for example \code{"https://apps.example.com/my_app"}. It must use \verb{https://},
+except for local development on \verb{http://127.0.0.1} or \verb{http://localhost}.
+\verb{?reset=<token>} is appended to it.}
 
 \item{reset_ttl_minutes}{Lifetime of the password change link, in minutes.}
 
@@ -190,10 +191,13 @@ settings <- aa_settings()
 settings <- aa_settings(
   reset_enabled  = TRUE,
   reset_base_url = "https://apps.example.com/my_app",
-  send_reset     = function(email, link, login) message("Email for ", login, ": ", link)
+  send_reset = function(email, link, login) {
+    message("Email for ", login, ": ", link)
+  }
 )
 
-# sign-in with Google (secret from an environment variable), password stays as a fallback
+# sign-in with Google (secret from an environment variable), password stays
+# as a fallback
 settings <- aa_settings(
   google_enabled       = TRUE,
   google_client_id     = "1234-abc.apps.googleusercontent.com",

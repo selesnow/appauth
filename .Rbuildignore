@@ -8,7 +8,11 @@
 ^desktop\.ini$
 ^README\.Rmd$
 ^doc$
+^docs$
+^pkgdown$
 ^Meta$
 ^dev$
 ^TODO\.md$
 ^cran-comments\.md$
+^\.github$
+^_pkgdown\.yml$

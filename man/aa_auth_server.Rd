@@ -21,11 +21,13 @@ aa_auth_server(
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or
+\code{NULL}.}
 
 \item{title}{Sign-in form title. Defaults to the \code{login_title} text.}
 
-\item{logo}{Address of an image above the title (for example \code{"logo.png"} from the
+\item{logo}{Address of an image above the title (for example \code{"logo.png"}
+from the
 \code{www} folder) or \code{NULL}.}
 
 \item{cookie_name}{Auto-login cookie name. Cookies are not isolated by port,
@@ -34,76 +36,108 @@ so apps on the same host need different names.}
 \value{
 A list: \code{user} (reactive value, a list with \code{login} and \code{role} or
 \code{NULL}), \code{logged_in} (reactive logical), \code{role} (reactive role or
-\code{NULL}), a \code{token()} function (the auto-login token of this session or \code{NULL}, needed by
-\code{\link[=aa_session_guard]{aa_session_guard()}}), a \code{logout(reason = NULL, reload = FALSE)} function and
+\code{NULL}), a \code{token()} function (the auto-login token of this session or
+\code{NULL}, needed by
+\code{\link[=aa_session_guard]{aa_session_guard()}}), a \code{logout(reason = NULL, reload = FALSE)} function
+and
 a \code{logout_all(reload = TRUE)} function. Without \code{reason}
-this is an ordinary sign-out (event \code{logout}); with \code{reason} (\code{"blocked"}, \code{"deleted"},
-\code{"role_changed"}, \code{"token_revoked"}) it is forced (\code{session_forced_logout}). With
-\code{reload = TRUE} the page is reloaded so that the modules of the previous user
+this is an ordinary sign-out (event \code{logout}); with \code{reason} (\code{"blocked"},
+\code{"deleted"},
+\code{"role_changed"}, \code{"token_revoked"}) it is forced
+(\code{session_forced_logout}). With
+\code{reload = TRUE} the page is reloaded so that the modules of the previous
+user
 disappear.
 
 \code{logout_all()} is "sign out on all devices": it revokes all tokens of the
 user (event \code{sessions_revoked}) and signs out immediately; open sessions on
-other devices are closed by \code{\link[=aa_session_guard]{aa_session_guard()}} at the next check. Show the user a
-confirmation dialog before calling it: the button kicks them out everywhere.
+other devices are closed by \code{\link[=aa_session_guard]{aa_session_guard()}} at the next check. Show
+the user a
+confirmation dialog before calling it: the button kicks them out
+everywhere.
 }
 \description{
-Sign-in with login and password protected against guessing (\code{\link[=aa_login_gate]{aa_login_gate()}}), creation of the
-first administrator on an empty database, auto-login by cookie (if enabled in the
+Sign-in with login and password protected against guessing
+(\code{\link[=aa_login_gate]{aa_login_gate()}}), creation of the
+first administrator on an empty database, auto-login by cookie (if enabled in
+the
 settings) and sign-out. The module reports all events to the \code{on_event} hook
 (catalog in \code{\link[=aa_events]{aa_events()}}) and writes nothing to logs itself.
 }
 \details{
-If the password was set by an administrator (\code{must_change}), the password change form
-is shown after the correct password is entered, and the user gets into the app
+If the password was set by an administrator (\code{must_change}), the password
+change form
+is shown after the correct password is entered, and the user gets into the
+app
 only after the change.
 }
 \section{Two-factor authentication}{
 
 With \code{totp_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a user who has
-2FA enabled (\code{\link[=aa_totp_server]{aa_totp_server()}}) enters, after the correct password, a code from the
+2FA enabled (\code{\link[=aa_totp_server]{aa_totp_server()}}) enters, after the correct password, a code
+from the
 authenticator app or a recovery code. Until then no auto-login token is
 issued and the successful login attempt is not recorded: wrong codes count as
 failed login attempts, and the login is locked by the same rules as for
-password guessing. Auto-login by cookie does not ask for the second factor (the cookie
-was issued after it was passed). The module reports the events \code{totp_failed} and
+password guessing. Auto-login by cookie does not ask for the second factor
+(the cookie
+was issued after it was passed). The module reports the events \code{totp_failed}
+and
 \code{recovery_code_used}.
 }
 
 \section{Password recovery by email}{
 
-With \code{reset_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Forgot password?"
+With \code{reset_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Forgot
+password?"
 link appears on the sign-in form. The user enters a login or email and is
-sent an email with a link \verb{<reset_base_url>/?reset=<token>}, and the on-screen answer is
+sent an email with a link \verb{<reset_base_url>/?reset=<token>}, and the
+on-screen answer is
 always the same, whether or not the user was found. The module itself
-reads the \code{reset} parameter from the address bar, removes it from the address and shows
-the new password form if the link works. After the password is changed the user signs in
+reads the \code{reset} parameter from the address bar, removes it from the address
+and shows
+the new password form if the link works. After the password is changed the
+user signs in
 as usual: they are not signed in automatically. The module reports the events
-\code{password_reset_requested}, \code{password_reset_done} and \code{password_reset_failed}.
+\code{password_reset_requested}, \code{password_reset_done} and
+\code{password_reset_failed}.
 Logic without UI: \code{\link[=aa_request_password_reset]{aa_request_password_reset()}} and
 \code{\link[=aa_reset_password_with_token]{aa_reset_password_with_token()}}.
 }
 
 \section{Sign-in with Google}{
 
-With \code{google_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Sign in with Google"
-button appears on the sign-in form. The user confirms the sign-in with Google and returns
-to \code{google_redirect_uri}; the package checks the signature and contents of the Google token, the organization
-domain (\code{google_domains}) and finds the user \strong{by email among already created ones}:
-sign-in does not create new users, the role is taken from the database, a blocked
+With \code{google_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Sign in
+with Google"
+button appears on the sign-in form. The user confirms the sign-in with Google
+and returns
+to \code{google_redirect_uri}; the package checks the signature and contents of
+the Google token, the organization
+domain (\code{google_domains}) and finds the user \strong{by email among already created
+ones}:
+sign-in does not create new users, the role is taken from the database, a
+blocked
 user does not get in. The two-factor code is not asked for in this case
-(Google does the confirmation). \code{state} from the address is compared with a short cookie
-of the browser that started the sign-in, so someone else's return link cannot be slipped in. With
-\code{password_login = FALSE} the password form is hidden and password sign-in attempts are rejected
+(Google does the confirmation). \code{state} from the address is compared with a
+short cookie
+of the browser that started the sign-in, so someone else's return link cannot
+be slipped in. With
+\code{password_login = FALSE} the password form is hidden and password sign-in
+attempts are rejected
 on the server. The module reports \code{login_success} with the value \code{google} and
 \code{google_login_failed} (reason and email in \code{value}); on refusal the user
 sees a generic text. If the page is opened not at the
-\code{google_redirect_uri} address (for example, the app is opened by IP while the return is configured for a
-domain), the button sends the user to the return address and sign-in starts there on its own
-(parameter \code{?google=1}): \code{state} is stored in the cookie of the site address, and cookies for an IP and for a domain
-are different. Password sign-in and cookie auto-login work independently at each address.
+\code{google_redirect_uri} address (for example, the app is opened by IP while the
+return is configured for a
+domain), the button sends the user to the return address and sign-in starts
+there on its own
+(parameter \code{?google=1}): \code{state} is stored in the cookie of the site address,
+and cookies for an IP and for a domain
+are different. Password sign-in and cookie auto-login work independently at
+each address.
 
-The role and login are taken from the database, not from the entered string. The \code{conn}
+The role and login are taken from the database, not from the entered string.
+The \code{conn}
 connection belongs to the app: close it when the session ends.
 }
 

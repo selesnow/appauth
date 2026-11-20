@@ -58,7 +58,8 @@ aa_permissions_from_matrix <- function(matrix) {
 
 aa_check_matrix <- function(matrix, call = rlang::caller_env()) {
   ok <- is.list(matrix) &&
-    (length(matrix) == 0 || (!is.null(names(matrix)) && all(nzchar(names(matrix)))))
+    (length(matrix) == 0 ||
+      (!is.null(names(matrix)) && all(nzchar(names(matrix)))))
 
   if (!ok) {
     rlang::abort(
@@ -134,7 +135,8 @@ aa_can <- function(user, permission, provider) {
 #'   `role`).
 #' @param permission Permission name.
 #' @param provider Permission provider, see [aa_can()].
-#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or
+#' `NULL`.
 #' @param settings Settings, the result of [aa_settings()] (language of the
 #'   denial text).
 #' @param session_id Session identifier for the hook. By default it is taken
@@ -150,8 +152,14 @@ aa_can <- function(user, permission, provider) {
 #'   # ... the action ...
 #' })
 #' }
-aa_require <- function(auth, permission, provider, on_event = NULL,
-                       settings = aa_settings(), session_id = NULL) {
+aa_require <- function(
+  auth,
+  permission,
+  provider,
+  on_event = NULL,
+  settings = aa_settings(),
+  session_id = NULL
+) {
   user <- if (is.list(auth) && is.function(auth$user)) auth$user() else auth
 
   if (aa_can(user, permission, provider)) {
@@ -167,13 +175,17 @@ aa_require <- function(auth, permission, provider, on_event = NULL,
   message(
     "appauth: access denied: user=",
     if (aa_is_string(login)) login else "anonymous",
-    ", permission=", if (aa_is_string(permission)) permission else "?"
+    ", permission=",
+    if (aa_is_string(permission)) permission else "?"
   )
   aa_emit(on_event, "access_denied", login, session_id, permission)
 
   if (!is.null(domain)) {
     try(
-      shiny::showNotification(aa_text(settings, "access_denied"), type = "error"),
+      shiny::showNotification(
+        aa_text(settings, "access_denied"),
+        type = "error"
+      ),
       silent = TRUE
     )
   }

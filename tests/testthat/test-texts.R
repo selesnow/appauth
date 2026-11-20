@@ -42,7 +42,11 @@ test_that("Russian texts are available and differ from English ones", {
   expect_true(all(vapply(texts, function(x) !is.na(x), logical(1))))
   expect_false(identical(texts$login_title, aa_texts("en")$login_title))
   # Russian texts are not plain ASCII
-  expect_true(any(vapply(texts, function(x) any(utf8ToInt(x) > 127L), logical(1))))
+  expect_true(any(vapply(
+    texts,
+    function(x) any(utf8ToInt(x) > 127L),
+    logical(1)
+  )))
 })
 
 test_that("unknown language is rejected", {
@@ -59,11 +63,21 @@ test_that("custom texts replace the defaults, the rest stay", {
 
 test_that("invalid custom texts are rejected", {
   expect_error(aa_texts("en", "unnamed"), class = "appauth_error_texts")
-  expect_error(aa_texts("en", no_such_key = "x"), "no_such_key", class = "appauth_error_texts")
+  expect_error(
+    aa_texts("en", no_such_key = "x"),
+    "no_such_key",
+    class = "appauth_error_texts"
+  )
   expect_error(aa_texts("en", login_button = ""), class = "appauth_error_texts")
-  expect_error(aa_texts("en", login_button = NA_character_), class = "appauth_error_texts")
+  expect_error(
+    aa_texts("en", login_button = NA_character_),
+    class = "appauth_error_texts"
+  )
   expect_error(aa_texts("en", login_button = 5), class = "appauth_error_texts")
-  expect_error(aa_texts("en", login_button = c("a", "b")), class = "appauth_error_texts")
+  expect_error(
+    aa_texts("en", login_button = c("a", "b")),
+    class = "appauth_error_texts"
+  )
 })
 
 test_that("aa_text returns a string and substitutes values", {
@@ -78,7 +92,10 @@ test_that("aa_text returns a string and substitutes values", {
     aa_text(texts, "setup_hint", "admin"),
     "The application has no users yet. The first user you create gets the admin role."
   )
-  expect_identical(aa_text(texts, "password_too_short", 8), "Password must be at least 8 characters long")
+  expect_identical(
+    aa_text(texts, "password_too_short", 8),
+    "Password must be at least 8 characters long"
+  )
 
   ru <- aa_texts("ru")
   expect_identical(aa_text(ru, "locked", 15), sprintf(ru$locked, 15))
@@ -97,8 +114,14 @@ test_that("aa_text rejects invalid arguments", {
 
   expect_error(aa_text(texts, "no_such_key"), class = "appauth_error_texts")
   expect_error(aa_text(texts, NA_character_), class = "appauth_error_texts")
-  expect_error(aa_text(texts, c("login_button", "login_title")), class = "appauth_error_texts")
-  expect_error(aa_text(list(login_button = "x"), "login_button"), class = "appauth_error_texts")
+  expect_error(
+    aa_text(texts, c("login_button", "login_title")),
+    class = "appauth_error_texts"
+  )
+  expect_error(
+    aa_text(list(login_button = "x"), "login_button"),
+    class = "appauth_error_texts"
+  )
 })
 
 test_that("print shows the language and the number of strings", {

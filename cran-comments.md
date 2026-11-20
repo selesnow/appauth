@@ -1,6 +1,6 @@
 ## Submission
 
-This is a new submission of appauth 0.10.0.
+This is a new submission of appauth 0.10.1.
 
 appauth provides login, user management and access control for 'shiny'
 applications. It stores users in 'SQLite' (the default), 'DuckDB',

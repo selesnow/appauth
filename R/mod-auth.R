@@ -1,7 +1,8 @@
 #' Sign-in module: UI
 #'
 #' The sign-in form (or the creation of the first administrator if there are
-#' no users yet). When the user is signed in, the module shows nothing. Styles are attached
+#' no users yet). When the user is signed in, the module shows nothing. Styles
+#' are attached
 #' through [aa_app_head()].
 #'
 #' @param id Module id.
@@ -18,82 +19,116 @@ aa_auth_ui <- function(id) {
 
 #' Sign-in module: server
 #'
-#' Sign-in with login and password protected against guessing ([aa_login_gate()]), creation of the
-#' first administrator on an empty database, auto-login by cookie (if enabled in the
+#' Sign-in with login and password protected against guessing
+#' ([aa_login_gate()]), creation of the
+#' first administrator on an empty database, auto-login by cookie (if enabled in
+#' the
 #' settings) and sign-out. The module reports all events to the `on_event` hook
 #' (catalog in [aa_events()]) and writes nothing to logs itself.
 #'
-#' If the password was set by an administrator (`must_change`), the password change form
-#' is shown after the correct password is entered, and the user gets into the app
+#' If the password was set by an administrator (`must_change`), the password
+#' change form
+#' is shown after the correct password is entered, and the user gets into the
+#' app
 #' only after the change.
 #'
 #' @section Two-factor authentication:
 #' With `totp_enabled = TRUE` in the settings ([aa_settings()]), a user who has
-#' 2FA enabled ([aa_totp_server()]) enters, after the correct password, a code from the
+#' 2FA enabled ([aa_totp_server()]) enters, after the correct password, a code
+#' from the
 #' authenticator app or a recovery code. Until then no auto-login token is
 #' issued and the successful login attempt is not recorded: wrong codes count as
 #' failed login attempts, and the login is locked by the same rules as for
-#' password guessing. Auto-login by cookie does not ask for the second factor (the cookie
-#' was issued after it was passed). The module reports the events `totp_failed` and
+#' password guessing. Auto-login by cookie does not ask for the second factor
+#' (the cookie
+#' was issued after it was passed). The module reports the events `totp_failed`
+#' and
 #' `recovery_code_used`.
 #'
 #' @section Password recovery by email:
-#' With `reset_enabled = TRUE` in the settings ([aa_settings()]), a "Forgot password?"
+#' With `reset_enabled = TRUE` in the settings ([aa_settings()]), a "Forgot
+#' password?"
 #' link appears on the sign-in form. The user enters a login or email and is
-#' sent an email with a link `<reset_base_url>/?reset=<token>`, and the on-screen answer is
+#' sent an email with a link `<reset_base_url>/?reset=<token>`, and the
+#' on-screen answer is
 #' always the same, whether or not the user was found. The module itself
-#' reads the `reset` parameter from the address bar, removes it from the address and shows
-#' the new password form if the link works. After the password is changed the user signs in
+#' reads the `reset` parameter from the address bar, removes it from the address
+#' and shows
+#' the new password form if the link works. After the password is changed the
+#' user signs in
 #' as usual: they are not signed in automatically. The module reports the events
-#' `password_reset_requested`, `password_reset_done` and `password_reset_failed`.
+#' `password_reset_requested`, `password_reset_done` and
+#' `password_reset_failed`.
 #' Logic without UI: [aa_request_password_reset()] and
 #' [aa_reset_password_with_token()].
 #'
 #' @section Sign-in with Google:
-#' With `google_enabled = TRUE` in the settings ([aa_settings()]), a "Sign in with Google"
-#' button appears on the sign-in form. The user confirms the sign-in with Google and returns
-#' to `google_redirect_uri`; the package checks the signature and contents of the Google token, the organization
-#' domain (`google_domains`) and finds the user **by email among already created ones**:
-#' sign-in does not create new users, the role is taken from the database, a blocked
+#' With `google_enabled = TRUE` in the settings ([aa_settings()]), a "Sign in
+#' with Google"
+#' button appears on the sign-in form. The user confirms the sign-in with Google
+#' and returns
+#' to `google_redirect_uri`; the package checks the signature and contents of
+#' the Google token, the organization
+#' domain (`google_domains`) and finds the user **by email among already created
+#' ones**:
+#' sign-in does not create new users, the role is taken from the database, a
+#' blocked
 #' user does not get in. The two-factor code is not asked for in this case
-#' (Google does the confirmation). `state` from the address is compared with a short cookie
-#' of the browser that started the sign-in, so someone else's return link cannot be slipped in. With
-#' `password_login = FALSE` the password form is hidden and password sign-in attempts are rejected
+#' (Google does the confirmation). `state` from the address is compared with a
+#' short cookie
+#' of the browser that started the sign-in, so someone else's return link cannot
+#' be slipped in. With
+#' `password_login = FALSE` the password form is hidden and password sign-in
+#' attempts are rejected
 #' on the server. The module reports `login_success` with the value `google` and
 #' `google_login_failed` (reason and email in `value`); on refusal the user
 #' sees a generic text. If the page is opened not at the
-#' `google_redirect_uri` address (for example, the app is opened by IP while the return is configured for a
-#' domain), the button sends the user to the return address and sign-in starts there on its own
-#' (parameter `?google=1`): `state` is stored in the cookie of the site address, and cookies for an IP and for a domain
-#' are different. Password sign-in and cookie auto-login work independently at each address.
+#' `google_redirect_uri` address (for example, the app is opened by IP while the
+#' return is configured for a
+#' domain), the button sends the user to the return address and sign-in starts
+#' there on its own
+#' (parameter `?google=1`): `state` is stored in the cookie of the site address,
+#' and cookies for an IP and for a domain
+#' are different. Password sign-in and cookie auto-login work independently at
+#' each address.
 #'
-#' The role and login are taken from the database, not from the entered string. The `conn`
+#' The role and login are taken from the database, not from the entered string.
+#' The `conn`
 #' connection belongs to the app: close it when the session ends.
 #'
 #' @param id Module id, the same as in [aa_auth_ui()].
 #' @param conn Database connection with the [aa_init_db()] schema.
 #' @param settings Settings, the result of [aa_settings()].
-#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or
+#' `NULL`.
 #' @param title Sign-in form title. Defaults to the `login_title` text.
-#' @param logo Address of an image above the title (for example `"logo.png"` from the
+#' @param logo Address of an image above the title (for example `"logo.png"`
+#' from the
 #'   `www` folder) or `NULL`.
 #' @param cookie_name Auto-login cookie name. Cookies are not isolated by port,
 #'   so apps on the same host need different names.
 #'
 #' @returns A list: `user` (reactive value, a list with `login` and `role` or
 #'   `NULL`), `logged_in` (reactive logical), `role` (reactive role or
-#'   `NULL`), a `token()` function (the auto-login token of this session or `NULL`, needed by
-#'   [aa_session_guard()]), a `logout(reason = NULL, reload = FALSE)` function and
+#'   `NULL`), a `token()` function (the auto-login token of this session or
+#'   `NULL`, needed by
+#'   [aa_session_guard()]), a `logout(reason = NULL, reload = FALSE)` function
+#'   and
 #'   a `logout_all(reload = TRUE)` function. Without `reason`
-#'   this is an ordinary sign-out (event `logout`); with `reason` (`"blocked"`, `"deleted"`,
-#'   `"role_changed"`, `"token_revoked"`) it is forced (`session_forced_logout`). With
-#'   `reload = TRUE` the page is reloaded so that the modules of the previous user
+#'   this is an ordinary sign-out (event `logout`); with `reason` (`"blocked"`,
+#'   `"deleted"`,
+#'   `"role_changed"`, `"token_revoked"`) it is forced
+#'   (`session_forced_logout`). With
+#'   `reload = TRUE` the page is reloaded so that the modules of the previous
+#'   user
 #'   disappear.
 #'
 #'   `logout_all()` is "sign out on all devices": it revokes all tokens of the
 #'   user (event `sessions_revoked`) and signs out immediately; open sessions on
-#'   other devices are closed by [aa_session_guard()] at the next check. Show the user a
-#'   confirmation dialog before calling it: the button kicks them out everywhere.
+#'   other devices are closed by [aa_session_guard()] at the next check. Show
+#'   the user a
+#'   confirmation dialog before calling it: the button kicks them out
+#'   everywhere.
 #' @seealso [aa_auth_ui()]
 #' @export
 #'
@@ -108,8 +143,15 @@ aa_auth_ui <- function(id) {
 #'   output$app <- shiny::renderUI(if (auth$logged_in()) main_ui())
 #' }
 #' }
-aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
-                           title = NULL, logo = NULL, cookie_name = "appauth_token") {
+aa_auth_server <- function(
+  id,
+  conn,
+  settings = aa_settings(),
+  on_event = NULL,
+  title = NULL,
+  logo = NULL,
+  cookie_name = "appauth_token"
+) {
   aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -161,7 +203,10 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         token <- tryCatch(
           aa_issue_token(conn, login, settings),
           error = function(e) {
-            message("appauth: could not issue an auto-login token: ", conditionMessage(e))
+            message(
+              "appauth: could not issue an auto-login token: ",
+              conditionMessage(e)
+            )
             NULL
           }
         )
@@ -170,7 +215,11 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           current_token <<- token
           session$sendCustomMessage(
             "appauth_set_cookie",
-            list(name = cookie_name, token = token, days = settings$session_days)
+            list(
+              name = cookie_name,
+              token = token,
+              days = settings$session_days
+            )
           )
         }
       }
@@ -178,47 +227,63 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
     # password recovery link from the email: ?reset=<token>
     if (isTRUE(settings$reset_enabled) && password_on) {
-      shiny::observeEvent(aa_url_search(session), {
-        token <- shiny::parseQueryString(aa_url_search(session))[["reset"]]
+      shiny::observeEvent(
+        aa_url_search(session),
+        {
+          token <- shiny::parseQueryString(aa_url_search(session))[["reset"]]
 
-        if (!aa_is_string(token) || !is.null(shiny::isolate(user()))) {
-          return()
-        }
+          if (!aa_is_string(token) || !is.null(shiny::isolate(user()))) {
+            return()
+          }
 
-        # the token must not stay in the address: it would end up in history and bookmarks
-        shiny::updateQueryString("?", mode = "replace", session = session)
+          # the token must not stay in the address: it would end up in history and bookmarks
+          shiny::updateQueryString("?", mode = "replace", session = session)
 
-        login <- tryCatch(aa_reset_token_login(conn, token), error = function(e) NULL)
+          login <- tryCatch(
+            aa_reset_token_login(conn, token),
+            error = function(e) NULL
+          )
 
-        if (is.null(login)) {
-          message_text(aa_text(settings, "reset_link_invalid"))
-          emit("password_reset_failed")
-        } else {
-          message_text("")
-          reset_pending(token)
-        }
-      }, once = TRUE)
+          if (is.null(login)) {
+            message_text(aa_text(settings, "reset_link_invalid"))
+            emit("password_reset_failed")
+          } else {
+            message_text("")
+            reset_pending(token)
+          }
+        },
+        once = TRUE
+      )
     }
 
     # auto-login by cookie
     if (isTRUE(settings$autologin)) {
-      session$onFlushed(function() {
-        session$sendCustomMessage(
-          "appauth_read_cookie",
-          list(name = cookie_name, input = session$ns("cookie"))
-        )
-      }, once = TRUE)
+      session$onFlushed(
+        function() {
+          session$sendCustomMessage(
+            "appauth_read_cookie",
+            list(name = cookie_name, input = session$ns("cookie"))
+          )
+        },
+        once = TRUE
+      )
 
       shiny::observeEvent(input$cookie, {
         if (!is.null(shiny::isolate(user())) || !aa_is_string(input$cookie)) {
           return()
         }
 
-        found <- tryCatch(aa_find_session_user(conn, input$cookie), error = function(e) NULL)
+        found <- tryCatch(
+          aa_find_session_user(conn, input$cookie),
+          error = function(e) NULL
+        )
 
         if (is.null(found)) {
           # the token is expired, revoked or belongs to a blocked user: remove the cookie
-          session$sendCustomMessage("appauth_clear_cookie", list(name = cookie_name))
+          session$sendCustomMessage(
+            "appauth_clear_cookie",
+            list(name = cookie_name)
+          )
           return()
         }
 
@@ -231,7 +296,11 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     # sign-in with Google ------------------------------------------------------------
     google_fail <- function(reason, email = NULL) {
       message_text(aa_text(settings, aa_google_text_key(reason)))
-      emit("google_login_failed", NULL, paste(c(reason, if (aa_is_string(email)) email), collapse = " "))
+      emit(
+        "google_login_failed",
+        NULL,
+        paste(c(reason, if (aa_is_string(email)) email), collapse = " ")
+      )
     }
 
     if (google_on) {
@@ -244,7 +313,10 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         started <- tryCatch(
           aa_google_start(conn, settings),
           error = function(e) {
-            message("appauth: could not start sign-in with Google: ", conditionMessage(e))
+            message(
+              "appauth: could not start sign-in with Google: ",
+              conditionMessage(e)
+            )
             NULL
           }
         )
@@ -273,7 +345,8 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         if (!aa_page_matches(session, settings$google_redirect_uri)) {
           message_text("")
           aa_redirect(
-            session, aa_google_hop_url(settings),
+            session,
+            aa_google_hop_url(settings),
             aa_origin_string(aa_url_origin(settings$google_redirect_uri))
           )
           return()
@@ -283,64 +356,100 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       })
 
       # return from Google: ?code=...&state=... (or ?error=... if the user refused)
-      shiny::observeEvent(aa_url_search(session), {
-        query <- shiny::parseQueryString(aa_url_search(session))
-        code <- query[["code"]]
-        state <- query[["state"]]
+      shiny::observeEvent(
+        aa_url_search(session),
+        {
+          query <- shiny::parseQueryString(aa_url_search(session))
+          code <- query[["code"]]
+          state <- query[["state"]]
 
-      # redirect from the button at another address (by IP): start sign-in at once, without a second click.
-      # The address is not compared here, otherwise a wrong address detection would cause an endless redirect
-        if (identical(query[["google"]], "1") && !aa_is_string(code) && !aa_is_string(state) &&
-            is.null(shiny::isolate(user()))) {
+          # redirect from the button at another address (by IP): start sign-in at once, without a second click.
+          # The address is not compared here, otherwise a wrong address detection would cause an endless redirect
+          if (
+            identical(query[["google"]], "1") &&
+              !aa_is_string(code) &&
+              !aa_is_string(state) &&
+              is.null(shiny::isolate(user()))
+          ) {
+            shiny::updateQueryString("?", mode = "replace", session = session)
+            start_google()
+            return()
+          }
+
+          if (
+            !is.null(shiny::isolate(user())) ||
+              !aa_is_string(state) ||
+              !(aa_is_string(code) || aa_is_string(query[["error"]]))
+          ) {
+            return()
+          }
+
+          # code and state must not stay in the address bar
           shiny::updateQueryString("?", mode = "replace", session = session)
-          start_google()
-          return()
-        }
 
-        if (!is.null(shiny::isolate(user())) || !aa_is_string(state) ||
-            !(aa_is_string(code) || aa_is_string(query[["error"]]))) {
-          return()
-        }
+          if (!aa_is_string(code)) {
+            google_fail("cancelled")
+            return()
+          }
 
-        # code and state must not stay in the address bar
-        shiny::updateQueryString("?", mode = "replace", session = session)
-
-        if (!aa_is_string(code)) {
-          google_fail("cancelled")
-          return()
-        }
-
-        google_callback(list(code = code, state = state))
-        session$sendCustomMessage("appauth_read_cookie", list(name = oauth_cookie, input = session$ns("oauth_cookie")))
-      }, once = TRUE)
+          google_callback(list(code = code, state = state))
+          session$sendCustomMessage(
+            "appauth_read_cookie",
+            list(name = oauth_cookie, input = session$ns("oauth_cookie"))
+          )
+        },
+        once = TRUE
+      )
 
       # the browser cookie must match state from the address: this way sign-in finishes
       # only in the browser that started it
-      shiny::observeEvent(input$oauth_cookie, {
-        callback <- shiny::isolate(google_callback())
-        shiny::req(callback)
-        google_callback(NULL)
-        session$sendCustomMessage("appauth_clear_cookie", list(name = oauth_cookie))
+      shiny::observeEvent(
+        input$oauth_cookie,
+        {
+          callback <- shiny::isolate(google_callback())
+          shiny::req(callback)
+          google_callback(NULL)
+          session$sendCustomMessage(
+            "appauth_clear_cookie",
+            list(name = oauth_cookie)
+          )
 
-        if (!is.null(shiny::isolate(user()))) {
-          return()
-        }
+          if (!is.null(shiny::isolate(user()))) {
+            return()
+          }
 
-        if (!aa_is_string(input$oauth_cookie) || !identical(input$oauth_cookie, callback$state)) {
-          google_fail("bad_browser")
-          return()
-        }
+          if (
+            !aa_is_string(input$oauth_cookie) ||
+              !identical(input$oauth_cookie, callback$state)
+          ) {
+            google_fail("bad_browser")
+            return()
+          }
 
-        res <- aa_google_complete(conn, settings, callback$code, callback$state)
+          res <- aa_google_complete(
+            conn,
+            settings,
+            callback$code,
+            callback$state
+          )
 
-        if (!isTRUE(res$ok)) {
-          google_fail(res$reason, res$email)
-          return()
-        }
+          if (!isTRUE(res$ok)) {
+            google_fail(res$reason, res$email)
+            return()
+          }
 
-        finish_login(res$login, res$role)
-        emit("login_success", res$login, "google")
-      }, ignoreNULL = FALSE, ignoreInit = TRUE)
+          if (isTRUE(res$must_change)) {
+            message_text("")
+            pending(list(login = res$login, role = res$role, via_sso = TRUE))
+            return()
+          }
+
+          finish_login(res$login, res$role)
+          emit("login_success", res$login, "google")
+        },
+        ignoreNULL = FALSE,
+        ignoreInit = TRUE
+      )
     }
 
     logout <- function(reason = NULL, reload = FALSE) {
@@ -350,7 +459,10 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         try(aa_revoke_token(conn, current_token), silent = TRUE)
       }
       current_token <<- NULL
-      session$sendCustomMessage("appauth_clear_cookie", list(name = cookie_name))
+      session$sendCustomMessage(
+        "appauth_clear_cookie",
+        list(name = cookie_name)
+      )
 
       if (is.null(reason)) {
         emit("logout", login)
@@ -395,40 +507,120 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
       fields <- if (!is.null(second_factor())) {
         heading <- aa_text(settings, "totp_title")
-        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "totp_hint"))
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "totp_hint")
+        )
         shiny::tagList(
-          shiny::textInput(ns("totp_code"), aa_text(settings, "totp_code_label")),
-          shiny::actionButton(ns("totp_btn"), aa_text(settings, "totp_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
-          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+          shiny::textInput(
+            ns("totp_code"),
+            aa_text(settings, "totp_code_label")
+          ),
+          shiny::actionButton(
+            ns("totp_btn"),
+            aa_text(settings, "totp_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          ),
+          shiny::div(
+            class = "aa-login-hint",
+            shiny::actionLink(
+              ns("back_link"),
+              aa_text(settings, "back_to_login")
+            )
+          )
         )
       } else if (!is.null(pending())) {
         heading <- aa_text(settings, "must_change_title")
-        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "must_change_hint"))
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "must_change_hint")
+        )
         shiny::tagList(
-          shiny::passwordInput(ns("change_password"), aa_text(settings, "password_new_label")),
-          shiny::passwordInput(ns("change_confirm"), aa_text(settings, "password_confirm_label")),
-          shiny::actionButton(ns("change_btn"), aa_text(settings, "password_change_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
+          shiny::passwordInput(
+            ns("change_password"),
+            aa_text(settings, "password_new_label")
+          ),
+          shiny::passwordInput(
+            ns("change_confirm"),
+            aa_text(settings, "password_confirm_label")
+          ),
+          shiny::actionButton(
+            ns("change_btn"),
+            aa_text(settings, "password_change_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          )
         )
       } else if (!is.null(reset_pending())) {
         heading <- aa_text(settings, "reset_title")
-        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "reset_hint"))
-        shiny::tagList(
-          shiny::passwordInput(ns("reset_password"), aa_text(settings, "password_new_label")),
-          shiny::passwordInput(ns("reset_confirm"), aa_text(settings, "password_confirm_label")),
-          shiny::actionButton(ns("reset_btn"), aa_text(settings, "reset_save_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
-          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "reset_hint")
         )
-      } else if (users_exist() && identical(mode(), "forgot") && isTRUE(settings$reset_enabled)) {
-        heading <- aa_text(settings, "forgot_title")
-        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "forgot_hint"))
         shiny::tagList(
-          shiny::textInput(ns("forgot_identifier"), aa_text(settings, "forgot_identifier_label")),
-          shiny::actionButton(ns("forgot_btn"), aa_text(settings, "forgot_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
-          shiny::div(class = "aa-login-hint", shiny::actionLink(ns("back_link"), aa_text(settings, "back_to_login")))
+          shiny::passwordInput(
+            ns("reset_password"),
+            aa_text(settings, "password_new_label")
+          ),
+          shiny::passwordInput(
+            ns("reset_confirm"),
+            aa_text(settings, "password_confirm_label")
+          ),
+          shiny::actionButton(
+            ns("reset_btn"),
+            aa_text(settings, "reset_save_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          ),
+          shiny::div(
+            class = "aa-login-hint",
+            shiny::actionLink(
+              ns("back_link"),
+              aa_text(settings, "back_to_login")
+            )
+          )
+        )
+      } else if (
+        users_exist() &&
+          identical(mode(), "forgot") &&
+          isTRUE(settings$reset_enabled)
+      ) {
+        heading <- aa_text(settings, "forgot_title")
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "forgot_hint")
+        )
+        shiny::tagList(
+          shiny::textInput(
+            ns("forgot_identifier"),
+            aa_text(settings, "forgot_identifier_label")
+          ),
+          shiny::actionButton(
+            ns("forgot_btn"),
+            aa_text(settings, "forgot_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          ),
+          shiny::div(
+            class = "aa-login-hint",
+            shiny::actionLink(
+              ns("back_link"),
+              aa_text(settings, "back_to_login")
+            )
+          )
         )
       } else if (users_exist()) {
         heading <- title %||% aa_text(settings, "login_title")
@@ -436,34 +628,74 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
           if (password_on) {
             shiny::tagList(
               shiny::textInput(ns("login"), aa_text(settings, "login_label")),
-              shiny::passwordInput(ns("password"), aa_text(settings, "password_label")),
-              shiny::actionButton(ns("login_btn"), aa_text(settings, "login_button"), class = "aa-login-button")
+              shiny::passwordInput(
+                ns("password"),
+                aa_text(settings, "password_label")
+              ),
+              shiny::actionButton(
+                ns("login_btn"),
+                aa_text(settings, "login_button"),
+                class = "aa-login-button"
+              )
             )
           },
           if (google_on) {
             shiny::tagList(
-              if (password_on) shiny::div(class = "aa-login-or", aa_text(settings, "google_or")),
+              if (password_on) {
+                shiny::div(
+                  class = "aa-login-or",
+                  aa_text(settings, "google_or")
+                )
+              },
               shiny::actionButton(
                 ns("google_btn"),
-                shiny::tagList(aa_google_icon(), aa_text(settings, "google_button")),
+                shiny::tagList(
+                  aa_google_icon(),
+                  aa_text(settings, "google_button")
+                ),
                 class = "aa-login-button aa-google-button"
               )
             )
           },
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message"))),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          ),
           if (isTRUE(settings$reset_enabled) && password_on) {
-            shiny::div(class = "aa-login-hint", shiny::actionLink(ns("forgot_link"), aa_text(settings, "forgot_link")))
+            shiny::div(
+              class = "aa-login-hint",
+              shiny::actionLink(
+                ns("forgot_link"),
+                aa_text(settings, "forgot_link")
+              )
+            )
           }
         )
       } else {
         heading <- aa_text(settings, "setup_title")
-        hint <- shiny::tags$p(class = "aa-login-hint", aa_text(settings, "setup_hint", settings$admin_role))
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "setup_hint", settings$admin_role)
+        )
         shiny::tagList(
           shiny::textInput(ns("setup_login"), aa_text(settings, "login_label")),
-          shiny::passwordInput(ns("setup_password"), aa_text(settings, "password_label")),
-          shiny::passwordInput(ns("setup_confirm"), aa_text(settings, "password_confirm_label")),
-          shiny::actionButton(ns("setup_btn"), aa_text(settings, "setup_button"), class = "aa-login-button"),
-          shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
+          shiny::passwordInput(
+            ns("setup_password"),
+            aa_text(settings, "password_label")
+          ),
+          shiny::passwordInput(
+            ns("setup_confirm"),
+            aa_text(settings, "password_confirm_label")
+          ),
+          shiny::actionButton(
+            ns("setup_btn"),
+            aa_text(settings, "setup_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          )
         )
       }
 
@@ -471,7 +703,9 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
         class = "aa-login",
         shiny::div(
           class = "aa-login-card",
-          if (!is.null(logo)) shiny::tags$img(src = logo, class = "aa-login-logo"),
+          if (!is.null(logo)) {
+            shiny::tags$img(src = logo, class = "aa-login-logo")
+          },
           shiny::tags$h2(class = "aa-login-title", heading),
           hint,
           fields
@@ -483,77 +717,94 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     shiny::outputOptions(output, "message", suspendWhenHidden = FALSE)
 
     shiny::observeEvent(input$login_btn, {
-      login <- input$login
-      password <- input$password
+      aa_write_section(conn, function() {
+        login <- input$login
+        password <- input$password
 
-      # server-side protection: a hidden form is not a substitute for a check
-      if (!password_on) {
-        message_text(aa_text(settings, "password_login_disabled"))
-        emit("login_failed", NULL, "password_disabled")
-        return()
-      }
-
-      if (!aa_is_string(login) || !aa_is_string(password)) {
-        message_text(aa_text(settings, "bad_credentials"))
-        return()
-      }
-
-      # blocked login and the general limit: the password is not checked and the attempt is not
-      # recorded, so that the block is not extended
-      gate <- aa_login_gate(conn, login, settings)
-      if (!gate$allowed) {
-        message_text(gate$message)
-        emit(if (gate$reason == "throttled") "login_throttled" else "login_locked", login, gate$seconds)
-        return()
-      }
-
-      res <- aa_authenticate(conn, login, password)
-
-      if (!is.null(res) && isTRUE(res$blocked[1] == 1)) {
-        # the password is correct but the account is blocked: this is reported only
-        # to someone who knows the password, so as not to reveal the list of logins
-        message_text(aa_text(settings, "blocked_user"))
-        emit("login_blocked_user", login)
-        return()
-      }
-
-      if (!is.null(res) && isTRUE(settings$totp_enabled) && aa_totp_enabled(conn, res$login[1])) {
-        # the password is correct but a code is needed: the successful attempt is not recorded (it would reset
-        # the failure counter and the code could be guessed endlessly), no token is issued
-        message_text("")
-        second_factor(list(
-          login = res$login[1], role = res$role[1],
-          must_change = isTRUE(res$must_change[1] == 1), old = password
-        ))
-        return()
-      }
-
-      if (!is.null(res)) {
-        try(aa_record_attempt(conn, login, success = TRUE, settings = settings), silent = TRUE)
-
-        if (isTRUE(res$must_change[1] == 1)) {
-          # the password is correct but it was set by an administrator: password change first
-          message_text("")
-          pending(list(login = res$login[1], role = res$role[1], old = password))
+        if (!password_on) {
+          message_text(aa_text(settings, "password_login_disabled"))
+          emit("login_failed", NULL, "password_disabled")
           return()
         }
 
-        finish_login(res$login[1], res$role[1])
-        emit("login_success", res$login[1])
-        return()
-      }
+        if (!aa_is_string(login) || !aa_is_string(password)) {
+          message_text(aa_text(settings, "bad_credentials"))
+          return()
+        }
 
-      try(aa_record_attempt(conn, login, success = FALSE, settings = settings), silent = TRUE)
+        gate <- aa_login_gate(conn, login, settings)
+        if (!gate$allowed) {
+          message_text(gate$message)
+          emit(
+            if (gate$reason == "throttled") {
+              "login_throttled"
+            } else {
+              "login_locked"
+            },
+            login,
+            gate$seconds
+          )
+          return()
+        }
 
-      # this attempt could have led to a block
-      gate <- aa_login_gate(conn, login, settings)
-      if (!gate$allowed && gate$reason == "locked") {
-        message_text(gate$message)
-        emit("login_locked", login, gate$seconds)
-      } else {
-        message_text(aa_text(settings, "bad_credentials"))
-        emit("login_failed", login)
-      }
+        res <- aa_authenticate(conn, login, password)
+
+        if (!is.null(res) && isTRUE(res$blocked[1] == 1)) {
+          message_text(aa_text(settings, "blocked_user"))
+          emit("login_blocked_user", login)
+          return()
+        }
+
+        if (
+          !is.null(res) &&
+            isTRUE(settings$totp_enabled) &&
+            aa_totp_enabled(conn, res$login[1])
+        ) {
+          message_text("")
+          second_factor(list(
+            login = res$login[1],
+            role = res$role[1],
+            must_change = isTRUE(res$must_change[1] == 1),
+            old = password
+          ))
+          return()
+        }
+
+        if (!is.null(res)) {
+          try(
+            aa_record_attempt(conn, login, success = TRUE, settings = settings),
+            silent = TRUE
+          )
+
+          if (isTRUE(res$must_change[1] == 1)) {
+            message_text("")
+            pending(list(
+              login = res$login[1],
+              role = res$role[1],
+              old = password
+            ))
+            return()
+          }
+
+          finish_login(res$login[1], res$role[1])
+          emit("login_success", res$login[1])
+          return()
+        }
+
+        try(
+          aa_record_attempt(conn, login, success = FALSE, settings = settings),
+          silent = TRUE
+        )
+
+        gate <- aa_login_gate(conn, login, settings)
+        if (!gate$allowed && gate$reason == "locked") {
+          message_text(gate$message)
+          emit("login_locked", login, gate$seconds)
+        } else {
+          message_text(aa_text(settings, "bad_credentials"))
+          emit("login_failed", login)
+        }
+      })
     })
 
     shiny::observeEvent(input$change_btn, {
@@ -567,7 +818,22 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
 
       changed <- tryCatch(
         {
-          aa_change_own_password(conn, waiting$login, waiting$old, input$change_password, settings)
+          if (isTRUE(waiting$via_sso)) {
+            aa_set_own_password_after_sso(
+              conn,
+              waiting$login,
+              input$change_password,
+              settings
+            )
+          } else {
+            aa_change_own_password(
+              conn,
+              waiting$login,
+              waiting$old,
+              input$change_password,
+              settings
+            )
+          }
           TRUE
         },
         appauth_error_user = function(e) {
@@ -604,14 +870,25 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       res <- tryCatch(
         aa_request_password_reset(conn, input$forgot_identifier, settings),
         error = function(e) {
-          message("appauth: could not process the password recovery request: ", conditionMessage(e))
+          message(
+            "appauth: could not process the password recovery request: ",
+            conditionMessage(e)
+          )
           list(reason = "error", login = NA_character_)
         }
       )
 
       # the journal gets the reason, the user always gets the same answer
-      emit("password_reset_requested", if (is.na(res$login)) NULL else res$login, res$reason)
-      message_text(aa_text(settings, "forgot_done", as.integer(round(settings$reset_ttl_minutes))))
+      emit(
+        "password_reset_requested",
+        if (is.na(res$login)) NULL else res$login,
+        res$reason
+      )
+      message_text(aa_text(
+        settings,
+        "forgot_done",
+        as.integer(round(settings$reset_ttl_minutes))
+      ))
     })
 
     shiny::observeEvent(input$reset_btn, {
@@ -624,7 +901,12 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
       }
 
       login <- tryCatch(
-        aa_reset_password_with_token(conn, token, input$reset_password, settings),
+        aa_reset_password_with_token(
+          conn,
+          token,
+          input$reset_password,
+          settings
+        ),
         appauth_error_user = function(e) {
           message_text(conditionMessage(e))
 
@@ -650,54 +932,91 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
     })
 
     shiny::observeEvent(input$totp_btn, {
-      waiting <- second_factor()
-      shiny::req(waiting)
-
-      gate <- aa_login_gate(conn, waiting$login, settings)
-      if (!gate$allowed) {
-        message_text(gate$message)
-        emit(if (gate$reason == "throttled") "login_throttled" else "login_locked", waiting$login, gate$seconds)
-        return()
-      }
-
-      checked <- tryCatch(
-        aa_verify_second_factor(conn, waiting$login, input$totp_code, settings),
-        error = function(e) {
-          message("appauth: could not verify the second factor: ", conditionMessage(e))
-          list(ok = FALSE, method = NA_character_)
-        }
-      )
-
-      if (!isTRUE(checked$ok)) {
-        try(aa_record_attempt(conn, waiting$login, success = FALSE, settings = settings), silent = TRUE)
-        emit("totp_failed", waiting$login)
+      aa_write_section(conn, function() {
+        waiting <- second_factor()
+        shiny::req(waiting)
 
         gate <- aa_login_gate(conn, waiting$login, settings)
-        if (!gate$allowed && gate$reason == "locked") {
-          # block: the user has to start over with the password (when it ends)
-          second_factor(NULL)
+        if (!gate$allowed) {
           message_text(gate$message)
-          emit("login_locked", waiting$login, gate$seconds)
-        } else {
-          message_text(aa_text(settings, "totp_wrong"))
+          emit(
+            if (gate$reason == "throttled") {
+              "login_throttled"
+            } else {
+              "login_locked"
+            },
+            waiting$login,
+            gate$seconds
+          )
+          return()
         }
-        return()
-      }
 
-      try(aa_record_attempt(conn, waiting$login, success = TRUE, settings = settings), silent = TRUE)
-      if (identical(checked$method, "recovery")) {
-        emit("recovery_code_used", waiting$login)
-      }
-      second_factor(NULL)
+        checked <- tryCatch(
+          aa_verify_second_factor(
+            conn,
+            waiting$login,
+            input$totp_code,
+            settings
+          ),
+          error = function(e) {
+            message(
+              "appauth: could not verify the second factor: ",
+              conditionMessage(e)
+            )
+            list(ok = FALSE, method = NA_character_)
+          }
+        )
 
-      if (isTRUE(waiting$must_change)) {
-        message_text("")
-        pending(list(login = waiting$login, role = waiting$role, old = waiting$old))
-        return()
-      }
+        if (!isTRUE(checked$ok)) {
+          try(
+            aa_record_attempt(
+              conn,
+              waiting$login,
+              success = FALSE,
+              settings = settings
+            ),
+            silent = TRUE
+          )
+          emit("totp_failed", waiting$login)
 
-      finish_login(waiting$login, waiting$role)
-      emit("login_success", waiting$login)
+          gate <- aa_login_gate(conn, waiting$login, settings)
+          if (!gate$allowed && gate$reason == "locked") {
+            second_factor(NULL)
+            message_text(gate$message)
+            emit("login_locked", waiting$login, gate$seconds)
+          } else {
+            message_text(aa_text(settings, "totp_wrong"))
+          }
+          return()
+        }
+
+        try(
+          aa_record_attempt(
+            conn,
+            waiting$login,
+            success = TRUE,
+            settings = settings
+          ),
+          silent = TRUE
+        )
+        if (identical(checked$method, "recovery")) {
+          emit("recovery_code_used", waiting$login)
+        }
+        second_factor(NULL)
+
+        if (isTRUE(waiting$must_change)) {
+          message_text("")
+          pending(list(
+            login = waiting$login,
+            role = waiting$role,
+            old = waiting$old
+          ))
+          return()
+        }
+
+        finish_login(waiting$login, waiting$role)
+        emit("login_success", waiting$login)
+      })
     })
 
     shiny::observeEvent(input$setup_btn, {
@@ -747,10 +1066,10 @@ aa_auth_server <- function(id, conn, settings = aa_settings(), on_event = NULL,
   })
 }
 
-#' Google icon for the sign-in button
-#'
-#' @returns A Shiny UI element (inline SVG).
-#' @noRd
+# Google icon for the sign-in button
+#
+# @returns A Shiny UI element (inline SVG).
+# @noRd
 aa_google_icon <- function() {
   shiny::HTML(paste0(
     '<svg viewBox="0 0 48 48" aria-hidden="true">',
@@ -762,15 +1081,16 @@ aa_google_icon <- function() {
   ))
 }
 
-#' Page address parameters string
-#'
-#' Wrapped in a function so that tests can substitute the address: the mock Shiny
-#' session does not have a configurable address bar.
-#'
-#' @param session Module session.
-#'
-#' @returns A string like `"?reset=abc"` (may be empty).
-#' @noRd
+# Page address parameters string
+#
+# Wrapped in a function so that tests can substitute the address: the mock
+# Shiny
+# session does not have a configurable address bar.
+#
+# @param session Module session.
+#
+# @returns A string like `"?reset=abc"` (may be empty).
+# @noRd
 aa_url_search <- function(session) {
   session$clientData$url_search
 }

@@ -1,6 +1,6 @@
 # appauth event catalog
 
-Package version: 0.8.0. The table is generated from `aa_events()`.
+Package version: 0.10.1. The table is generated from `aa_events()`.
 
 All modules and `aa_require()` report events to a single function `on_event(event, user, session_id, value)`:
 

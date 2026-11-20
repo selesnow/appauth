@@ -14,9 +14,15 @@ test_that("the guard leaves a valid session alone", {
 
 test_that("the guard ends sessions of blocked, deleted and role-changed users", {
   for (case in list(
-    list(reason = "blocked", change = function(con) texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")),
-    list(reason = "deleted", change = function(con) texec(con, "DELETE FROM users WHERE login = 'ivan'")),
-    list(reason = "role_changed", change = function(con) texec(con, "UPDATE users SET role = 'viewer' WHERE login = 'ivan'"))
+    list(reason = "blocked", change = function(con) {
+      texec(con, "UPDATE users SET blocked = 1 WHERE login = 'ivan'")
+    }),
+    list(reason = "deleted", change = function(con) {
+      texec(con, "DELETE FROM users WHERE login = 'ivan'")
+    }),
+    list(reason = "role_changed", change = function(con) {
+      texec(con, "UPDATE users SET role = 'viewer' WHERE login = 'ivan'")
+    })
   )) {
     con <- users_db()
     raw_user(con, "ivan", "user")
@@ -89,7 +95,10 @@ test_that("the guard does nothing while nobody is signed in", {
 })
 
 test_that("the guard requires a database connection", {
-  expect_error(aa_session_guard(fake_auth_obj(), "not a connection"), class = "appauth_error_connection")
+  expect_error(
+    aa_session_guard(fake_auth_obj(), "not a connection"),
+    class = "appauth_error_connection"
+  )
 })
 
 test_that("the session connection is closed when the session ends, the file can be deleted", {
@@ -112,12 +121,24 @@ test_that("the session connection is closed when the session ends, the file can 
 })
 
 test_that("session connection: a missing session or a wrong path gives a clear error", {
-  expect_error(aa_session_connection(tempfile(), session = NULL), class = "appauth_error_connection")
-  expect_error(aa_session_connection(NULL, session = list(onSessionEnded = function(f) NULL)), class = "appauth_error_connection")
+  expect_error(
+    aa_session_connection(tempfile(), session = NULL),
+    class = "appauth_error_connection"
+  )
+  expect_error(
+    aa_session_connection(
+      NULL,
+      session = list(onSessionEnded = function(f) NULL)
+    ),
+    class = "appauth_error_connection"
+  )
 })
 
 test_that("the module is registered once and only when the permission is granted", {
-  provider <- aa_permissions_from_matrix(list(Tasks = c("admin", "user"), Access = "admin"))
+  provider <- aa_permissions_from_matrix(list(
+    Tasks = c("admin", "user"),
+    Access = "admin"
+  ))
   counter <- new.env()
   counter$tasks <- 0
   counter$access <- 0
@@ -125,8 +146,12 @@ test_that("the module is registered once and only when the permission is granted
 
   shiny::testServer(
     function(input, output, session) {
-      aa_register_module(auth, "Tasks", provider, function() counter$tasks <- counter$tasks + 1)
-      aa_register_module(auth, "Access", provider, function() counter$access <- counter$access + 1)
+      aa_register_module(auth, "Tasks", provider, function() {
+        counter$tasks <- counter$tasks + 1
+      })
+      aa_register_module(auth, "Access", provider, function() {
+        counter$access <- counter$access + 1
+      })
     },
     {
       session$flushReact()
@@ -146,6 +171,13 @@ test_that("the module is registered once and only when the permission is granted
 })
 
 test_that("module registration requires a function", {
-  expect_error(aa_register_module(fake_auth_obj(), "Tasks", function(user) "Tasks", "not a function"),
-               class = "appauth_error_permissions")
+  expect_error(
+    aa_register_module(
+      fake_auth_obj(),
+      "Tasks",
+      function(user) "Tasks",
+      "not a function"
+    ),
+    class = "appauth_error_permissions"
+  )
 })

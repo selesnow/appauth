@@ -1,12 +1,12 @@
-#' Autologin token hash
-#'
-#' Only the sha256 of the token is stored in the database, as text (64
-#' characters).
-#'
-#' @param token Token from the cookie.
-#'
-#' @returns A string of 64 characters.
-#' @noRd
+# Autologin token hash
+#
+# Only the sha256 of the token is stored in the database, as text (64
+# characters).
+#
+# @param token Token from the cookie.
+#
+# @returns A string of 64 characters.
+# @noRd
 aa_token_hash <- function(token) {
   as.character(openssl::sha256(token))
 }
@@ -72,7 +72,9 @@ aa_issue_token <- function(conn, login, settings = aa_settings()) {
 #' @examples
 #' \dontrun{
 #' user <- aa_find_session_user(conn, input$auth_cookie)
-#' if (!is.null(user)) { # the user logs in without a password }
+#' if (!is.null(user)) {
+#'   # the user logs in without a password
+#' }
 #' }
 aa_find_session_user <- function(conn, token) {
   if (!aa_is_string(token)) {
@@ -124,13 +126,13 @@ aa_revoke_token <- function(conn, token) {
   ))
 }
 
-#' Is the autologin token active
-#'
-#' @param conn Database connection.
-#' @param token Token from the cookie.
-#'
-#' @returns `TRUE` if the token exists, is not revoked and has not expired.
-#' @noRd
+# Is the autologin token active
+#
+# @param conn Database connection.
+# @param token Token from the cookie.
+#
+# @returns `TRUE` if the token exists, is not revoked and has not expired.
+# @noRd
 aa_token_active <- function(conn, token) {
   n <- aa_query(
     conn,
@@ -178,7 +180,9 @@ aa_active_autologins <- function(conn, login = NULL) {
        GROUP BY user_login",
       params = list(aa_utc())
     ),
-    error = function(e) data.frame(login = character(), n = integer(), stringsAsFactors = FALSE)
+    error = function(e) {
+      data.frame(login = character(), n = integer(), stringsAsFactors = FALSE)
+    }
   )
   counts$n <- as.integer(counts$n)
 
@@ -219,7 +223,8 @@ aa_active_autologins <- function(conn, login = NULL) {
 #'
 #' @examples
 #' \dontrun{
-#' check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role, auth$token())
+#' check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role,
+#' auth$token())
 #' if (!check$valid) auth$logout(reason = check$reason)
 #' }
 aa_user_session_valid <- function(conn, login, role, token = NULL) {

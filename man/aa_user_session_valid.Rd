@@ -37,7 +37,8 @@ users; access is not widened, because no password is checked.
 }
 \examples{
 \dontrun{
-check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role, auth$token())
+check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role,
+auth$token())
 if (!check$valid) auth$logout(reason = check$reason)
 }
 }

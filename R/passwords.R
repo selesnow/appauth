@@ -77,11 +77,18 @@ aa_verify_password <- function(password, stored) {
     return(FALSE)
   }
 
-  if (!(is.character(stored) && length(stored) == 1 && aa_is_password_hash(stored))) {
+  if (
+    !(is.character(stored) &&
+      length(stored) == 1 &&
+      aa_is_password_hash(stored))
+  ) {
     return(FALSE)
   }
 
-  isTRUE(tryCatch(sodium::password_verify(stored, password), error = function(e) FALSE))
+  isTRUE(tryCatch(
+    sodium::password_verify(stored, password),
+    error = function(e) FALSE
+  ))
 }
 
 # Dummy hash that equalizes verification time when the user does not exist:
@@ -90,10 +97,10 @@ aa_verify_password <- function(password, stored) {
 # session.
 .aa_dummy <- new.env(parent = emptyenv())
 
-#' Dummy hash for equalizing verification time
-#'
-#' @returns A string with the hash (the same during an R session).
-#' @noRd
+# Dummy hash for equalizing verification time
+#
+# @returns A string with the hash (the same during an R session).
+# @noRd
 aa_dummy_hash <- function() {
   if (is.null(.aa_dummy$hash)) {
     .aa_dummy$hash <- aa_hash_password("dummy-password-for-timing")
@@ -102,18 +109,18 @@ aa_dummy_hash <- function() {
   .aa_dummy$hash
 }
 
-#' Find a weakness in a password
-#'
-#' Checks a password that has already passed the length rules: whether it is in
-#' the list of common weak passwords, whether it equals the login
-#' (case-insensitive) and whether it consists of one repeated character.
-#'
-#' @param password The password to check.
-#' @param login User login or `NULL` if unknown.
-#'
-#' @returns A text key (`password_common`, `password_equals_login`,
-#'   `password_repeated`) or `NULL` if no weaknesses were found.
-#' @noRd
+# Find a weakness in a password
+#
+# Checks a password that has already passed the length rules: whether it is in
+# the list of common weak passwords, whether it equals the login
+# (case-insensitive) and whether it consists of one repeated character.
+#
+# @param password The password to check.
+# @param login User login or `NULL` if unknown.
+#
+# @returns A text key (`password_common`, `password_equals_login`,
+#   `password_repeated`) or `NULL` if no weaknesses were found.
+# @noRd
 aa_password_weakness <- function(password, login = NULL) {
   if (!aa_is_string(password)) {
     return(NULL)
@@ -137,17 +144,17 @@ aa_password_weakness <- function(password, login = NULL) {
   NULL
 }
 
-#' Find a problem in a new password
-#'
-#' @param password The password to check.
-#' @param settings Settings, the result of [aa_settings()].
-#' @param login User login for checking whether the password equals the login
-#'   (optional). Weak passwords are rejected only if
-#'   `settings$password_policy` is `"reject"`.
-#'
-#' @returns `NULL` if the password is fine, otherwise a list with `reason` (a
-#'   text key) and `args` (values to substitute into the text).
-#' @noRd
+# Find a problem in a new password
+#
+# @param password The password to check.
+# @param settings Settings, the result of [aa_settings()].
+# @param login User login for checking whether the password equals the login
+#   (optional). Weak passwords are rejected only if
+#   `settings$password_policy` is `"reject"`.
+#
+# @returns `NULL` if the password is fine, otherwise a list with `reason` (a
+#   text key) and `args` (values to substitute into the text).
+# @noRd
 aa_password_problem <- function(password, settings, login = NULL) {
   if (!aa_is_string(password)) {
     return(list(reason = "password_empty", args = list()))
@@ -156,11 +163,17 @@ aa_password_problem <- function(password, settings, login = NULL) {
   n <- nchar(password, type = "chars")
 
   if (n < settings$password_min) {
-    return(list(reason = "password_too_short", args = list(as.integer(settings$password_min))))
+    return(list(
+      reason = "password_too_short",
+      args = list(as.integer(settings$password_min))
+    ))
   }
 
   if (n > settings$password_max) {
-    return(list(reason = "password_too_long", args = list(as.integer(settings$password_max))))
+    return(list(
+      reason = "password_too_long",
+      args = list(as.integer(settings$password_max))
+    ))
   }
 
   if (identical(settings$password_policy, "reject")) {
@@ -173,16 +186,16 @@ aa_password_problem <- function(password, settings, login = NULL) {
   NULL
 }
 
-#' Weak password warning (`password_policy = "warn"` mode)
-#'
-#' @param password The password that was just accepted.
-#' @param settings Settings, the result of [aa_settings()].
-#' @param login User login or `NULL`.
-#'
-#' @returns A list with `reason` (the reason key) and `text` (the ready
-#'   message), or `NULL` if the mode is not `"warn"` or there are no
-#'   weaknesses.
-#' @noRd
+# Weak password warning (`password_policy = "warn"` mode)
+#
+# @param password The password that was just accepted.
+# @param settings Settings, the result of [aa_settings()].
+# @param login User login or `NULL`.
+#
+# @returns A list with `reason` (the reason key) and `text` (the ready
+#   message), or `NULL` if the mode is not `"warn"` or there are no
+#   weaknesses.
+# @noRd
 aa_password_warning <- function(password, settings, login = NULL) {
   if (!identical(settings$password_policy, "warn")) {
     return(NULL)
@@ -195,20 +208,29 @@ aa_password_warning <- function(password, settings, login = NULL) {
 
   list(
     reason = weakness,
-    text   = aa_text(settings, "weak_password_notice", aa_text(settings, weakness))
+    text = aa_text(
+      settings,
+      "weak_password_notice",
+      aa_text(settings, weakness)
+    )
   )
 }
 
-#' Find a problem in a new user's login
-#'
-#' @param login The login to check.
-#' @param settings Settings, the result of [aa_settings()].
-#'
-#' @returns `NULL` if the login is fine, otherwise a list with `reason` and
-#'   `args`.
-#' @noRd
+# Find a problem in a new user's login
+#
+# @param login The login to check.
+# @param settings Settings, the result of [aa_settings()].
+#
+# @returns `NULL` if the login is fine, otherwise a list with `reason` and
+#   `args`.
+# @noRd
 aa_login_problem <- function(login, settings) {
-  if (!(is.character(login) && length(login) == 1 && !is.na(login) && nzchar(trimws(login)))) {
+  if (
+    !(is.character(login) &&
+      length(login) == 1 &&
+      !is.na(login) &&
+      nzchar(trimws(login)))
+  ) {
     return(list(reason = "login_empty", args = list()))
   }
 
@@ -218,19 +240,22 @@ aa_login_problem <- function(login, settings) {
   }
 
   if (nchar(login, type = "chars") > settings$login_max) {
-    return(list(reason = "login_too_long", args = list(as.integer(settings$login_max))))
+    return(list(
+      reason = "login_too_long",
+      args = list(as.integer(settings$login_max))
+    ))
   }
 
   NULL
 }
 
-#' Problem text in the settings language
-#'
-#' @param settings Settings, the result of [aa_settings()].
-#' @param problem The result of `aa_password_problem()` or `aa_login_problem()`.
-#'
-#' @returns A string, or `NULL` if there is no problem.
-#' @noRd
+# Problem text in the settings language
+#
+# @param settings Settings, the result of [aa_settings()].
+# @param problem The result of `aa_password_problem()` or `aa_login_problem()`.
+#
+# @returns A string, or `NULL` if there is no problem.
+# @noRd
 aa_problem_text <- function(settings, problem) {
   if (is.null(problem)) {
     return(NULL)
@@ -264,7 +289,11 @@ aa_problem_text <- function(settings, problem) {
 #' aa_validate_password("abc")
 #' aa_validate_password("long-enough-password")
 #' aa_validate_password("long-enough-password", aa_settings(password_min = 30))
-aa_validate_password <- function(password, settings = aa_settings(), login = NULL) {
+aa_validate_password <- function(
+  password,
+  settings = aa_settings(),
+  login = NULL
+) {
   aa_problem_text(settings, aa_password_problem(password, settings, login))
 }
 
@@ -289,7 +318,11 @@ aa_validate_password <- function(password, settings = aa_settings(), login = NUL
 #' aa_weak_password_warning("123456")
 #' aa_weak_password_warning("boss", login = "Boss")
 #' aa_weak_password_warning("long-and-unusual-phrase")
-aa_weak_password_warning <- function(password, settings = aa_settings(), login = NULL) {
+aa_weak_password_warning <- function(
+  password,
+  settings = aa_settings(),
+  login = NULL
+) {
   aa_password_warning(password, settings, login)$text
 }
 
@@ -349,8 +382,10 @@ aa_validate_login <- function(login, settings = aa_settings()) {
 #' if (requireNamespace("RSQLite", quietly = TRUE)) {
 #'   db <- tempfile(fileext = ".db")
 #'   conn <- DBI::dbConnect(RSQLite::SQLite(), db)
-#'   DBI::dbExecute(conn, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)")
-#'   DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret', 'admin')")
+#'   DBI::dbExecute(conn, "CREATE TABLE users (login TEXT, password TEXT, role
+#'   TEXT)")
+#'   DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret',
+#'   'admin')")
 #'   DBI::dbDisconnect(conn)
 #'
 #'   # what would be migrated
@@ -359,7 +394,11 @@ aa_validate_login <- function(login, settings = aa_settings()) {
 #'   # run without a backup (in this example only; keep the backup in real use)
 #'   aa_migrate_plaintext_passwords(db, backup = FALSE)
 #' }
-aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FALSE) {
+aa_migrate_plaintext_passwords <- function(
+  db_path,
+  backup = TRUE,
+  dry_run = FALSE
+) {
   rlang::check_installed("RSQLite", reason = "to migrate passwords to hashes.")
 
   if (!(aa_is_string(db_path) && file.exists(db_path))) {
@@ -371,7 +410,10 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   aa_check_flag(dry_run, "dry_run")
 
-  if (!(is.logical(backup) && length(backup) == 1 && !is.na(backup)) && !aa_is_string(backup)) {
+  if (
+    !(is.logical(backup) && length(backup) == 1 && !is.na(backup)) &&
+      !aa_is_string(backup)
+  ) {
     rlang::abort(
       "`backup` must be TRUE, FALSE or a path to the backup file.",
       class = "appauth_error_migration"
@@ -395,9 +437,9 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   result <- list(
     migrated = to_migrate$login,
-    skipped  = users$login[is_hash],
-    backup   = NA_character_,
-    dry_run  = dry_run
+    skipped = users$login[is_hash],
+    backup = NA_character_,
+    dry_run = dry_run
   )
 
   if (dry_run || nrow(to_migrate) == 0) {
@@ -448,7 +490,10 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
     }),
     error = function(e) {
       rlang::abort(
-        paste0("Migration cancelled, no changes were applied: ", conditionMessage(e)),
+        paste0(
+          "Migration cancelled, no changes were applied: ",
+          conditionMessage(e)
+        ),
         class = "appauth_error_migration",
         parent = e
       )
@@ -457,7 +502,8 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 
   if (!is.na(result$backup)) {
     rlang::inform(paste0(
-      "The database backup contains plain-text passwords: ", result$backup,
+      "The database backup contains plain-text passwords: ",
+      result$backup,
       ". Delete it after checking."
     ))
   }
@@ -476,10 +522,33 @@ aa_migrate_plaintext_passwords <- function(db_path, backup = TRUE, dry_run = FAL
 #' head(aa_common_passwords())
 aa_common_passwords <- function() {
   c(
-    "root", "admin", "administrator", "password", "passw0rd", "pass", "test",
-    "tester", "user", "guest", "demo", "changeme", "welcome", "letmein",
-    "qwerty", "qwerty123", "1234", "12345", "123456", "1234567", "12345678",
-    "123456789", "1234567890", "111111", "000000", "abc123", "iloveyou"
+    "root",
+    "admin",
+    "administrator",
+    "password",
+    "passw0rd",
+    "pass",
+    "test",
+    "tester",
+    "user",
+    "guest",
+    "demo",
+    "changeme",
+    "welcome",
+    "letmein",
+    "qwerty",
+    "qwerty123",
+    "1234",
+    "12345",
+    "123456",
+    "1234567",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "111111",
+    "000000",
+    "abc123",
+    "iloveyou"
   )
 }
 
@@ -526,19 +595,27 @@ aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
     )
   }
 
-  users <- aa_query(conn, paste0("SELECT login, role, password FROM users ORDER BY ", aa_users_order(conn)))
+  users <- aa_query(
+    conn,
+    paste0(
+      "SELECT login, role, password FROM users ORDER BY ",
+      aa_users_order(conn)
+    )
+  )
 
   found <- list()
   add <- function(i, reason) {
     found[[length(found) + 1]] <<- data.frame(
-      login = users$login[i], role = users$role[i], reason = reason,
+      login = users$login[i],
+      role = users$role[i],
+      reason = reason,
       stringsAsFactors = FALSE
     )
   }
 
   for (i in seq_len(nrow(users))) {
     stored <- users$password[i]
-    login  <- users$login[i]
+    login <- users$login[i]
     login_variants <- unique(c(login, tolower(login), toupper(login)))
 
     if (!aa_is_password_hash(stored)) {
@@ -554,16 +631,29 @@ aa_check_default_accounts <- function(conn, common = aa_common_passwords()) {
       next
     }
 
-    if (any(vapply(login_variants, aa_verify_password, logical(1), stored = stored))) {
+    if (
+      any(vapply(
+        login_variants,
+        aa_verify_password,
+        logical(1),
+        stored = stored
+      ))
+    ) {
       add(i, "login_as_password")
-    } else if (any(vapply(common, aa_verify_password, logical(1), stored = stored))) {
+    } else if (
+      any(vapply(common, aa_verify_password, logical(1), stored = stored))
+    ) {
       add(i, "common_password")
     }
   }
 
   if (length(found) == 0) {
-    return(data.frame(login = character(), role = character(), reason = character(),
-                      stringsAsFactors = FALSE))
+    return(data.frame(
+      login = character(),
+      role = character(),
+      reason = character(),
+      stringsAsFactors = FALSE
+    ))
   }
 
   do.call(rbind, found)

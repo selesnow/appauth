@@ -7,7 +7,8 @@
 aa_totp_secret()
 }
 \value{
-A base32 string of 32 characters (160 bits), the way it is entered into the app
+A base32 string of 32 characters (160 bits), the way it is entered
+into the app
 manually.
 }
 \description{

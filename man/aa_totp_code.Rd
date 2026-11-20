@@ -19,7 +19,8 @@ aa_totp_code(secret, time = Sys.time(), digits = 6, period = 30)
 A string of \code{digits} digits or \code{NA} if the secret is invalid.
 }
 \description{
-The RFC 6238 algorithm (HMAC-SHA1, 30-second step). Needed in tests and for comparing with
+The RFC 6238 algorithm (HMAC-SHA1, 30-second step). Needed in tests and for
+comparing with
 an authenticator app.
 }
 \examples{

@@ -36,11 +36,19 @@ res <- testthat::test_dir(
 
 df <- as.data.frame(res)
 cat(
-  "\nDatabase:", backend,
-  "| tests:", nrow(df),
-  "| failed:", sum(df$failed),
-  "| errors:", sum(df$error),
-  "| skipped:", sum(df$skipped), "\n"
+  "\nDatabase:",
+  backend,
+  "| tests:",
+  nrow(df),
+  "| failed:",
+  sum(df$failed),
+  "| errors:",
+  sum(df$error),
+  "| skipped:",
+  sum(df$skipped),
+  "\n"
 )
 
-if (sum(df$failed) + sum(df$error) > 0) quit(status = 1)
+if (sum(df$failed) + sum(df$error) > 0) {
+  quit(status = 1)
+}

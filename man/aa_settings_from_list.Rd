@@ -21,7 +21,8 @@ Only known parameters of \code{\link[=aa_settings]{aa_settings()}} are taken, th
 any parameter can be overridden with the \code{...} arguments.
 }
 \examples{
-security <- list(max_failed_logins = 3, lockout_minutes = 10, unknown_key = 1)
+security <- list(max_failed_logins = 3, lockout_minutes = 10, unknown_key =
+1)
 settings <- aa_settings_from_list(security, texts = aa_texts("en"))
 settings$max_failed_logins
 }

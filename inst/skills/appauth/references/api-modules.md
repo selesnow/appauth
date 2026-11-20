@@ -1,20 +1,20 @@
 # appauth reference: UI modules and app helpers
 
-Reference built from appauth 0.8.0. The file was generated automatically from the package help pages and is not edited by hand.
+Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
-Functions in this section:
+Functions in this section: 
 `aa_app_head()`, `aa_auth_ui()`, `aa_auth_server()`, `aa_users_ui()`, `aa_users_server()`, `aa_password_ui()`, `aa_password_server()`, `aa_totp_ui()`, `aa_totp_server()`, `aa_session_guard()`, `aa_register_module()`
 
 ## aa_app_head
 
 ```text
-Include appauth styles and scripts
+Attach appauth styles and scripts
 
 Description:
 
-     Call once in the app UI (inside 'fluidPage()' or 'tagList()'). Adds the CSS of the
-     login form and the users tab, and the JS that reads, writes and deletes the
-     auto-login cookie.
+     Call it once in the application UI (inside 'fluidPage()' or 'tagList()'). Adds the
+     CSS of the sign-in form and the users tab, and the JS that reads, writes and deletes
+     the auto sign-in cookie.
 
 Usage:
 
@@ -22,9 +22,9 @@ Usage:
      
 Details:
 
-     The look is controlled by --aa-* CSS variables (for example '--aa-primary'), which
-     you override in your own CSS placed after 'aa_app_head()'. The light theme is enabled
-     by the 'aa-theme-light' class on <body> or on a parent element.
+     The look is changed with --aa-* CSS variables (for example '--aa-primary'), which
+     you override in your own CSS after 'aa_app_head()'. The light theme is enabled with
+     the 'aa-theme-light' class on <body> or a parent element.
 
      The cookie is written with 'SameSite=Lax', and on HTTPS also with 'Secure'.
 
@@ -36,20 +36,20 @@ Examples:
 
      ui <- shiny::fluidPage(
        aa_app_head()
-       # ... the rest of the app UI
+       # ... the rest of the application UI
      )
 ```
 
 ## aa_auth_ui
 
 ```text
-Login module: UI
+Sign-in module: UI
 
 Description:
 
-     The login form (or the form for creating the first administrator when there are no
-     users yet). When the user is logged in, the module shows nothing. Styles are
-     included via 'aa_app_head()'.
+     The sign-in form (or the creation of the first administrator if there are no users
+     yet). When the user is signed in, the module shows nothing. Styles are attached
+     through 'aa_app_head()'.
 
 Usage:
 
@@ -75,14 +75,14 @@ Examples:
 ## aa_auth_server
 
 ```text
-Login module: server
+Sign-in module: server
 
 Description:
 
-     Login by username and password with brute-force protection ('aa_login_gate()'),
+     Sign-in with login and password protected against guessing ('aa_login_gate()'),
      creation of the first administrator on an empty database, auto-login by cookie (if
-     enabled in the settings) and logout. The module reports all events to the 'on_event'
-     hook (catalog in 'aa_events()') and writes nothing to logs itself.
+     enabled in the settings) and sign-out. The module reports all events to the
+     'on_event' hook (catalog in 'aa_events()') and writes nothing to logs itself.
 
 Usage:
 
@@ -106,36 +106,35 @@ settings: Settings, the result of 'aa_settings()'.
 
 on_event: Event hook function(event, user, session_id, value) or 'NULL'.
 
-   title: Login form title. Defaults to the 'login_title' text.
+   title: Sign-in form title. Defaults to the 'login_title' text.
 
-    logo: URL of an image above the title (for example '"logo.png"' from the 'www'
+    logo: Address of an image above the title (for example '"logo.png"' from the 'www'
           folder) or 'NULL'.
 
-cookie_name: Name of the auto-login cookie. Cookies are not isolated by port, so apps on
-          the same host need different names.
+cookie_name: Auto-login cookie name. Cookies are not isolated by port, so apps on the
+          same host need different names.
 
 Details:
 
-     If the password was set for the user by an administrator ('must_change'), after the
-     correct password is entered the password change form is shown, and the user gets
-     into the app only after changing it.
+     If the password was set by an administrator ('must_change'), the password change
+     form is shown after the correct password is entered, and the user gets into the app
+     only after the change.
 
 Value:
 
-     A list: 'user' (reactive value, a list with 'login' and 'role', or 'NULL'),
-     'logged_in' (reactive logical), 'role' (reactive role or 'NULL'), the function
-     'token()' (auto-login token of this session or 'NULL', needed by
-     'aa_session_guard()'), the function 'logout(reason = NULL, reload = FALSE)' and the
-     function 'logout_all(reload = TRUE)'. Without 'reason' this is a regular logout
+     A list: 'user' (reactive value, a list with 'login' and 'role' or 'NULL'),
+     'logged_in' (reactive logical), 'role' (reactive role or 'NULL'), a 'token()'
+     function (the auto-login token of this session or 'NULL', needed by
+     'aa_session_guard()'), a 'logout(reason = NULL, reload = FALSE)' function and a
+     'logout_all(reload = TRUE)' function. Without 'reason' this is an ordinary sign-out
      (event 'logout'); with 'reason' ('"blocked"', '"deleted"', '"role_changed"',
-     '"token_revoked"') it is a forced one ('session_forced_logout'). With
-     'reload = TRUE' the page is reloaded so that the modules of the previous user
-     disappear.
+     '"token_revoked"') it is forced ('session_forced_logout'). With 'reload = TRUE' the
+     page is reloaded so that the modules of the previous user disappear.
 
-     'logout_all()' is "log out on all devices": it revokes all the user's tokens (event
-     'sessions_revoked') and logs out immediately; open sessions on other devices are
-     closed by 'aa_session_guard()' at its next check. Show the user a confirmation
-     dialog before calling it: the button throws them out everywhere.
+     'logout_all()' is "sign out on all devices": it revokes all tokens of the user
+     (event 'sessions_revoked') and signs out immediately; open sessions on other devices
+     are closed by 'aa_session_guard()' at the next check. Show the user a confirmation
+     dialog before calling it: the button kicks them out everywhere.
 
 Two-factor authentication:
 
@@ -144,43 +143,42 @@ Two-factor authentication:
      authenticator app or a recovery code. Until then no auto-login token is issued and
      the successful login attempt is not recorded: wrong codes count as failed login
      attempts, and the login is locked by the same rules as for password guessing.
-     Login by the auto-login cookie does not ask for the second factor (the cookie was
-     issued after it was passed). The module reports the events 'totp_failed' and
+     Auto-login by cookie does not ask for the second factor (the cookie was issued after
+     it was passed). The module reports the events 'totp_failed' and
      'recovery_code_used'.
 
 Password recovery by email:
 
      With 'reset_enabled = TRUE' in the settings ('aa_settings()'), a "Forgot password?"
-     link appears on the login form (default text 'forgot_link'). The user enters a
-     username or email and receives an email with the link
-     <reset_base_url>/?reset=<token>, and the on-screen answer is always the same,
-     regardless of whether the user was found. The module itself reads the 'reset'
-     parameter from the address bar, removes it from the address and shows the new
-     password form if the link is valid. After the password change the user logs in as
-     usual: they are not let in automatically. The module reports the events
-     'password_reset_requested', 'password_reset_done' and 'password_reset_failed'.
-     UI-free logic: 'aa_request_password_reset()' and 'aa_reset_password_with_token()'.
+     link appears on the sign-in form. The user enters a login or email and is sent an
+     email with a link <reset_base_url>/?reset=<token>, and the on-screen answer is
+     always the same, whether or not the user was found. The module itself reads the
+     'reset' parameter from the address bar, removes it from the address and shows the
+     new password form if the link works. After the password is changed the user signs in
+     as usual: they are not signed in automatically. The module reports the events
+     'password_reset_requested', 'password_reset_done' and 'password_reset_failed'. Logic
+     without UI: 'aa_request_password_reset()' and 'aa_reset_password_with_token()'.
 
-Google login:
+Sign-in with Google:
 
      With 'google_enabled = TRUE' in the settings ('aa_settings()'), a "Sign in with
-     Google" button appears on the login form. The user confirms the login at Google and
-     returns to 'google_redirect_uri'; the package verifies the signature and contents of
-     the Google token, the organization domain ('google_domains') and finds the user *by
-     email among already created users*: the login does not create new users, the role is
-     taken from the database, and a blocked user does not get in. The app's two-factor
-     code is not requested in this case (Google performs the confirmation). The 'state'
-     from the address is compared with a short-lived cookie of the browser that started
-     the login, so a foreign return link cannot be substituted. With
-     'password_login = FALSE' the password form is hidden and password login attempts are
-     rejected on the server. The module reports 'login_success' with the value 'google'
-     and 'google_login_failed' (reason and email in 'value'); on failure the user is shown
-     a generic text. If the page is open not at the 'google_redirect_uri' address (for
-     example the app is opened by IP while the return is configured for a domain), the
-     button sends the user to the return address, and the login starts there on its own
-     (parameter '?google=1'): 'state' is stored in the cookie of the site address, and
-     cookies by IP and by domain are different. Password login and cookie auto-login work
-     independently on each address.
+     Google" button appears on the sign-in form. The user confirms the sign-in with
+     Google and returns to 'google_redirect_uri'; the package checks the signature and
+     contents of the Google token, the organization domain ('google_domains') and finds
+     the user *by email among already created ones*: sign-in does not create new users,
+     the role is taken from the database, a blocked user does not get in. The two-factor
+     code is not asked for in this case (Google does the confirmation). 'state' from the
+     address is compared with a short cookie of the browser that started the sign-in, so
+     someone else's return link cannot be slipped in. With 'password_login = FALSE' the
+     password form is hidden and password sign-in attempts are rejected on the server.
+     The module reports 'login_success' with the value 'google' and 'google_login_failed'
+     (reason and email in 'value'); on refusal the user sees a generic text. If the page
+     is opened not at the 'google_redirect_uri' address (for example, the app is opened
+     by IP while the return is configured for a domain), the button sends the user to the
+     return address and sign-in starts there on its own (parameter '?google=1'): 'state'
+     is stored in the cookie of the site address, and cookies for an IP and for a domain
+     are different. Password sign-in and cookie auto-login work independently at each
+     address.
 
      The role and login are taken from the database, not from the entered string. The
      'conn' connection belongs to the app: close it when the session ends.
@@ -213,7 +211,7 @@ Description:
 
      A table of users with statuses and an add button. Double-clicking a row opens the
      user card. The module is visible only to an administrator and shows nothing to
-     others. Styles are included via 'aa_app_head()'.
+     anyone else. Styles are attached through 'aa_app_head()'.
 
 Usage:
 
@@ -225,8 +223,8 @@ Arguments:
 
 Details:
 
-     The rest of the contents of the "Access" tab (permissions editor, log toggles) is
-     assembled by the app, for example 'tabPanel("Access", aa_users_ui("users"),
+     The rest of the "Access" tab content (permissions editor, log switches) is assembled
+     by the app, for example 'tabPanel("Access", aa_users_ui("users"),
      my_permissions_editor())'.
 
 Value:
@@ -249,11 +247,10 @@ Users module: server
 
 Description:
 
-     User management for an administrator: adding, changing the role, resetting the
-     password, blocking and unblocking, clearing the login lockout, deleting. The rules
-     (you cannot block or delete yourself, you cannot be left without an active
-     administrator) are checked on the server by the package functions; the UI merely
-     does not show the disallowed buttons.
+     User management for an administrator: adding, role change, password reset, blocking
+     and unblocking, clearing the login lock, deletion. The rules (one cannot block or
+     delete oneself, one cannot be left without an active administrator) are checked on
+     the server by the package functions; the UI merely does not show forbidden buttons.
 
 Usage:
 
@@ -273,37 +270,37 @@ Arguments:
 
     conn: Database connection.
 
-    auth: Authorization object, the result of 'aa_auth_server()'.
+    auth: Authentication object, the result of 'aa_auth_server()'.
 
 settings: Settings, the result of 'aa_settings()'.
 
 on_event: Event hook function(event, user, session_id, value) or 'NULL'.
 
-extra_card_ui, extra_card_server: Card extension slots, see the "Extension slots"
-          section.
+extra_card_ui, extra_card_server: Card extension slots, see the section "Extension
+          slots".
 
 Details:
 
-     The module does not depend on the app's permission matrix: users can be managed only
-     by a user with the role 'settings$admin_role', which is additionally checked against
-     the database on every action. The target of an action is taken from the server-side
-     state of the open card, not from a value sent by the browser.
+     The module does not depend on the app's permission matrix: only a user with the role
+     'settings$admin_role' can manage users, and the role is additionally checked against
+     the database on every action. The target of an action is taken from the server state
+     of the open card, not from a value sent by the browser.
 
 Value:
 
-     A list with the function 'refresh()', which redraws the table (for example after
-     changes made not through the module).
+     A list with a 'refresh()' function that redraws the table (for example after changes
+     made not through the module).
 
 Extension slots:
 
      The app can add its own block to the user card.
 
-        * 'extra_card_ui(login, ns)' returns the UI of the block. Element ids must be
-          wrapped in 'ns()'.
+        * 'extra_card_ui(login, ns)' returns the block UI. Element ids must be wrapped in
+          'ns()'.
 
-        * 'extra_card_server(input, output, session, login)' is called once at module
+        * 'extra_card_server(input, output, session, login)' is called once on module
           start inside its namespace; 'login' is a reactive value with the login of the
-          open card. The block handlers are registered here.
+          open card. Register the block handlers here.
 
 See Also:
 
@@ -315,7 +312,8 @@ Examples:
      
      auth <- aa_auth_server("auth", conn)
      shiny::observe({
-       if (auth$logged_in()) aa_users_server("users", conn, auth, on_event = log_event)
+       if (auth$logged_in()) aa_users_server("users", conn, auth, on_event =
+       log_event)
      })
      ## End(Not run)
 ```
@@ -327,9 +325,9 @@ Own password change module: UI
 
 Description:
 
-     A form "current password, new password, confirmation". Shown only to a logged-in
-     user. Place it where the app has a personal account or settings (on a tab or in a
-     modal window). Styles are included via 'aa_app_head()'.
+     A form with "current password, new password, confirmation". Shown only to a
+     signed-in user. Place it wherever the app has an account page or settings (in a tab
+     or a modal window). Styles are attached through 'aa_app_head()'.
 
 Usage:
 
@@ -362,7 +360,7 @@ Description:
      The user confirms the current password and sets a new one
      ('aa_change_own_password()'). Auto-login tokens of the other sessions are revoked,
      the current session keeps working. The module reports the change to the 'on_event'
-     hook with the event 'password_changed'.
+     hook with the 'password_changed' event.
 
 Usage:
 
@@ -374,7 +372,7 @@ Arguments:
 
     conn: Database connection.
 
-    auth: Authorization object, the result of 'aa_auth_server()'.
+    auth: Authentication object, the result of 'aa_auth_server()'.
 
 settings: Settings, the result of 'aa_settings()'.
 
@@ -405,9 +403,9 @@ Two-factor authentication module: UI
 
 Description:
 
-     A block for the personal account: two-factor authentication status, setup (secret,
-     QR code and confirmation by code) and disabling. Shows nothing until 'totp_enabled'
-     is turned on in the settings. Styles are included via 'aa_app_head()'.
+     A block for the account page: the two-factor authentication status, enabling
+     (secret, QR code and confirmation with a code) and disabling. Shows nothing until
+     'totp_enabled' is set in the settings. Styles are attached through 'aa_app_head()'.
 
 Usage:
 
@@ -449,7 +447,7 @@ Arguments:
 
     conn: Database connection.
 
-    auth: Authorization object, the result of 'aa_auth_server()'.
+    auth: Authentication object, the result of 'aa_auth_server()'.
 
 settings: Settings, the result of 'aa_settings()' with 'totp_enabled = TRUE'.
 
@@ -457,21 +455,22 @@ on_event: Event hook function(event, user, session_id, value) or 'NULL'.
 
 Details:
 
-        * *enabling*: the button creates a secret ('aa_totp_setup()'), shows a QR code (if
+        * *enabling*: a button creates a secret ('aa_totp_setup()'), shows a QR code (if
           the 'qrcode' package is installed) and a key for manual entry, and after a code
-          from the app is entered ('aa_totp_enable()') turns the protection on and shows
-          10 recovery codes *once*. The user's other sessions are terminated on enabling;
+          from the authenticator app is entered ('aa_totp_enable()') turns protection on
+          and shows 10 recovery codes *once*. The user's other sessions are ended on
+          enabling;
 
-        * *disabling*: requires the password and a code (or a recovery code), otherwise
-          someone who took over an open session could remove the protection.
+        * *disabling*: needs the password and a code (or a recovery code), otherwise
+          whoever took over an open session could remove the protection.
 
      Wrong codes count as failed login attempts ('aa_record_attempt()'), so guessing a
-     code in the personal account locks the login just like guessing a password. Events:
-     'totp_enabled', 'totp_disabled', 'totp_failed'.
+     code on the account page locks the login the same way as guessing a password.
+     Events: 'totp_enabled', 'totp_disabled', 'totp_failed'.
 
 Value:
 
-     A list with the function 'refresh()', which redraws the block.
+     A list with a 'refresh()' function that redraws the block.
 
 See Also:
 
@@ -483,7 +482,8 @@ Examples:
      
      auth <- aa_auth_server("auth", conn, settings)
      shiny::observe({
-       if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event = log_event)
+       if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event
+       = log_event)
      })
      ## End(Not run)
 ```
@@ -491,16 +491,16 @@ Examples:
 ## aa_session_guard
 
 ```text
-Forcibly terminate invalid sessions
+Forcibly end invalid sessions
 
 Description:
 
      Every 'session_check_seconds' (from 'aa_settings()') checks the open session
-     ('aa_user_session_valid()'). If the user was blocked, deleted or had their role
-     changed, the session is terminated via 'auth$logout()': the 'on_event' hook receives
+     ('aa_user_session_valid()'). If the user has been blocked, deleted or had their role
+     changed, the session is ended through 'auth$logout()': the 'on_event' hook receives
      'session_forced_logout' with the reason, and tokens are revoked. Thanks to this,
-     blocking and role downgrade take effect within the check interval rather than at the
-     next login.
+     blocking and role downgrades take effect within the check interval rather than at
+     the next sign-in.
 
 Usage:
 
@@ -514,28 +514,28 @@ Usage:
      
 Arguments:
 
-    auth: The result of 'aa_auth_server()'.
+    auth: A result of 'aa_auth_server()'.
 
     conn: Database connection.
 
-settings: Settings, the result of 'aa_settings()'.
+settings: Settings, a result of 'aa_settings()'.
 
-  reload: Reload the page after logout so that the modules of the previous user
+  reload: Reload the page after sign-out so that the modules of the previous user
           disappear. 'TRUE' is recommended.
 
-cleanup_minutes: How often to clean up stale records, in minutes.
+cleanup_minutes: How often to clean up outdated records, in minutes.
 
 Details:
 
-     If the database cannot be read, the session is not terminated.
+     If the database cannot be read, the session is not ended.
 
-     The session token ('auth$token()') is checked too: a password reset of the user or
-     "terminate all sessions" also terminates open sessions. Every 'cleanup_minutes' the
-     guard also deletes stale login attempts and tokens ('aa_cleanup()').
+     The session token ('auth$token()') is checked too: a password reset of a user or
+     "end all sessions" also end open sessions. Every 'cleanup_minutes' the guard also
+     deletes outdated sign-in attempts and tokens ('aa_cleanup()').
 
 Value:
 
-     Invisibly, a Shiny observer (it can be stopped with $destroy()).
+     Invisibly a Shiny observer (it can be stopped with $destroy()).
 
 Examples:
 
@@ -549,12 +549,12 @@ Examples:
 ## aa_register_module
 
 ```text
-Register a module's server part only if the permission is granted
+Attach a module server only if the permission is granted
 
 Description:
 
-     Calls 'server()' once per session when the logged-in user gets the permission
-     'permission'. For other users the module's server part is not registered at all, and
+     Calls 'server()' once per session, when the signed-in user gets the 'permission'
+     permission. For other users the module server is not registered at all, and
      permissions still have to be checked inside handlers ('aa_require()'): registration
      protects against unnecessary work, not against forged requests.
 
@@ -564,30 +564,32 @@ Usage:
      
 Arguments:
 
-    auth: The result of 'aa_auth_server()'.
+    auth: A result of 'aa_auth_server()'.
 
 permission: Permission name.
 
 provider: Permission source, see 'aa_can()'.
 
-  server: A function without arguments that registers the module, for example
-          'function() mod_tasks_server("tasks")'.
+  server: A function without arguments that registers the module, for example 'function()
+          mod_tasks_server("tasks")'.
 
 Details:
 
-     Registered modules cannot be removed from a session, so on logout use
-     'auth$logout(reload = TRUE)': the page will reload and the modules of the previous
-     user will disappear.
+     Registered modules cannot be removed from a session, so on sign-out use
+     'auth$logout(reload = TRUE)': the page reloads and the modules of the previous user
+     disappear.
 
 Value:
 
-     Invisibly, a Shiny observer.
+     Invisibly a Shiny observer.
 
 Examples:
 
      ## Not run:
      
-     provider <- aa_permissions_from_matrix(conf$access_managemet)
-     aa_register_module(auth, "Tasks", provider, function() mod_tasks_server("tasks"))
+     provider <- aa_permissions_from_matrix(conf$access_management)
+     aa_register_module(auth, "Tasks", provider, function()
+     mod_tasks_server("tasks"))
      ## End(Not run)
 ```
+

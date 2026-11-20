@@ -59,17 +59,31 @@
 #' )
 #' handler("login_failed", "boss", "s1", "")
 #' handler("logout", "boss", "s1", "")
-aa_event_logger <- function(writer, actions = NULL, events = NULL, enabled = TRUE,
-                            format_value = NULL) {
+aa_event_logger <- function(
+  writer,
+  actions = NULL,
+  events = NULL,
+  enabled = TRUE,
+  format_value = NULL
+) {
   known <- aa_events()$event
 
   if (!is.function(writer)) {
-    rlang::abort("`writer` must be a function.", class = "appauth_error_settings")
+    rlang::abort(
+      "`writer` must be a function.",
+      class = "appauth_error_settings"
+    )
   }
 
   if (!is.null(actions)) {
-    if (!(is.character(actions) && length(actions) >= 1 && !anyNA(actions) &&
-          !is.null(names(actions)) && all(nzchar(names(actions))) && all(nzchar(actions)))) {
+    if (
+      !(is.character(actions) &&
+        length(actions) >= 1 &&
+        !anyNA(actions) &&
+        !is.null(names(actions)) &&
+        all(nzchar(names(actions))) &&
+        all(nzchar(actions)))
+    ) {
       rlang::abort(
         "`actions` must be a named character vector: the name is an event key, the value is the action name.",
         class = "appauth_error_settings"
@@ -79,7 +93,11 @@ aa_event_logger <- function(writer, actions = NULL, events = NULL, enabled = TRU
     unknown <- setdiff(names(actions), known)
     if (length(unknown) > 0) {
       rlang::abort(
-        paste0("`actions` contains unknown events: ", paste(unknown, collapse = ", "), ". List: aa_events()$event."),
+        paste0(
+          "`actions` contains unknown events: ",
+          paste(unknown, collapse = ", "),
+          ". List: aa_events()$event."
+        ),
         class = "appauth_error_settings"
       )
     }
@@ -87,24 +105,40 @@ aa_event_logger <- function(writer, actions = NULL, events = NULL, enabled = TRU
 
   if (!is.null(events)) {
     if (!(is.character(events) && !anyNA(events))) {
-      rlang::abort("`events` must be a character vector or `NULL`.", class = "appauth_error_settings")
+      rlang::abort(
+        "`events` must be a character vector or `NULL`.",
+        class = "appauth_error_settings"
+      )
     }
 
     unknown <- setdiff(events, known)
     if (length(unknown) > 0) {
       rlang::abort(
-        paste0("`events` contains unknown events: ", paste(unknown, collapse = ", "), ". List: aa_events()$event."),
+        paste0(
+          "`events` contains unknown events: ",
+          paste(unknown, collapse = ", "),
+          ". List: aa_events()$event."
+        ),
         class = "appauth_error_settings"
       )
     }
   }
 
-  if (!(is.function(enabled) || (is.logical(enabled) && length(enabled) == 1 && !is.na(enabled)))) {
-    rlang::abort("`enabled` must be TRUE, FALSE or a function `function(event)`.", class = "appauth_error_settings")
+  if (
+    !(is.function(enabled) ||
+      (is.logical(enabled) && length(enabled) == 1 && !is.na(enabled)))
+  ) {
+    rlang::abort(
+      "`enabled` must be TRUE, FALSE or a function `function(event)`.",
+      class = "appauth_error_settings"
+    )
   }
 
   if (!(is.null(format_value) || is.function(format_value))) {
-    rlang::abort("`format_value` must be a function or `NULL`.", class = "appauth_error_settings")
+    rlang::abort(
+      "`format_value` must be a function or `NULL`.",
+      class = "appauth_error_settings"
+    )
   }
 
   function(event, user, session_id, value) {

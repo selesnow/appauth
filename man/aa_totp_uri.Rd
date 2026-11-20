@@ -17,7 +17,8 @@ aa_totp_uri(secret, login, issuer = "appauth")
 A string like \verb{otpauth://totp/...}.
 }
 \description{
-The QR code is built from this link, and apps also understand it on manual entry.
+The QR code is built from this link, and apps also understand it on manual
+entry.
 }
 \examples{
 aa_totp_uri("JBSWY3DPEHPK3PXP", "ivan", "Reports portal")

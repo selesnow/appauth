@@ -2,33 +2,53 @@
 # from the readable dev/texts-ru-source.R. Run from the package root.
 
 env <- new.env()
-for (e in parse("dev/texts-ru-source.R", encoding = "UTF-8", keep.source = FALSE)) {
+for (e in parse(
+  "dev/texts-ru-source.R",
+  encoding = "UTF-8",
+  keep.source = FALSE
+)) {
   eval(e, env)
 }
 texts <- env$aa_texts_ru
 
 esc <- function(s) {
   chars <- strsplit(s, "")[[1]]
-  out <- vapply(chars, function(ch) {
-    cp <- utf8ToInt(ch)
-    if (ch == "\\") "\\\\"
-    else if (ch == "\"") "\\\""
-    else if (cp > 126 || cp < 32) {
-      if (cp > 0xFFFF) sprintf("\\U%08x", cp) else sprintf("\\u%04x", cp)
-    } else ch
-  }, character(1))
+  out <- vapply(
+    chars,
+    function(ch) {
+      cp <- utf8ToInt(ch)
+      if (ch == "\\") {
+        "\\\\"
+      } else if (ch == "\"") {
+        "\\\""
+      } else if (cp > 126 || cp < 32) {
+        if (cp > 0xFFFF) sprintf("\\U%08x", cp) else sprintf("\\u%04x", cp)
+      } else {
+        ch
+      }
+    },
+    character(1)
+  )
   paste0("\"", paste(out, collapse = ""), "\"")
 }
 
 nms <- names(texts)
 w <- max(nchar(nms))
-lines <- sprintf("  %s = %s", formatC(nms, width = -w), vapply(texts, esc, character(1)))
+lines <- sprintf(
+  "  %s = %s",
+  formatC(nms, width = -w),
+  vapply(texts, esc, character(1))
+)
 body <- paste(lines, collapse = ",\n")
 
 ev <- env$aa_events_ru_source
 ev_body <- paste(
-  sprintf("  %s = c(%s, %s)", names(ev), vapply(ev, function(x) esc(x[1]), character(1)),
-          vapply(ev, function(x) esc(x[2]), character(1))),
+  sprintf(
+    "  %s = c(%s, %s)",
+    names(ev),
+    vapply(ev, function(x) esc(x[1]), character(1)),
+    vapply(ev, function(x) esc(x[2]), character(1))
+  ),
   collapse = ",
 "
 )

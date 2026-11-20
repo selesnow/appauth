@@ -18,8 +18,10 @@ aa_totp_disable(conn, login)
 }
 \description{
 Erases the user's secret and recovery codes. The function \strong{checks nothing}:
-the \code{\link[=aa_totp_server]{aa_totp_server()}} module requires a password and a code before calling it, and reset
-by an administrator (\code{\link[=aa_users_server]{aa_users_server()}}) is allowed only to an administrator.
+the \code{\link[=aa_totp_server]{aa_totp_server()}} module requires a password and a code before calling
+it, and reset
+by an administrator (\code{\link[=aa_users_server]{aa_users_server()}}) is allowed only to an
+administrator.
 }
 \examples{
 if (requireNamespace("RSQLite", quietly = TRUE)) {

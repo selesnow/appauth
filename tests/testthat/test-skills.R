@@ -40,6 +40,39 @@ test_that("aa_install_skills() does not overwrite installed skills without overw
 })
 
 test_that("aa_install_skills() validates arguments", {
-  expect_error(aa_install_skills(path = c("a", "b")), class = "appauth_error_settings")
+  expect_error(
+    aa_install_skills(path = c("a", "b")),
+    class = "appauth_error_settings"
+  )
   expect_error(aa_install_skills(agent = "unknown"))
+})
+
+test_that("aa_install_skills() installs into the home directory with global = TRUE", {
+  skip_if(!nzchar(system.file("skills", package = "appauth")), "no inst/skills")
+
+  home <- withr::local_tempdir()
+  testthat::local_mocked_bindings(
+    aa_home_dir = function() home,
+    .package = "appauth"
+  )
+
+  out <- suppressMessages(aa_install_skills(global = TRUE))
+
+  expect_true(all(startsWith(out, home)))
+  expect_true(file.exists(file.path(
+    home,
+    ".claude",
+    "skills",
+    "appauth",
+    "SKILL.md"
+  )))
+
+  suppressMessages(aa_install_skills(agent = "agents", global = TRUE))
+  expect_true(file.exists(file.path(
+    home,
+    ".agents",
+    "skills",
+    "appauth",
+    "SKILL.md"
+  )))
 })

@@ -9,15 +9,15 @@ default_config <- function() {
     logging = list(session_log = TRUE, action_log = TRUE),
     # authentication settings (appauth package, see ?aa_settings), unset ones are taken from the package
     security = list(
-      max_failed_logins            = 5,    # failures before a login is locked
-      lockout_minutes              = 15,   # counting window and lockout duration, minutes
-      max_failed_logins_per_minute = 30,   # global limit of failures across all logins
-      must_change_default          = TRUE  # a password set by the administrator is temporary by default
+      max_failed_logins = 5, # failures before a login is locked
+      lockout_minutes = 15, # counting window and lockout duration, minutes
+      max_failed_logins_per_minute = 30, # global limit of failures across all logins
+      must_change_default = TRUE # a password set by the administrator is temporary by default
     ),
     # permission matrix: permission -> roles (permission names are arbitrary but must match the code)
     access_matrix = list(
-      "Tasks"  = c("admin", "user", "viewer"),
-      "Run"    = c("admin", "user"),
+      "Tasks" = c("admin", "user", "viewer"),
+      "Run" = c("admin", "user"),
       "Access" = "admin"
     )
   )
@@ -27,8 +27,12 @@ merge_missing_config <- function(current, defaults) {
   for (key in names(defaults)) {
     if (is.null(current[[key]])) {
       current[[key]] <- defaults[[key]]
-    } else if (is.list(current[[key]]) && !is.null(names(current[[key]])) &&
-               is.list(defaults[[key]]) && !is.null(names(defaults[[key]]))) {
+    } else if (
+      is.list(current[[key]]) &&
+        !is.null(names(current[[key]])) &&
+        is.list(defaults[[key]]) &&
+        !is.null(names(defaults[[key]]))
+    ) {
       current[[key]] <- merge_missing_config(current[[key]], defaults[[key]])
     }
   }

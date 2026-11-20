@@ -43,8 +43,10 @@ still works, because the entered password is verified against the new hash.
 if (requireNamespace("RSQLite", quietly = TRUE)) {
   db <- tempfile(fileext = ".db")
   conn <- DBI::dbConnect(RSQLite::SQLite(), db)
-  DBI::dbExecute(conn, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)")
-  DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret', 'admin')")
+  DBI::dbExecute(conn, "CREATE TABLE users (login TEXT, password TEXT, role
+  TEXT)")
+  DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret',
+  'admin')")
   DBI::dbDisconnect(conn)
 
   # what would be migrated

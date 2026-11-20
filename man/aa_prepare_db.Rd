@@ -7,8 +7,10 @@
 aa_prepare_db(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
-(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or
+PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres
+driver).}
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
@@ -19,7 +21,8 @@ aa_prepare_db(conn, settings = aa_settings())
 Calls \code{\link[=aa_init_db]{aa_init_db()}} and \code{\link[=aa_cleanup]{aa_cleanup()}} and \strong{never stops
 the app}: on error it writes a message to the app log and returns
 \code{FALSE}. Meant to be called once at app start. Without the prepared
-tables, protection against guessing and locks will not work, while password sign-in
+tables, protection against guessing and locks will not work, while password
+sign-in
 will keep working.
 }
 \examples{

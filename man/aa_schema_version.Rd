@@ -7,8 +7,10 @@
 aa_schema_version(conn)
 }
 \arguments{
-\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
-(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or
+PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres
+driver).}
 }
 \value{
 An integer: the number of the last applied migration or \code{0} if the

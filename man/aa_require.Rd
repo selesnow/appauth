@@ -22,7 +22,8 @@ returned by the login module) or the user itself (a list with \code{login} and
 
 \item{provider}{Permission provider, see \code{\link[=aa_can]{aa_can()}}.}
 
-\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or
+\code{NULL}.}
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} (language of the
 denial text).}

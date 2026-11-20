@@ -1,0 +1,149 @@
+url: https://alexey-seleznev.pro/appauth/
+title: appauth
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+  bslib:
+    primary: '#0b1f3a'
+    secondary: '#14b8a6'
+  params:
+    bootswatch: cosmo
+home:
+  title: Secure authentication for Shiny
+  description: |
+    Passwords, sessions, permissions, two-factor authentication and Google sign-in for Shiny applications, with a versioned database schema.
+  sidebar:
+    structure:
+    - links
+    - license
+    - community
+    - citation
+    - authors
+    - dev
+  links:
+  - text: Source on GitHub
+    href: https://github.com/selesnow/appauth
+  - text: Report a bug
+    href: https://github.com/selesnow/appauth/issues
+navbar:
+  structure:
+    left:
+    - home
+    - articles
+    - reference
+    right: github
+  components:
+    github:
+      icon: fab fa-github
+      href: https://github.com/selesnow/appauth
+      aria-label: GitHub
+articles:
+- title: Guides
+  navbar: ~
+  contents:
+  - getting-started
+  - integrating-existing-app
+  - extension-points
+  - testing-your-app
+  - deployment
+  - architecture-and-security
+reference:
+- title: Package
+  contents: appauth-package
+- title: Settings and texts
+  contents:
+  - aa_settings
+  - aa_settings_from_list
+  - aa_texts
+  - aa_text
+  - aa_text_keys
+- title: Database
+  contents:
+  - aa_init_db
+  - aa_prepare_db
+  - aa_schema_version
+  - aa_cleanup
+  - aa_session_connection
+- title: Passwords
+  contents:
+  - aa_hash_password
+  - aa_verify_password
+  - aa_is_password_hash
+  - aa_validate_password
+  - aa_validate_login
+  - aa_migrate_plaintext_passwords
+  - aa_check_default_accounts
+  - aa_common_passwords
+  - aa_weak_password_warning
+- title: Users
+  contents:
+  - aa_get_user
+  - aa_list_users
+  - aa_users_exist
+  - aa_users_overview
+  - aa_active_autologins
+  - aa_create_user
+  - aa_create_first_admin
+  - aa_validate_new_user
+  - aa_authenticate
+  - aa_set_password
+  - aa_change_own_password
+  - aa_set_role
+  - aa_set_blocked
+  - aa_delete_user
+  - aa_check_can_block
+  - aa_check_can_delete
+  - aa_check_can_change_role
+- title: Password recovery
+  contents:
+  - aa_set_email
+  - aa_get_email
+  - aa_request_password_reset
+  - aa_reset_token_login
+  - aa_reset_password_with_token
+- title: Two-factor authentication
+  contents:
+  - aa_totp_setup
+  - aa_totp_enable
+  - aa_totp_disable
+  - aa_totp_enabled
+  - aa_verify_second_factor
+  - aa_recovery_codes_left
+  - aa_totp_secret
+  - aa_totp_uri
+  - aa_totp_code
+  - aa_totp_ui
+  - aa_totp_server
+- title: Login protection and sessions
+  contents:
+  - aa_login_gate
+  - aa_record_attempt
+  - aa_login_lock_remaining
+  - aa_global_throttled
+  - aa_clear_attempts
+  - aa_issue_token
+  - aa_find_session_user
+  - aa_revoke_token
+  - aa_revoke_sessions
+  - aa_user_session_valid
+- title: Permissions and events
+  contents:
+  - aa_permissions_from_matrix
+  - aa_can
+  - aa_require
+  - aa_events
+  - aa_event_logger
+- title: UI modules and app helpers
+  contents:
+  - aa_app_head
+  - aa_auth_ui
+  - aa_auth_server
+  - aa_users_ui
+  - aa_users_server
+  - aa_password_ui
+  - aa_password_server
+  - aa_session_guard
+  - aa_register_module
+- title: AI agent skills
+  contents: aa_install_skills
+

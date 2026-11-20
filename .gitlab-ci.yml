@@ -1,7 +1,18 @@
 stages:
+  - check
   - deploy
   - notify
   - notify_fail
+
+check-package:
+  stage: check
+  script:
+    - Rscript -e "if (!requireNamespace('devtools', quietly = TRUE)) install.packages('devtools', repos='https://cran.r-project.org')"
+    - Rscript -e "devtools::check(document = FALSE, cran = FALSE)"
+  only:
+    - master
+  tags:
+    - rpup_pak_updater
 
 deploy-package:
   stage: deploy

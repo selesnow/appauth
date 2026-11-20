@@ -23,6 +23,8 @@ is taken from the database at the time of the check.
 \examples{
 \dontrun{
 user <- aa_find_session_user(conn, input$auth_cookie)
-if (!is.null(user)) { # the user logs in without a password }
+if (!is.null(user)) {
+  # the user logs in without a password
+}
 }
 }

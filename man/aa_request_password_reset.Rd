@@ -32,7 +32,8 @@ user, \code{reset_max_per_minute} overall). The function result is meant
 for the journal: the user should be shown the same answer in every
 case, so that it is impossible to find out which logins and addresses exist.
 
-An error in \code{send_reset} does not abort the function but is returned as \code{send_failed}:
+An error in \code{send_reset} does not abort the function but is returned as
+\code{send_failed}:
 the token is consumed in that case.
 }
 \examples{
@@ -45,7 +46,8 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   settings <- aa_settings(
     reset_enabled  = TRUE,
     reset_base_url = "https://apps.example.com/my_app",
-    send_reset     = function(email, link, login) message("Link for ", login, ": ", link)
+    send_reset = function(email, link, login) message("Link for ", login, ":
+    ", link)
   )
   aa_request_password_reset(conn, "boss", settings)$reason
   aa_request_password_reset(conn, "nobody", settings)$reason

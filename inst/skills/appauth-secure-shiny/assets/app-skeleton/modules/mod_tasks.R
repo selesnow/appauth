@@ -16,7 +16,7 @@ mod_tasks_ui <- function(id, can_run = FALSE) {
 mod_tasks_server <- function(id, auth, conf_rv, session_id) {
   moduleServer(id, function(input, output, session) {
     observeEvent(input$run, {
-      require_permission(auth, conf_rv, "Run", session_id)   # the Run permission is checked on the server
+      require_permission(auth, conf_rv, "Run", session_id) # the Run permission is checked on the server
       showNotification("Done", type = "message")
     })
   })

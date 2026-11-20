@@ -12,13 +12,14 @@
 #  - after a password change by link all auto-login tokens are revoked, all recovery
 #    tokens are consumed and the lock for failed login attempts is cleared.
 
-#' Normalize an email to the stored form
-#'
-#' @param email A string or `NULL`.
-#'
-#' @returns The address without surrounding spaces in lower case, `""` for an empty
-#'   value (`NULL`, `NA`, an empty string).
-#' @noRd
+# Normalize an email to the stored form
+#
+# @param email A string or `NULL`.
+#
+# @returns The address without surrounding spaces in lower case, `""` for an
+# empty
+#   value (`NULL`, `NA`, an empty string).
+# @noRd
 aa_normalize_email <- function(email) {
   if (is.null(email) || length(email) != 1 || is.na(email)) {
     return("")
@@ -27,33 +28,40 @@ aa_normalize_email <- function(email) {
   tolower(trimws(as.character(email)))
 }
 
-#' Whether the email format is acceptable
-#'
-#' @param email A normalized address.
-#'
-#' @returns `TRUE` or `FALSE`.
-#' @noRd
+# Whether the email format is acceptable
+#
+# @param email A normalized address.
+#
+# @returns `TRUE` or `FALSE`.
+# @noRd
 aa_email_is_valid <- function(email) {
-  is.character(email) && length(email) == 1 && nchar(email) <= 254 &&
-    grepl("^[^@[:space:]]+@[^@[:space:].][^@[:space:]]*\\.[^@[:space:].]+$", email)
+  is.character(email) &&
+    length(email) == 1 &&
+    nchar(email) <= 254 &&
+    grepl(
+      "^[^@[:space:]]+@[^@[:space:].][^@[:space:]]*\\.[^@[:space:].]+$",
+      email
+    )
 }
 
-#' Find a problem in a user's email
-#'
-#' @param conn Database connection.
-#' @param email A normalized address (not empty).
-#' @param login The login the address belongs to (its own address is not
-#'   considered taken), or `NULL`.
-#'
-#' @returns `NULL` or a list with `reason` and `args`.
-#' @noRd
+# Find a problem in a user's email
+#
+# @param conn Database connection.
+# @param email A normalized address (not empty).
+# @param login The login the address belongs to (its own address is not
+#   considered taken), or `NULL`.
+#
+# @returns `NULL` or a list with `reason` and `args`.
+# @noRd
 aa_email_problem <- function(conn, email, login = NULL) {
   if (!aa_email_is_valid(email)) {
     return(list(reason = "email_invalid", args = list()))
   }
 
   owner <- aa_query(
-    conn, "SELECT login FROM users WHERE email = ?", params = list(email)
+    conn,
+    "SELECT login FROM users WHERE email = ?",
+    params = list(email)
   )$login
 
   if (length(owner) > 0 && !identical(owner[1], login)) {
@@ -68,7 +76,8 @@ aa_email_problem <- function(conn, email, login = NULL) {
 #' @inheritParams aa_get_user
 #'
 #' @returns The address in lower case or `NA_character_` if no address is set or
-#'   the user does not exist. If the schema is not upgraded to version 7, also `NA_character_`.
+#'   the user does not exist. If the schema is not upgraded to version 7, also
+#'   `NA_character_`.
 #' @export
 #'
 #' @examples
@@ -88,7 +97,11 @@ aa_get_email <- function(conn, login) {
   }
 
   email <- tryCatch(
-    aa_query(conn, "SELECT email FROM users WHERE login = ?", params = list(login))$email,
+    aa_query(
+      conn,
+      "SELECT email FROM users WHERE login = ?",
+      params = list(login)
+    )$email,
     error = function(e) character()
   )
 
@@ -99,15 +112,18 @@ aa_get_email <- function(conn, login) {
 #'
 #' The address is needed for password recovery ([aa_request_password_reset()]).
 #' It is stored in lower case, and two users cannot have the same address.
-#' An empty value (`NULL`, `NA` or `""`) removes the address. Errors (invalid format,
-#' address taken, no such user) have the class `appauth_error_user` and a text in the
+#' An empty value (`NULL`, `NA` or `""`) removes the address. Errors (invalid
+#' format,
+#' address taken, no such user) have the class `appauth_error_user` and a text
+#' in the
 #' settings language.
 #'
 #' @inheritParams aa_get_user
 #' @param email An address or an empty value to remove it.
 #' @param settings Settings, the result of [aa_settings()].
 #'
-#' @returns `TRUE` if the address was saved and `FALSE` if it was removed (invisibly).
+#' @returns `TRUE` if the address was saved and `FALSE` if it was removed
+#' (invisibly).
 #' @export
 #'
 #' @examples
@@ -129,15 +145,25 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   email <- aa_normalize_email(email)
 
   if (!nzchar(email)) {
-    aa_execute(conn, "UPDATE users SET email = NULL WHERE login = ?", params = list(login))
+    aa_execute(
+      conn,
+      "UPDATE users SET email = NULL WHERE login = ?",
+      params = list(login)
+    )
     return(invisible(FALSE))
   }
 
   problem <- aa_email_problem(conn, email, login)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+  if (!is.null(problem)) {
+    aa_abort_problem(settings, problem)
+  }
 
   tryCatch(
-    aa_execute(conn, "UPDATE users SET email = ? WHERE login = ?", params = list(email, login)),
+    aa_execute(
+      conn,
+      "UPDATE users SET email = ? WHERE login = ?",
+      params = list(email, login)
+    ),
     error = function(e) {
       # on a simultaneous write the address uniqueness constraint fires
       if (aa_is_unique_violation(e)) {
@@ -151,15 +177,16 @@ aa_set_email <- function(conn, login, email, settings = aa_settings()) {
   invisible(TRUE)
 }
 
-#' Consume a user's password recovery tokens
-#'
-#' The table may be missing (schema not upgraded); this must not get in the caller's way.
-#'
-#' @param conn Database connection.
-#' @param login User login.
-#'
-#' @returns The number of consumed tokens (invisibly).
-#' @noRd
+# Consume a user's password recovery tokens
+#
+# The table may be missing (schema not upgraded); this must not get in the
+# caller's way.
+#
+# @param conn Database connection.
+# @param login User login.
+#
+# @returns The number of consumed tokens (invisibly).
+# @noRd
 aa_invalidate_resets <- function(conn, login) {
   n <- tryCatch(
     aa_execute(
@@ -173,31 +200,40 @@ aa_invalidate_resets <- function(conn, login) {
   invisible(n)
 }
 
-#' Delete a user's password recovery tokens
-#'
-#' @inheritParams aa_invalidate_resets
-#'
-#' @returns The number of deleted tokens (invisibly).
-#' @noRd
+# Delete a user's password recovery tokens
+#
+# @inheritParams aa_invalidate_resets
+#
+# @returns The number of deleted tokens (invisibly).
+# @noRd
 aa_delete_user_resets <- function(conn, login) {
   n <- tryCatch(
-    aa_execute(conn, "DELETE FROM password_resets WHERE user_login = ?", params = list(login)),
+    aa_execute(
+      conn,
+      "DELETE FROM password_resets WHERE user_login = ?",
+      params = list(login)
+    ),
     error = function(e) 0L
   )
 
   invisible(n)
 }
 
-#' Password change link
-#'
-#' @param settings Settings, the result of [aa_settings()].
-#' @param token Recovery token.
-#'
-#' @returns A string with the link.
-#' @noRd
+# Password change link
+#
+# @param settings Settings, the result of [aa_settings()].
+# @param token Recovery token.
+#
+# @returns A string with the link.
+# @noRd
 aa_reset_link <- function(settings, token) {
   base <- sub("/+$", "", settings$reset_base_url)
-  paste0(base, if (grepl("?", base, fixed = TRUE)) "&" else "/?", "reset=", token)
+  paste0(
+    base,
+    if (grepl("?", base, fixed = TRUE)) "&" else "/?",
+    "reset=",
+    token
+  )
 }
 
 #' Request password recovery
@@ -213,12 +249,14 @@ aa_reset_link <- function(settings, token) {
 #' for the journal: the user should be shown the same answer in every
 #' case, so that it is impossible to find out which logins and addresses exist.
 #'
-#' An error in `send_reset` does not abort the function but is returned as `send_failed`:
+#' An error in `send_reset` does not abort the function but is returned as
+#' `send_failed`:
 #' the token is consumed in that case.
 #'
 #' @inheritParams aa_get_user
 #' @param identifier The login or email the user entered.
-#' @param settings Settings, the result of [aa_settings()] with `reset_enabled = TRUE`.
+#' @param settings Settings, the result of [aa_settings()] with `reset_enabled =
+#' TRUE`.
 #'
 #' @returns A list (invisibly): `sent` (`TRUE` if the email was sent), `reason`
 #'   (`"sent"`, `"disabled"`, `"no_user"`, `"no_email"`, `"blocked"`,
@@ -235,17 +273,26 @@ aa_reset_link <- function(settings, token) {
 #'   settings <- aa_settings(
 #'     reset_enabled  = TRUE,
 #'     reset_base_url = "https://apps.example.com/my_app",
-#'     send_reset     = function(email, link, login) message("Link for ", login, ": ", link)
+#'     send_reset = function(email, link, login) message("Link for ", login, ":
+#'     ", link)
 #'   )
 #'   aa_request_password_reset(conn, "boss", settings)$reason
 #'   aa_request_password_reset(conn, "nobody", settings)$reason
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_request_password_reset <- function(conn, identifier, settings = aa_settings()) {
+aa_request_password_reset <- function(
+  conn,
+  identifier,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
   result <- function(reason, login = NA_character_) {
-    invisible(list(sent = identical(reason, "sent"), reason = reason, login = login))
+    invisible(list(
+      sent = identical(reason, "sent"),
+      reason = reason,
+      login = login
+    ))
   }
 
   if (!isTRUE(settings$reset_enabled)) {
@@ -259,13 +306,22 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
 
   # the login is compared exactly, the address case-insensitively; both queries always run
   by_login <- aa_query(
-    conn, "SELECT login, blocked, email FROM users WHERE login = ?", params = list(identifier)
+    conn,
+    "SELECT login, blocked, email FROM users WHERE login = ?",
+    params = list(identifier)
   )
   by_email <- aa_query(
-    conn, "SELECT login, blocked, email FROM users WHERE email = ?",
+    conn,
+    "SELECT login, blocked, email FROM users WHERE email = ?",
     params = list(aa_normalize_email(identifier))
   )
-  user <- if (nrow(by_login) == 1) by_login else if (nrow(by_email) == 1) by_email else NULL
+  user <- if (nrow(by_login) == 1) {
+    by_login
+  } else if (nrow(by_email) == 1) {
+    by_email
+  } else {
+    NULL
+  }
 
   if (is.null(user)) {
     return(result("no_user"))
@@ -294,7 +350,10 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
     params = list(aa_utc(-60))
   )$n
 
-  if (per_user >= settings$reset_max_per_hour || overall >= settings$reset_max_per_minute) {
+  if (
+    per_user >= settings$reset_max_per_hour ||
+      overall >= settings$reset_max_per_minute
+  ) {
     return(result("throttled", login))
   }
 
@@ -312,11 +371,18 @@ aa_request_password_reset <- function(conn, identifier, settings = aa_settings()
 
   sent <- tryCatch(
     {
-      settings$send_reset(email = email, link = aa_reset_link(settings, token), login = login)
+      settings$send_reset(
+        email = email,
+        link = aa_reset_link(settings, token),
+        login = login
+      )
       TRUE
     },
     error = function(e) {
-      message("appauth: could not send the password recovery email: ", conditionMessage(e))
+      message(
+        "appauth: could not send the password recovery email: ",
+        conditionMessage(e)
+      )
       FALSE
     }
   )
@@ -372,15 +438,21 @@ aa_reset_token_login <- function(conn, token) {
 
 #' Set a new password by the link from the email
 #'
-#' Checks the token ([aa_reset_token_login()]), checks the new password against the rules
-#' from the settings and writes it. The token is one-time: a weak password is rejected
-#' with an error and does not spend the token, and after a successful change the link stops
-#' working. Along with the password, all of the user's auto-login tokens are revoked, the
-#' other recovery links are consumed, and the password change requirement and the
+#' Checks the token ([aa_reset_token_login()]), checks the new password against
+#' the rules
+#' from the settings and writes it. The token is one-time: a weak password is
+#' rejected
+#' with an error and does not spend the token, and after a successful change the
+#' link stops
+#' working. Along with the password, all of the user's auto-login tokens are
+#' revoked, the
+#' other recovery links are consumed, and the password change requirement and
+#' the
 #' lock for failed login attempts are cleared.
 #'
 #' A wrong, expired or used link raises an error of class
-#' `appauth_error_user` with `reason = "reset_link_invalid"`, a weak password an error
+#' `appauth_error_user` with `reason = "reset_link_invalid"`, a weak password an
+#' error
 #' of the same class with a password reason.
 #'
 #' @inheritParams aa_reset_token_login
@@ -400,7 +472,12 @@ aa_reset_token_login <- function(conn, token) {
 #'   )
 #'   DBI::dbDisconnect(conn)
 #' }
-aa_reset_password_with_token <- function(conn, token, password, settings = aa_settings()) {
+aa_reset_password_with_token <- function(
+  conn,
+  token,
+  password,
+  settings = aa_settings()
+) {
   aa_check_conn(conn)
 
   login <- aa_reset_token_login(conn, token)
@@ -410,7 +487,9 @@ aa_reset_password_with_token <- function(conn, token, password, settings = aa_se
   }
 
   problem <- aa_password_problem(password, settings, login)
-  if (!is.null(problem)) aa_abort_problem(settings, problem)
+  if (!is.null(problem)) {
+    aa_abort_problem(settings, problem)
+  }
 
   # the token is taken by whoever is first: of two simultaneous requests only one works
   claimed <- aa_execute(

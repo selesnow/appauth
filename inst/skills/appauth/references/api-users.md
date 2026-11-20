@@ -1,18 +1,19 @@
 # appauth reference: Users
 
-Reference built from appauth 0.8.0. The file was generated automatically from the package help (`dev/skills/build_reference.R`) and is not edited by hand.
+Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
-Functions in this section:
+Functions in this section: 
 `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()`
 
 ## aa_get_user
 
 ```text
-Get a user by login
+User by login
 
 Description:
 
-     The login is compared exactly, case-sensitive. The password is not included in the result.
+     The login is matched exactly, case-sensitive. The password is not included in the
+     result.
 
 Usage:
 
@@ -20,17 +21,16 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
 Value:
 
-     A one-row table with the columns 'login', 'role', 'blocked', 'created_at' and
-     'last_login_at', or 'NULL' if there is no such user. Dates are stored as text
-     '"YYYY-MM-DD HH:MM:SS"' in UTC; for users created before version 0.3.0,
-     'created_at' is empty ('NA'), and 'last_login_at' is empty until the user logs in
-     with a password.
+     A one-row table with 'login', 'role', 'blocked', 'created_at' and 'last_login_at'
+     columns, or 'NULL' if there is no such user. Dates are stored as text '"YYYY-MM-DD
+     HH:MM:SS"' in UTC; for users created before version 0.3.0 'created_at' is empty
+     ('NA'), and 'last_login_at' is empty until the user logs in with a password.
 
 Examples:
 
@@ -47,11 +47,11 @@ Examples:
 ## aa_list_users
 
 ```text
-List users
+List of users
 
 Description:
 
-     List users
+     List of users
 
 Usage:
 
@@ -59,13 +59,13 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
 Value:
 
-     A table with the columns 'login', 'role', 'blocked', 'created_at' and 'last_login_at'
-     in creation order (dates are described in 'aa_get_user()'). Password hashes are not
-     included in the result.
+     A table with 'login', 'role', 'blocked', 'created_at' and 'last_login_at' columns in
+     creation order (for the dates see 'aa_get_user()'). Password hashes are not included
+     in the result.
 
 Examples:
 
@@ -81,12 +81,12 @@ Examples:
 ## aa_users_exist
 
 ```text
-Is there at least one user in the database
+Does the database have at least one user
 
 Description:
 
-     If there are no users, the app has to show the first-administrator creation dialog;
-     the package login module does this.
+     If there are no users, the app needs to show the form for creating the first
+     administrator; the package login module does this.
 
 Usage:
 
@@ -94,7 +94,7 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
 Value:
 
@@ -118,9 +118,9 @@ Users with statuses for a table
 Description:
 
      A list of users with the flags needed for the table on the access management tab:
-     whether the user is blocked by an administrator, whether login is locked after failed
-     attempts, and how much time is left. If the attempts tables are unavailable, the
-     attempt-based lockout status is considered absent.
+     whether the user is blocked by an administrator, whether login is blocked after
+     failed attempts and how much time is left. If the attempts tables are unavailable,
+     the attempt-based lockout status is treated as absent.
 
 Usage:
 
@@ -128,22 +128,22 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
 settings: Settings, the result of 'aa_settings()'.
 
 Value:
 
-     A table with the columns 'login', 'role', 'blocked', 'state' ('"blocked"' when blocked
-     by an administrator, '"locked"' when locked after failed attempts, otherwise '"ok"'),
-     'lock_seconds' (seconds until the attempt-based lockout ends) and 'status' (status
-     text in the settings language, an empty string for '"ok"'), as well as 'created_at'
-     and 'last_login_at' (database dates in UTC, as in 'aa_get_user()') and 'created' and
-     'last_login' (the same dates for display: server local time; for unknown dates the
-     text is a language-dependent "unknown" / "never logged in" label), as well as
-     'has_email' (1 if an email for password recovery is set; the address itself is not
-     included in the overview), 'totp_on' (1 if the user has 2FA enabled) and
-     'autologins' (the number of active autologins, see 'aa_active_autologins()').
+     A table with columns 'login', 'role', 'blocked', 'state' ('"blocked"' for a block by
+     an administrator, '"locked"' for a lockout by attempts, otherwise '"ok"'),
+     'lock_seconds' (seconds until the attempt lockout ends) and 'status' (status text in
+     the settings language, an empty string for '"ok"'), as well as 'created_at' and
+     'last_login_at' (dates from the database in UTC, as in 'aa_get_user()') and
+     'created' and 'last_login' (the same dates for display: server local time, with the
+     texts for "unknown" and "never logged in" for unknown dates), as well as 'has_email'
+     (1 if an email is set for password recovery; the address itself is not included),
+     'totp_on' (1 if the user has 2FA enabled) and 'autologins' (how many active
+     autologins, see 'aa_active_autologins()').
 
 Examples:
 
@@ -163,11 +163,11 @@ Create a user
 
 Description:
 
-     Creates a user with a password hash. Before creation, the login, password, role
-     (must be in 'roles' from the settings) and login uniqueness are checked. If a rule
-     is violated, the function stops with an error of class 'appauth_error_user' whose
-     message is in the settings language (the 'reason' field holds the reason key) and
-     can be shown to the user.
+     Creates a user with a password hash. Before creation the login, password, role (must
+     be in 'roles' from the settings) and login uniqueness are checked. On a rule
+     violation the function aborts with an error of class 'appauth_error_user' with text
+     in the settings language (the 'reason' field holds the reason key) that can be shown
+     to the user.
 
 Usage:
 
@@ -183,21 +183,21 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-password: Plain-text password (only the hash is stored in the database).
+password: The password in plain text (only the hash goes to the database).
 
-    role: A role from the 'roles' list in the settings.
+    role: A role from the 'roles' list of the settings.
 
 settings: Settings, the result of 'aa_settings()'.
 
-must_change: Require a password change at first login (sensible if the password was set
-          by an administrator).
+must_change: Require a password change at the first login (sensible if the password was
+          set by an administrator).
 
-   email: Address for password recovery, or 'NULL' (the address can be set later via
-          'aa_set_email()'). Format and uniqueness are checked.
+   email: Address for password recovery or 'NULL' (the address can be set later with
+          'aa_set_email()'). The format and uniqueness are checked.
 
 Value:
 
@@ -228,8 +228,8 @@ Create the first user (administrator)
 Description:
 
      Creates a user with the 'admin_role' role from the settings *only if the 'users'
-     table is empty*. The check and the insert are done in a single SQL statement, so of
-     two simultaneous requests (two browser tabs, two sessions) only one succeeds.
+     table is empty*. The check and the insert run in one SQL statement, so of two
+     simultaneous requests (two browser tabs, two sessions) only one succeeds.
 
 Usage:
 
@@ -237,17 +237,17 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-password: Plain-text password (only the hash is stored in the database).
+password: The password in plain text (only the hash goes to the database).
 
 settings: Settings, the result of 'aa_settings()'.
 
 Details:
 
-     The login and password are checked by the same rules as in 'aa_create_user()' (on
+     The login and password are checked by the same rules as in 'aa_create_user()' (on a
      violation, an error of class 'appauth_error_user').
 
 Value:
@@ -268,7 +268,7 @@ Examples:
 ## aa_validate_new_user
 
 ```text
-Validate new user data
+Validate a new user's data
 
 Description:
 
@@ -281,25 +281,24 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-password: Plain-text password (only the hash is stored in the database).
+password: The password in plain text (only the hash goes to the database).
 
-    role: A role from the 'roles' list in the settings.
+    role: A role from the 'roles' list of the settings.
 
 settings: Settings, the result of 'aa_settings()'.
 
 Details:
 
-     A login is considered taken if it matches an existing one exactly or ignoring case
-     (so new users cannot create pairs like 'Kiruka' and 'kiruka').
+     A login is considered taken if it matches an existing one exactly or
+     case-insensitively (so new users do not create pairs like 'Kiruka' and 'kiruka').
 
 Value:
 
-     'NULL' if the data is acceptable, otherwise the problem text (in the settings
-     language).
+     'NULL' if the data is fine, otherwise the problem text (in the settings language).
 
 Examples:
 
@@ -316,14 +315,14 @@ Examples:
 ## aa_authenticate
 
 ```text
-Check login and password (sign-in)
+Verify login and password (login)
 
 Description:
 
-     Looks up the user by login (exact, case-sensitive) and checks the password against
-     the hash. If the user does not exist, the check is still performed against a dummy
-     hash so that response time does not reveal whether the login exists. A plain-text
-     password is never accepted in the database.
+     Looks up the user by login (exact, case-sensitive) and verifies the password against
+     the hash. If the user does not exist, verification is still run against a dummy hash
+     so the response time does not reveal whether the login exists. A plain-text password
+     in the database is never accepted.
 
 Usage:
 
@@ -331,7 +330,7 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
@@ -339,16 +338,16 @@ password: The entered password.
 
 Details:
 
-     For a user blocked by an administrator, a correct password returns a row with
-     'blocked = 1': what to do next is up to the calling code (the login module reports
-     the block only to someone who knows the password). With a wrong password the result
-     is always 'NULL'.
+     For a user blocked by an administrator, with a correct password a row with 'blocked
+     = 1' is returned: what to do next is up to the calling code (the login module
+     reports the block only to someone who knows the password). With a wrong password the
+     result is always 'NULL'.
 
 Value:
 
-     A one-row table with the columns 'login', 'role', 'blocked' and 'must_change'
-     (the password is not included in the result), or 'NULL' if the login or password
-     is wrong.
+     A one-row table with 'login', 'role', 'blocked' and 'must_change' columns (the
+     password is not included in the result), or 'NULL' if the login or password is
+     wrong.
 
 Examples:
 
@@ -370,9 +369,9 @@ Set a new password for a user
 Description:
 
      Stores the hash of the new password and *revokes all autologin tokens* of the user,
-     so that after a password reset old browser sessions stop working (open sessions
-     are ended by 'aa_session_guard()'). Unused email password-recovery links stop
-     working too. The password is checked against the rules from the settings; on
+     so that after a password reset old browser sessions stop working (open sessions are
+     ended by 'aa_session_guard()'). Unused password recovery links sent by email also
+     stop working. The password is checked against the rules from the settings; on a
      violation, an error of class 'appauth_error_user'.
 
 Usage:
@@ -388,18 +387,18 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-password: Plain-text password (only the hash is stored in the database).
+password: The password in plain text (only the hash goes to the database).
 
 settings: Settings, the result of 'aa_settings()'.
 
-must_change: Require the user to change this password at the next login (sensible if
-          the password was set by an administrator).
+must_change: Require the user to change this password at the next login (sensible if the
+          password was set by an administrator).
 
-keep_token: An autologin token that should not be revoked (the current session of the
+keep_token: An autologin token that must not be revoked (the current session of the
           person changing their own password), or 'NULL'.
 
 Value:
@@ -425,11 +424,10 @@ Change your own password
 
 Description:
 
-     For the user themselves: the current password must be confirmed. The new password
-     is checked against the rules from the settings and must differ from the current
-     one. Autologin tokens of other sessions are revoked; the token of the current
-     session ('keep_token') is kept. The password-change requirement ('must_change') is
-     cleared.
+     For the user themselves: the current password must be confirmed. The new password is
+     checked against the rules from the settings and must differ from the current one.
+     Autologin tokens of other sessions are revoked; the token of the current session
+     ('keep_token') stays. The password change requirement ('must_change') is cleared.
 
 Usage:
 
@@ -444,22 +442,22 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-old_password: Current password.
+old_password: The current password.
 
-new_password: New password.
+new_password: The new password.
 
 settings: Settings, the result of 'aa_settings()'.
 
-keep_token: The autologin token of the current session that should not be revoked.
+keep_token: Autologin token of the current session that must not be revoked.
 
 Details:
 
-     Errors (wrong current password, weak or identical password) have class
-     'appauth_error_user' and a message in the settings language.
+     Errors (wrong current password, weak or the same password) have class
+     'appauth_error_user' and text in the settings language.
 
 Value:
 
@@ -484,8 +482,8 @@ Change a user's role
 Description:
 
      The role must be in the 'roles' list of the settings; the administrator role cannot
-     be removed from the last active administrator (see 'aa_check_can_change_role()').
-     On violation, an error of class 'appauth_error_user'.
+     be taken from the last active administrator (see 'aa_check_can_change_role()'). On a
+     violation, an error of class 'appauth_error_user'.
 
 Usage:
 
@@ -493,18 +491,18 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-    role: A role from the 'roles' list in the settings.
+    role: A role from the 'roles' list of the settings.
 
 settings: Settings, the result of 'aa_settings()'.
 
 Details:
 
      The user's open session keeps working with the old role until the login module's
-     next live-session check, and at the next login the role is read from the database.
+     next live-session check, and at the next login the role is taken from the database.
 
 Value:
 
@@ -531,9 +529,9 @@ Block or unblock a user
 Description:
 
      A manual block closes login for the user (both by password and by autologin token)
-     without deleting the account, until an administrator lifts it. On blocking, *all
-     autologin tokens* of the user are revoked, and a session they already have open is
-     closed at the login module's next check.
+     without deleting the account, until an administrator lifts it. When blocking, *all
+     autologin tokens* of the user are revoked, and a session already open for the user
+     is closed at the login module's next check.
 
 Usage:
 
@@ -547,7 +545,7 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
@@ -561,9 +559,9 @@ settings: Settings, the result of 'aa_settings()'.
 Details:
 
      Blocking is performed only if 'aa_check_can_block()' allows it (you cannot block
-     yourself or the last active administrator); otherwise an error of class
+     yourself or the last active administrator), otherwise an error of class
      'appauth_error_user'. Unblocking needs no checks and does not restore revoked
-     tokens; the user must log in again.
+     tokens; the user has to log in again.
 
 Value:
 
@@ -590,9 +588,9 @@ Delete a user
 
 Description:
 
-     Deletes the user record, *their autologin tokens and failed login attempts*. This
-     matters: without deleting the tokens, a person who later gets the same login could
-     sign in with the previous owner's cookie.
+     Deletes the user record, *the user's autologin tokens and failed login attempts*.
+     This matters: without deleting the tokens, a person who later gets the same login
+     could log in with the cookie of the previous owner.
 
 Usage:
 
@@ -600,11 +598,11 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-acting_login: Login of the person deleting (the current administrator), or 'NULL' (for
+acting_login: Login of the person blocking (the current administrator), or 'NULL' (for
           example, when called from a script).
 
 settings: Settings, the result of 'aa_settings()'.
@@ -612,8 +610,8 @@ settings: Settings, the result of 'aa_settings()'.
 Details:
 
      Deletion is performed only if 'aa_check_can_delete()' allows it (you cannot delete
-     yourself or the last active administrator); otherwise an error of class
-     'appauth_error_user'. A session the user has open is closed at the login module's
+     yourself or the last active administrator), otherwise an error of class
+     'appauth_error_user'. A session open for the user is closed at the login module's
      next check.
 
 Value:
@@ -648,7 +646,7 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
@@ -659,8 +657,7 @@ settings: Settings, the result of 'aa_settings()'.
 
 Value:
 
-     'NULL' if allowed, otherwise the text of the reason for refusal (in the settings
-     language).
+     'NULL' if allowed, otherwise the reason for refusal (in the settings language).
 
 Examples:
 
@@ -688,19 +685,18 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-acting_login: Login of the person deleting (the current administrator), or 'NULL' (for
+acting_login: Login of the person blocking (the current administrator), or 'NULL' (for
           example, when called from a script).
 
 settings: Settings, the result of 'aa_settings()'.
 
 Value:
 
-     'NULL' if allowed, otherwise the text of the reason for refusal (in the settings
-     language).
+     'NULL' if allowed, otherwise the reason for refusal (in the settings language).
 
 Examples:
 
@@ -721,8 +717,8 @@ Can a user's role be changed
 Description:
 
      The role must be in the 'roles' list of the settings, and the administrator role
-     cannot be removed from the *last active (not blocked) administrator*, otherwise
-     nobody would be left in the app to manage users.
+     cannot be taken from the *last active (not blocked) administrator*, otherwise nobody
+     in the app could manage users.
 
 Usage:
 
@@ -730,18 +726,17 @@ Usage:
      
 Arguments:
 
-    conn: Database connection (e.g. 'DBI::dbConnect(RSQLite::SQLite(), ...)').
+    conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
 
    login: Login.
 
-    role: A role from the 'roles' list in the settings.
+    role: A role from the 'roles' list of the settings.
 
 settings: Settings, the result of 'aa_settings()'.
 
 Value:
 
-     'NULL' if allowed, otherwise the text of the reason for refusal (in the settings
-     language).
+     'NULL' if allowed, otherwise the reason for refusal (in the settings language).
 
 Examples:
 
@@ -753,3 +748,4 @@ Examples:
        DBI::dbDisconnect(conn)
      }
 ```
+

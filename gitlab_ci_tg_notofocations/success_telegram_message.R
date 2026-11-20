@@ -10,22 +10,30 @@ gitlab_token <- Sys.getenv("GITLAB_PAT")
 project_id <- Sys.getenv("CI_PROJECT_ID")
 commit_sha <- Sys.getenv("CI_COMMIT_SHA")
 
-gitlab_url <- paste0("https://git.netpeak.net/api/v4/projects/", project_id, "/repository/commits/", commit_sha)
+gitlab_url <- paste0(
+  "https://git.netpeak.net/api/v4/projects/",
+  project_id,
+  "/repository/commits/",
+  commit_sha
+)
 
-commit_raw <- tryCatch({
-  response <- request(gitlab_url) |>
-    req_headers("PRIVATE-TOKEN" = gitlab_token) |>
-    req_perform()
+commit_raw <- tryCatch(
+  {
+    response <- request(gitlab_url) |>
+      req_headers("PRIVATE-TOKEN" = gitlab_token) |>
+      req_perform()
 
-  if (resp_status(response) == 200) {
-    json <- resp_body_json(response)
-    json$message
-  } else {
-    "Не удалось получить коммит через API"
+    if (resp_status(response) == 200) {
+      json <- resp_body_json(response)
+      json$message
+    } else {
+      "Не удалось получить коммит через API"
+    }
+  },
+  error = function(e) {
+    "Ошибка при запросе API GitLab"
   }
-}, error = function(e) {
-  "Ошибка при запросе API GitLab"
-})
+)
 
 # Подготовка данных
 status <- Sys.getenv("CI_JOB_STATUS")
@@ -47,7 +55,12 @@ escape_markdown <- function(text) {
     if (i %% 2 == 1) {
       # Экранируем специальные символы
       for (char in special_chars) {
-        parts[i] <- gsub(paste0(char), paste0("\\", char), parts[i], fixed = TRUE)
+        parts[i] <- gsub(
+          paste0(char),
+          paste0("\\", char),
+          parts[i],
+          fixed = TRUE
+        )
       }
     }
     # Части внутри бектиков оставляем без изменений
@@ -73,12 +86,23 @@ escape_markdown <- function(text) {
 # Создание сообщения
 message <- paste0(
   "🚀 *Обновление appauth!*\n\n",
-  "● *Версия:* ", utils::packageVersion('appauth'), "\n\n",
+  "● *Версия:* ",
+  utils::packageVersion('appauth'),
+  "\n\n",
   "_Что было доработано:_\n\n",
-  escape_markdown(commit_raw), "\n\n",
-  "● Автор: ", author, "\n",
-  "● Ветка: ", branch, "\n",
-  "● *Pipeline:* [#", pipeline_id, "](", pipeline_url, ")\n\n",
+  escape_markdown(commit_raw),
+  "\n\n",
+  "● Автор: ",
+  author,
+  "\n",
+  "● Ветка: ",
+  branch,
+  "\n",
+  "● *Pipeline:* [#",
+  pipeline_id,
+  "](",
+  pipeline_url,
+  ")\n\n",
   "#appauth\n"
 )
 
@@ -89,7 +113,6 @@ url <- paste0("https://api.telegram.org/bot", token, "/sendMessage")
 
 
 if (!grepl('--test', x = commit_raw, ignore.case = T)) {
-
   response <- request(url) |>
     req_body_form(
       chat_id = chat_id,
@@ -105,7 +128,4 @@ if (!grepl('--test', x = commit_raw, ignore.case = T)) {
   } else {
     cat("Сообщение успешно отправлено!\n")
   }
-
 }
-
-

@@ -28,8 +28,8 @@
 #'   a single repeated character): `"off"` do not check, `"warn"` (default)
 #'   accept the password but show a warning, `"reject"` reject the password.
 #'   Existing passwords are not affected.
-#' @param login_max Maximum login length (the login is also lowercased and
-#'   trimmed when attempts are counted).
+#' @param login_max Maximum login length (the login is trimmed and compared
+#'   exactly, case-sensitively, when attempts are counted).
 #' @param autologin Whether to use cookie-based auto sign-in. If `FALSE`, the
 #'   user enters the password on every page load and no tokens are issued.
 #' @param session_days Lifetime of the auto sign-in token, in days.
@@ -57,8 +57,9 @@
 #'   request and is not visible to the user, the reason goes into the
 #'   `password_reset_requested` event.
 #' @param reset_base_url Application address the link in the email points to,
-#'   for example `"https://apps.example.com/my_app"`. `?reset=<token>` is
-#'   appended to it.
+#'   for example `"https://apps.example.com/my_app"`. It must use `https://`,
+#'   except for local development on `http://127.0.0.1` or `http://localhost`.
+#'   `?reset=<token>` is appended to it.
 #' @param reset_ttl_minutes Lifetime of the password change link, in minutes.
 #' @param reset_max_per_hour How many recovery emails can be sent to one user
 #'   per hour, further requests are silently ignored.
@@ -119,10 +120,13 @@
 #' settings <- aa_settings(
 #'   reset_enabled  = TRUE,
 #'   reset_base_url = "https://apps.example.com/my_app",
-#'   send_reset     = function(email, link, login) message("Email for ", login, ": ", link)
+#'   send_reset = function(email, link, login) {
+#'     message("Email for ", login, ": ", link)
+#'   }
 #' )
 #'
-#' # sign-in with Google (secret from an environment variable), password stays as a fallback
+#' # sign-in with Google (secret from an environment variable), password stays
+#' # as a fallback
 #' settings <- aa_settings(
 #'   google_enabled       = TRUE,
 #'   google_client_id     = "1234-abc.apps.googleusercontent.com",
@@ -141,42 +145,45 @@
 #' )
 #' settings$lockout_minutes
 aa_settings <- function(
-    max_failed_logins            = 5,
-    lockout_minutes              = 15,
-    max_failed_logins_per_minute = 30,
-    password_min                 = 6,
-    password_max                 = 128,
-    password_policy              = "warn",
-    login_max                    = 64,
-    autologin                    = TRUE,
-    session_days                 = 30,
-    session_check_seconds        = 30,
-    attempts_retention_hours     = 24,
-    token_retention_days         = 30,
-    roles                        = c("admin", "user", "viewer"),
-    admin_role                   = "admin",
-    must_change_default          = TRUE,
-    reset_enabled                = FALSE,
-    send_reset                   = NULL,
-    reset_base_url               = NULL,
-    reset_ttl_minutes            = 60,
-    reset_max_per_hour           = 3,
-    reset_max_per_minute         = 10,
-    totp_enabled                 = FALSE,
-    totp_key                     = NULL,
-    totp_issuer                  = "appauth",
-    totp_window                  = 1,
-    google_enabled               = FALSE,
-    google_client_id             = NULL,
-    google_client_secret         = NULL,
-    google_redirect_uri          = NULL,
-    google_domains               = NULL,
-    password_login               = TRUE,
-    texts                        = aa_texts("en")
+  max_failed_logins = 5,
+  lockout_minutes = 15,
+  max_failed_logins_per_minute = 30,
+  password_min = 6,
+  password_max = 128,
+  password_policy = "warn",
+  login_max = 64,
+  autologin = TRUE,
+  session_days = 30,
+  session_check_seconds = 30,
+  attempts_retention_hours = 24,
+  token_retention_days = 30,
+  roles = c("admin", "user", "viewer"),
+  admin_role = "admin",
+  must_change_default = TRUE,
+  reset_enabled = FALSE,
+  send_reset = NULL,
+  reset_base_url = NULL,
+  reset_ttl_minutes = 60,
+  reset_max_per_hour = 3,
+  reset_max_per_minute = 10,
+  totp_enabled = FALSE,
+  totp_key = NULL,
+  totp_issuer = "appauth",
+  totp_window = 1,
+  google_enabled = FALSE,
+  google_client_id = NULL,
+  google_client_secret = NULL,
+  google_redirect_uri = NULL,
+  google_domains = NULL,
+  password_login = TRUE,
+  texts = aa_texts("en")
 ) {
   aa_check_positive(max_failed_logins, "max_failed_logins")
   aa_check_positive(lockout_minutes, "lockout_minutes")
-  aa_check_positive(max_failed_logins_per_minute, "max_failed_logins_per_minute")
+  aa_check_positive(
+    max_failed_logins_per_minute,
+    "max_failed_logins_per_minute"
+  )
   aa_check_positive(password_min, "password_min")
   aa_check_positive(password_max, "password_max")
   aa_check_positive(login_max, "login_max")
@@ -194,7 +201,10 @@ aa_settings <- function(
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
   aa_check_positive(token_retention_days, "token_retention_days")
 
-  if (!(aa_is_string(password_policy) && password_policy %in% c("off", "warn", "reject"))) {
+  if (
+    !(aa_is_string(password_policy) &&
+      password_policy %in% c("off", "warn", "reject"))
+  ) {
     rlang::abort(
       "`password_policy` must be one of: \"off\", \"warn\", \"reject\".",
       class = "appauth_error_settings"
@@ -215,14 +225,33 @@ aa_settings <- function(
     )
   }
 
-  if (reset_enabled && !(is.function(send_reset) && aa_is_string(reset_base_url))) {
+  if (aa_is_string(reset_base_url)) {
+    is_https <- grepl("^https://", reset_base_url)
+    is_local <- grepl(
+      "^http://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?(/|$)",
+      reset_base_url
+    )
+    if (!is_https && !is_local) {
+      rlang::abort(
+        "`reset_base_url` must start with `https://` (local development may use `http://127.0.0.1` or `http://localhost`).",
+        class = "appauth_error_settings"
+      )
+    }
+  }
+
+  if (
+    reset_enabled && !(is.function(send_reset) && aa_is_string(reset_base_url))
+  ) {
     rlang::abort(
       "`reset_enabled = TRUE` requires the `send_reset` function and the application address `reset_base_url`.",
       class = "appauth_error_settings"
     )
   }
 
-  if (!(is.null(totp_key) || (is.character(totp_key) && length(totp_key) == 1 && !is.na(totp_key)))) {
+  if (
+    !(is.null(totp_key) ||
+      (is.character(totp_key) && length(totp_key) == 1 && !is.na(totp_key)))
+  ) {
     rlang::abort(
       "`totp_key` must be a string or `NULL`.",
       class = "appauth_error_settings"
@@ -243,8 +272,14 @@ aa_settings <- function(
     )
   }
 
-  if (!(is.numeric(totp_window) && length(totp_window) == 1 && is.finite(totp_window) &&
-        totp_window >= 0 && totp_window <= 5 && totp_window == round(totp_window))) {
+  if (
+    !(is.numeric(totp_window) &&
+      length(totp_window) == 1 &&
+      is.finite(totp_window) &&
+      totp_window >= 0 &&
+      totp_window <= 5 &&
+      totp_window == round(totp_window))
+  ) {
     rlang::abort(
       "`totp_window` must be an integer from 0 to 5.",
       class = "appauth_error_settings"
@@ -253,19 +288,30 @@ aa_settings <- function(
 
   # domains from a config arrive as a list, from code as a vector: lowercase them
   google_domains <- tolower(trimws(as.character(unlist(google_domains))))
-  google_domains <- unique(google_domains[!is.na(google_domains) & nzchar(google_domains)])
+  google_domains <- unique(google_domains[
+    !is.na(google_domains) & nzchar(google_domains)
+  ])
 
-  if (!all(grepl("^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\.[a-z]{2,}$", google_domains))) {
+  if (
+    !all(grepl("^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\\.[a-z]{2,}$", google_domains))
+  ) {
     rlang::abort(
       "`google_domains` must contain domains like `example.com`.",
       class = "appauth_error_settings"
     )
   }
 
-  for (field in c("google_client_id", "google_client_secret", "google_redirect_uri")) {
+  for (field in c(
+    "google_client_id",
+    "google_client_secret",
+    "google_redirect_uri"
+  )) {
     value <- get(field)
 
-    if (!(is.null(value) || (is.character(value) && length(value) == 1 && !is.na(value)))) {
+    if (
+      !(is.null(value) ||
+        (is.character(value) && length(value) == 1 && !is.na(value)))
+    ) {
       rlang::abort(
         paste0("`", field, "` must be a string or `NULL`."),
         class = "appauth_error_settings"
@@ -273,15 +319,26 @@ aa_settings <- function(
     }
   }
 
-  if (google_enabled && !(aa_is_string(google_client_id) && aa_is_string(google_client_secret) &&
-                          aa_is_string(google_redirect_uri))) {
+  if (
+    google_enabled &&
+      !(aa_is_string(google_client_id) &&
+        aa_is_string(google_client_secret) &&
+        aa_is_string(google_redirect_uri))
+  ) {
     rlang::abort(
       "`google_enabled = TRUE` requires `google_client_id`, `google_client_secret` and `google_redirect_uri`.",
       class = "appauth_error_settings"
     )
   }
 
-  if (google_enabled && !grepl("^(https://[^/\\s]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/\\S*)?$", google_redirect_uri, perl = TRUE)) {
+  if (
+    google_enabled &&
+      !grepl(
+        "^(https://[^/\\s]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/\\S*)?$",
+        google_redirect_uri,
+        perl = TRUE
+      )
+  ) {
     rlang::abort(
       "`google_redirect_uri` must be an `https://...` address (`http://localhost` for development).",
       class = "appauth_error_settings"
@@ -302,8 +359,13 @@ aa_settings <- function(
     )
   }
 
-  if (!(is.character(roles) && length(roles) >= 1 && !anyNA(roles) &&
-        all(nzchar(roles)) && !anyDuplicated(roles))) {
+  if (
+    !(is.character(roles) &&
+      length(roles) >= 1 &&
+      !anyNA(roles) &&
+      all(nzchar(roles)) &&
+      !anyDuplicated(roles))
+  ) {
     rlang::abort(
       "`roles` must be a vector of unique non-empty strings.",
       class = "appauth_error_settings"
@@ -326,38 +388,38 @@ aa_settings <- function(
 
   structure(
     list(
-      max_failed_logins            = max_failed_logins,
-      lockout_minutes              = lockout_minutes,
+      max_failed_logins = max_failed_logins,
+      lockout_minutes = lockout_minutes,
       max_failed_logins_per_minute = max_failed_logins_per_minute,
-      password_min                 = password_min,
-      password_max                 = password_max,
-      password_policy              = password_policy,
-      login_max                    = login_max,
-      autologin                    = autologin,
-      session_days                 = session_days,
-      session_check_seconds        = session_check_seconds,
-      attempts_retention_hours     = attempts_retention_hours,
-      token_retention_days         = token_retention_days,
-      roles                        = roles,
-      admin_role                   = admin_role,
-      must_change_default          = must_change_default,
-      reset_enabled                = reset_enabled,
-      send_reset                   = send_reset,
-      reset_base_url               = reset_base_url,
-      reset_ttl_minutes            = reset_ttl_minutes,
-      reset_max_per_hour           = reset_max_per_hour,
-      reset_max_per_minute         = reset_max_per_minute,
-      totp_enabled                 = totp_enabled,
-      totp_key                     = totp_key,
-      totp_issuer                  = totp_issuer,
-      totp_window                  = totp_window,
-      google_enabled               = google_enabled,
-      google_client_id             = google_client_id,
-      google_client_secret         = google_client_secret,
-      google_redirect_uri          = google_redirect_uri,
-      google_domains               = google_domains,
-      password_login               = password_login,
-      texts                        = texts
+      password_min = password_min,
+      password_max = password_max,
+      password_policy = password_policy,
+      login_max = login_max,
+      autologin = autologin,
+      session_days = session_days,
+      session_check_seconds = session_check_seconds,
+      attempts_retention_hours = attempts_retention_hours,
+      token_retention_days = token_retention_days,
+      roles = roles,
+      admin_role = admin_role,
+      must_change_default = must_change_default,
+      reset_enabled = reset_enabled,
+      send_reset = send_reset,
+      reset_base_url = reset_base_url,
+      reset_ttl_minutes = reset_ttl_minutes,
+      reset_max_per_hour = reset_max_per_hour,
+      reset_max_per_minute = reset_max_per_minute,
+      totp_enabled = totp_enabled,
+      totp_key = totp_key,
+      totp_issuer = totp_issuer,
+      totp_window = totp_window,
+      google_enabled = google_enabled,
+      google_client_id = google_client_id,
+      google_client_secret = google_client_secret,
+      google_redirect_uri = google_redirect_uri,
+      google_domains = google_domains,
+      password_login = password_login,
+      texts = texts
     ),
     class = "aa_settings"
   )
@@ -377,7 +439,8 @@ aa_settings <- function(
 #' @export
 #'
 #' @examples
-#' security <- list(max_failed_logins = 3, lockout_minutes = 10, unknown_key = 1)
+#' security <- list(max_failed_logins = 3, lockout_minutes = 10, unknown_key =
+#' 1)
 #' settings <- aa_settings_from_list(security, texts = aa_texts("en"))
 #' settings$max_failed_logins
 aa_settings_from_list <- function(x = NULL, ...) {
@@ -397,27 +460,102 @@ aa_settings_from_list <- function(x = NULL, ...) {
 #' @export
 print.aa_settings <- function(x, ...) {
   cat("appauth settings\n")
-  cat("  Failed attempts before login lock: ", x$max_failed_logins,
-      " within ", x$lockout_minutes, " min., lock for ", x$lockout_minutes, " min.\n", sep = "")
-  cat("  Overall limit of failed attempts: ", x$max_failed_logins_per_minute, " per minute\n", sep = "")
-  cat("  New password length: from ", x$password_min, " to ", x$password_max, " characters\n", sep = "")
-  cat("  Weak passwords: ", switch(x$password_policy, off = "not checked", warn = "warning", reject = "rejected"), "\n", sep = "")
-  cat("  Auto sign-in: ", if (x$autologin) "enabled" else "disabled",
-      ", token lifetime ", x$session_days, " days\n", sep = "")
-  cat("  Password set by an administrator: ", if (x$must_change_default) "temporary (change at sign-in)" else "permanent",
-      " by default\n", sep = "")
-  cat("  Password recovery by email: ",
-      if (x$reset_enabled) paste0("enabled, link valid for ", x$reset_ttl_minutes, " min.") else "disabled",
-      "\n", sep = "")
-  cat("  Two-factor authentication: ", if (x$totp_enabled) "enabled (voluntary)" else "disabled", "\n", sep = "")
-  cat("  Password sign-in: ", if (x$password_login) "allowed" else "disabled", "\n", sep = "")
-  cat("  Google sign-in: ",
-      if (x$google_enabled) {
-        paste0("enabled", if (length(x$google_domains)) paste0(" (domains: ", paste(x$google_domains, collapse = ", "), ")") else "")
-      } else "disabled",
-      "\n", sep = "")
-  cat("  Roles: ", paste(x$roles, collapse = ", "),
-      " (administrator: ", x$admin_role, ")\n", sep = "")
+  cat(
+    "  Failed attempts before login lock: ",
+    x$max_failed_logins,
+    " within ",
+    x$lockout_minutes,
+    " min., lock for ",
+    x$lockout_minutes,
+    " min.\n",
+    sep = ""
+  )
+  cat(
+    "  Overall limit of failed attempts: ",
+    x$max_failed_logins_per_minute,
+    " per minute\n",
+    sep = ""
+  )
+  cat(
+    "  New password length: from ",
+    x$password_min,
+    " to ",
+    x$password_max,
+    " characters\n",
+    sep = ""
+  )
+  cat(
+    "  Weak passwords: ",
+    switch(
+      x$password_policy,
+      off = "not checked",
+      warn = "warning",
+      reject = "rejected"
+    ),
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Auto sign-in: ",
+    if (x$autologin) "enabled" else "disabled",
+    ", token lifetime ",
+    x$session_days,
+    " days\n",
+    sep = ""
+  )
+  cat(
+    "  Password set by an administrator: ",
+    if (x$must_change_default) "temporary (change at sign-in)" else "permanent",
+    " by default\n",
+    sep = ""
+  )
+  cat(
+    "  Password recovery by email: ",
+    if (x$reset_enabled) {
+      paste0("enabled, link valid for ", x$reset_ttl_minutes, " min.")
+    } else {
+      "disabled"
+    },
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Two-factor authentication: ",
+    if (x$totp_enabled) "enabled (voluntary)" else "disabled",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Password sign-in: ",
+    if (x$password_login) "allowed" else "disabled",
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Google sign-in: ",
+    if (x$google_enabled) {
+      paste0(
+        "enabled",
+        if (length(x$google_domains)) {
+          paste0(" (domains: ", paste(x$google_domains, collapse = ", "), ")")
+        } else {
+          ""
+        }
+      )
+    } else {
+      "disabled"
+    },
+    "\n",
+    sep = ""
+  )
+  cat(
+    "  Roles: ",
+    paste(x$roles, collapse = ", "),
+    " (administrator: ",
+    x$admin_role,
+    ")\n",
+    sep = ""
+  )
   cat("  Interface language: ", attr(x$texts, "lang"), "\n", sep = "")
   invisible(x)
 }

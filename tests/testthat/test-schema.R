@@ -10,7 +10,15 @@ test_that("on an empty database all tables are created and all migrations applie
   expect_false(res$legacy)
   expect_identical(
     table_names(con),
-    c("appauth_migrations", "auth_sessions", "login_attempts", "oauth_states", "password_resets", "totp_recovery", "users")
+    c(
+      "appauth_migrations",
+      "auth_sessions",
+      "login_attempts",
+      "oauth_states",
+      "password_resets",
+      "totp_recovery",
+      "users"
+    )
   )
   expect_identical(aa_schema_version(con), 9L)
 })
@@ -19,23 +27,48 @@ test_that("table columns match the schema of earlier versions", {
   con <- new_db()
   aa_init_db(con)
 
-  expect_identical(columns_of(con, "users"), c("id", "login", "password", "role", "blocked", "must_change", "created_at", "last_login_at", "email", "totp_secret", "totp_enabled", "totp_last_step"))
+  expect_identical(
+    columns_of(con, "users"),
+    c(
+      "id",
+      "login",
+      "password",
+      "role",
+      "blocked",
+      "must_change",
+      "created_at",
+      "last_login_at",
+      "email",
+      "totp_secret",
+      "totp_enabled",
+      "totp_last_step"
+    )
+  )
   expect_identical(
     columns_of(con, "auth_sessions"),
     c("id", "user_login", "token_hash", "created_at", "expires_at", "revoked")
   )
-  expect_identical(columns_of(con, "login_attempts"), c("id", "login", "success", "attempted_at"))
+  expect_identical(
+    columns_of(con, "login_attempts"),
+    c("id", "login", "success", "attempted_at")
+  )
 })
 
 test_that("a new user has blocked 0 by default, login is unique", {
   con <- new_db()
   aa_init_db(con)
 
-  texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'user')")
+  texec(
+    con,
+    "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'user')"
+  )
 
   expect_identical(tquery(con, "SELECT blocked FROM users")$blocked, 0L)
   expect_error(
-    texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'y', 'user')")
+    texec(
+      con,
+      "INSERT INTO users (login, password, role) VALUES ('a', 'y', 'user')"
+    )
   )
 })
 
@@ -43,13 +76,25 @@ test_that("migrations are recorded in the service table", {
   con <- new_db()
   aa_init_db(con)
 
-  migrations <- tquery(con, "SELECT version, name FROM appauth_migrations ORDER BY version")
+  migrations <- tquery(
+    con,
+    "SELECT version, name FROM appauth_migrations ORDER BY version"
+  )
 
   expect_identical(migrations$version, 1:9)
   expect_identical(
     migrations$name,
-    c("users", "users_blocked_column", "auth_sessions", "login_attempts", "users_must_change_column",
-      "users_created_and_last_login_columns", "password_resets_and_email", "totp_two_factor", "oauth_states")
+    c(
+      "users",
+      "users_blocked_column",
+      "auth_sessions",
+      "login_attempts",
+      "users_must_change_column",
+      "users_created_and_last_login_columns",
+      "password_resets_and_email",
+      "totp_two_factor",
+      "oauth_states"
+    )
   )
 })
 
@@ -57,12 +102,21 @@ test_that("a repeated run changes nothing", {
   con <- new_db()
   aa_init_db(con)
 
-  texec(con, "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'admin')")
-  before <- lapply(c("users", "auth_sessions", "login_attempts", "appauth_migrations"), \(t) rows_of(con, t))
+  texec(
+    con,
+    "INSERT INTO users (login, password, role) VALUES ('a', 'x', 'admin')"
+  )
+  before <- lapply(
+    c("users", "auth_sessions", "login_attempts", "appauth_migrations"),
+    \(t) rows_of(con, t)
+  )
 
   res <- aa_init_db(con)
 
-  after <- lapply(c("users", "auth_sessions", "login_attempts", "appauth_migrations"), \(t) rows_of(con, t))
+  after <- lapply(
+    c("users", "auth_sessions", "login_attempts", "appauth_migrations"),
+    \(t) rows_of(con, t)
+  )
 
   expect_identical(res$applied, integer())
   expect_identical(res$version, 9L)
@@ -74,7 +128,7 @@ test_that("production schema from before login protection: completed, data uncha
   con <- new_db()
   fixture_legacy_full(con)
 
-  users_before    <- rows_of(con, "users")
+  users_before <- rows_of(con, "users")
   sessions_before <- rows_of(con, "auth_sessions")
 
   res <- aa_init_db(con)
@@ -114,14 +168,23 @@ test_that("home-grown schema: plain-text passwords and root/root stay as is, app
   fixture_legacy_plain(con)
 
   users_before <- rows_of(con, "users")
-  log_before   <- rows_of(con, "action_log")
+  log_before <- rows_of(con, "action_log")
 
   res <- aa_init_db(con)
 
   expect_true(res$legacy)
   expect_identical(
     table_names(con),
-    c("action_log", "appauth_migrations", "auth_sessions", "login_attempts", "oauth_states", "password_resets", "totp_recovery", "users")
+    c(
+      "action_log",
+      "appauth_migrations",
+      "auth_sessions",
+      "login_attempts",
+      "oauth_states",
+      "password_resets",
+      "totp_recovery",
+      "users"
+    )
   )
 
   users_after <- rows_of(con, "users")
@@ -132,7 +195,11 @@ test_that("home-grown schema: plain-text passwords and root/root stay as is, app
 
 test_that("a repeated run on old schemas changes nothing either", {
   skip_if_not_sqlite()
-  for (fixture in list(fixture_legacy_full, fixture_legacy_old, fixture_legacy_plain)) {
+  for (fixture in list(
+    fixture_legacy_full,
+    fixture_legacy_old,
+    fixture_legacy_plain
+  )) {
     con <- new_db()
     fixture(con)
     aa_init_db(con)
@@ -152,13 +219,20 @@ test_that("on a migration error the changes are rolled back in one transaction",
   con <- new_db()
   # in MySQL every DDL command ends the transaction implicitly, table creation cannot be rolled back
   # (migrations are idempotent, so a repeated run will complete the schema)
-  testthat::skip_if(aa_dialect(con) == "mysql", "DDL in MySQL is not rolled back")
+  testthat::skip_if(
+    aa_dialect(con) == "mysql",
+    "DDL in MySQL is not rolled back"
+  )
 
   testthat::local_mocked_bindings(
     aa_migrations = function() {
       list(
-        list(version = 1L, name = "ok",   up = function(conn) DBI::dbExecute(conn, "CREATE TABLE users (login TEXT)")),
-        list(version = 2L, name = "boom", up = function(conn) stop("migration failure"))
+        list(version = 1L, name = "ok", up = function(conn) {
+          DBI::dbExecute(conn, "CREATE TABLE users (login TEXT)")
+        }),
+        list(version = 2L, name = "boom", up = function(conn) {
+          stop("migration failure")
+        })
       )
     }
   )
@@ -169,7 +243,10 @@ test_that("on a migration error the changes are rolled back in one transaction",
 
 test_that("aa_init_db and aa_schema_version reject unsupported databases and closed connections", {
   expect_error(aa_init_db(list()), class = "appauth_error_connection")
-  expect_error(aa_schema_version("not a connection"), class = "appauth_error_connection")
+  expect_error(
+    aa_schema_version("not a connection"),
+    class = "appauth_error_connection"
+  )
 
   con <- new_db()
   DBI::dbDisconnect(con)
@@ -181,17 +258,23 @@ test_that("aa_cleanup deletes only stale attempts and tokens", {
   con <- new_db()
   aa_init_db(con)
 
-  texec(con, "
+  texec(
+    con,
+    "
     INSERT INTO login_attempts (login, success, attempted_at) VALUES
       ('old',  0, datetime('now', '-25 hours')),
-      ('new',  0, datetime('now', '-1 hours'))")
-  texec(con, "
+      ('new',  0, datetime('now', '-1 hours'))"
+  )
+  texec(
+    con,
+    "
     INSERT INTO auth_sessions (user_login, token_hash, created_at, expires_at, revoked) VALUES
       ('u', 'expired_long',  datetime('now', '-90 days'), datetime('now', '-60 days'), 0),
       ('u', 'revoked_long',  datetime('now', '-50 days'), datetime('now', '+10 days'), 1),
       ('u', 'revoked_new',   datetime('now', '-2 days'),  datetime('now', '+28 days'), 1),
       ('u', 'expired_new',   datetime('now', '-35 days'), datetime('now', '-5 days'),  0),
-      ('u', 'active',        datetime('now', '-1 days'),  datetime('now', '+29 days'), 0)")
+      ('u', 'active',        datetime('now', '-1 days'),  datetime('now', '+29 days'), 0)"
+  )
 
   res <- aa_cleanup(con, aa_settings())
 
@@ -208,10 +291,13 @@ test_that("aa_cleanup honors retention periods from the settings", {
   con <- new_db()
   aa_init_db(con)
 
-  texec(con, "
+  texec(
+    con,
+    "
     INSERT INTO login_attempts (login, success, attempted_at) VALUES
       ('a', 0, datetime('now', '-3 hours')),
-      ('b', 0, datetime('now', '-30 minutes'))")
+      ('b', 0, datetime('now', '-30 minutes'))"
+  )
 
   res <- aa_cleanup(con, aa_settings(attempts_retention_hours = 2))
 
@@ -225,7 +311,10 @@ test_that("aa_prepare_db prepares the database and does not throw errors", {
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
   expect_identical(aa_schema_version(con), 9L)
 
-  expect_message(aa_prepare_db(new_db(), aa_settings()), "schema migrations applied")
+  expect_message(
+    aa_prepare_db(new_db(), aa_settings()),
+    "schema migrations applied"
+  )
 })
 
 test_that("aa_prepare_db on error returns FALSE and writes a warning to the log", {

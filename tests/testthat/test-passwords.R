@@ -28,14 +28,27 @@ test_that("verification tells right from wrong, respects case and whitespace", {
 })
 
 test_that("non-ASCII, special characters and long passwords work", {
-  for (pw in c("\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441", "p'a\"ss;--%d", strrep("a", 128), "  spaces  ")) {
+  for (pw in c(
+    "\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441",
+    "p'a\"ss;--%d",
+    strrep("a", 128),
+    "  spaces  "
+  )) {
     hash <- aa_hash_password(pw)
     expect_true(aa_verify_password(pw, hash), info = pw)
   }
 })
 
 test_that("aa_hash_password rejects non-strings and empty values", {
-  for (bad in list("", NA_character_, NULL, 123, c("a", "b"), TRUE, list("a"))) {
+  for (bad in list(
+    "",
+    NA_character_,
+    NULL,
+    123,
+    c("a", "b"),
+    TRUE,
+    list("a")
+  )) {
     expect_error(aa_hash_password(bad), class = "appauth_error_password")
   }
 })
@@ -92,7 +105,9 @@ test_that("the dummy hash is a hash, does not change during the session and reje
 test_that("a password of the right length is fine", {
   expect_null(aa_validate_password("123456"))
   expect_null(aa_validate_password(strrep("a", 128)))
-  expect_null(aa_validate_password("\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441"))
+  expect_null(aa_validate_password(
+    "\u043f\u0430\u0440\u043e\u043b\u044c-\u0440\u0443\u0441"
+  ))
 })
 
 test_that("a too short and a too long password are rejected with a clear text", {
@@ -114,15 +129,24 @@ test_that("password length is counted in characters, not bytes", {
 
 test_that("empty and invalid passwords are rejected", {
   for (bad in list("", NA_character_, NULL, 123, c("abcdef", "abcdef"))) {
-    expect_identical(aa_validate_password(bad), aa_text(aa_settings(), "password_empty"))
+    expect_identical(
+      aa_validate_password(bad),
+      aa_text(aa_settings(), "password_empty")
+    )
   }
 })
 
 test_that("password rules come from the settings and texts are in the settings language", {
   s <- aa_settings(password_min = 10, password_max = 12)
 
-  expect_identical(aa_validate_password("123456789", s), "Password must be at least 10 characters long")
-  expect_identical(aa_validate_password(strrep("a", 13), s), "Password must be at most 12 characters long")
+  expect_identical(
+    aa_validate_password("123456789", s),
+    "Password must be at least 10 characters long"
+  )
+  expect_identical(
+    aa_validate_password(strrep("a", 13), s),
+    "Password must be at most 12 characters long"
+  )
   expect_null(aa_validate_password("1234567890", s))
   expect_identical(aa_validate_password("", s), "Password cannot be empty")
 })
@@ -134,14 +158,26 @@ test_that("the login is validated", {
 
   # edge whitespace is forbidden: login compares the login exactly
   for (bad in c("  alsey  ", " alsey", "alsey ", "alsey\t")) {
-    expect_identical(aa_validate_login(bad), aa_text(aa_settings(), "login_whitespace"))
+    expect_identical(
+      aa_validate_login(bad),
+      aa_text(aa_settings(), "login_whitespace")
+    )
   }
-  expect_identical(aa_validate_login(" alsey", aa_settings(texts = aa_texts("en"))), "Login must not start or end with a space")
+  expect_identical(
+    aa_validate_login(" alsey", aa_settings(texts = aa_texts("en"))),
+    "Login must not start or end with a space"
+  )
 
-  expect_identical(aa_validate_login(strrep("a", 65)), aa_text(aa_settings(), "login_too_long", 64L))
+  expect_identical(
+    aa_validate_login(strrep("a", 65)),
+    aa_text(aa_settings(), "login_too_long", 64L)
+  )
 
   for (bad in list("", "   ", NA_character_, NULL, 5, c("a", "b"))) {
-    expect_identical(aa_validate_login(bad), aa_text(aa_settings(), "login_empty"))
+    expect_identical(
+      aa_validate_login(bad),
+      aa_text(aa_settings(), "login_empty")
+    )
   }
 })
 
@@ -149,7 +185,10 @@ test_that("login rules come from the settings", {
   s <- aa_settings(login_max = 5)
 
   expect_null(aa_validate_login("abcde", s))
-  expect_identical(aa_validate_login("abcdef", s), "Login must be at most 5 characters long")
+  expect_identical(
+    aa_validate_login("abcdef", s),
+    "Login must be at most 5 characters long"
+  )
   expect_identical(aa_validate_login(" ", s), "Login cannot be empty")
 })
 
@@ -189,7 +228,10 @@ test_that("legacy app: plain-text passwords are migrated to hashes, login with o
   expect_identical(after$role, before$role)
 
   for (i in seq_len(nrow(before))) {
-    expect_true(aa_verify_password(before$password[i], after$password[i]), info = before$login[i])
+    expect_true(
+      aa_verify_password(before$password[i], after$password[i]),
+      info = before$login[i]
+    )
   }
 })
 
@@ -208,7 +250,10 @@ test_that("a backup copy with the old passwords is created before changes", {
 test_that("after the migration a reminder to delete the backup is shown", {
   db <- file_db(fixture_legacy_plain)
 
-  expect_message(res <- aa_migrate_plaintext_passwords(db), "Delete it after checking")
+  expect_message(
+    res <- aa_migrate_plaintext_passwords(db),
+    "Delete it after checking"
+  )
   unlink(res$backup)
 })
 
@@ -218,7 +263,11 @@ test_that("a repeated run changes nothing and creates no extra copies", {
   on.exit(unlink(first$backup), add = TRUE)
 
   hashes <- read_users(db)
-  files_before <- list.files(dirname(db), pattern = basename(db), full.names = TRUE)
+  files_before <- list.files(
+    dirname(db),
+    pattern = basename(db),
+    full.names = TRUE
+  )
 
   res <- aa_migrate_plaintext_passwords(db)
 
@@ -226,7 +275,10 @@ test_that("a repeated run changes nothing and creates no extra copies", {
   expect_setequal(res$skipped, c("root", "hr_one", "viewer"))
   expect_true(is.na(res$backup))
   expect_identical(read_users(db), hashes)
-  expect_identical(list.files(dirname(db), pattern = basename(db), full.names = TRUE), files_before)
+  expect_identical(
+    list.files(dirname(db), pattern = basename(db), full.names = TRUE),
+    files_before
+  )
 })
 
 test_that("dry_run shows what would be migrated and changes nothing", {
@@ -239,12 +291,19 @@ test_that("dry_run shows what would be migrated and changes nothing", {
   expect_setequal(res$migrated, c("root", "hr_one", "viewer"))
   expect_true(is.na(res$backup))
   expect_identical(read_users(db), before)
-  expect_identical(list.files(dirname(db), pattern = paste0(basename(db), ".bak"), full.names = TRUE), character())
+  expect_identical(
+    list.files(
+      dirname(db),
+      pattern = paste0(basename(db), ".bak"),
+      full.names = TRUE
+    ),
+    character()
+  )
 })
 
 test_that("already hashed passwords are skipped and unchanged", {
   db <- file_db(function(con) {
-    fixture_legacy_old(con)   # alsey: hash, tester: plain-text password
+    fixture_legacy_old(con) # alsey: hash, tester: plain-text password
   })
   before <- read_users(db)
 
@@ -253,8 +312,14 @@ test_that("already hashed passwords are skipped and unchanged", {
 
   expect_identical(res$migrated, "tester")
   expect_identical(res$skipped, "alsey")
-  expect_identical(after$password[after$login == "alsey"], before$password[before$login == "alsey"])
-  expect_true(aa_verify_password("tester", after$password[after$login == "tester"]))
+  expect_identical(
+    after$password[after$login == "alsey"],
+    before$password[before$login == "alsey"]
+  )
+  expect_true(aa_verify_password(
+    "tester",
+    after$password[after$login == "tester"]
+  ))
 })
 
 test_that("a users table without an id column is migrated too", {
@@ -269,9 +334,13 @@ test_that("a users table without an id column is migrated too", {
 
 test_that("special characters in password and login do not break the migration (parameters, not SQL concatenation)", {
   db <- file_db(function(con) {
-    texec(con, "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)")
+    texec(
+      con,
+      "CREATE TABLE users (login TEXT PRIMARY KEY, password TEXT, role TEXT)"
+    )
     DBI::dbExecute(
-      con, "INSERT INTO users VALUES (?, ?, 'user')",
+      con,
+      "INSERT INTO users VALUES (?, ?, 'user')",
       params = list("o'neil\"; DROP TABLE users;--", "p'a\"ss;--%d")
     )
   })
@@ -286,7 +355,10 @@ test_that("special characters in password and login do not break the migration (
 test_that("an empty password for one user rolls back the whole migration", {
   db <- file_db(function(con) {
     fixture_legacy_plain(con)
-    texec(con, "INSERT INTO users (login, password, role) VALUES ('empty', '', 'user')")
+    texec(
+      con,
+      "INSERT INTO users (login, password, role) VALUES ('empty', '', 'user')"
+    )
   })
   before <- read_users(db)
 
@@ -311,38 +383,75 @@ test_that("the backup can be saved to a custom path or disabled", {
   res2 <- aa_migrate_plaintext_passwords(db2, backup = FALSE)
 
   expect_true(is.na(res2$backup))
-  expect_identical(list.files(dirname(db2), pattern = paste0(basename(db2), ".bak"), full.names = TRUE), character())
+  expect_identical(
+    list.files(
+      dirname(db2),
+      pattern = paste0(basename(db2), ".bak"),
+      full.names = TRUE
+    ),
+    character()
+  )
 })
 
 test_that("a database with no users and with no users table is handled", {
-  db <- file_db(function(con) texec(con, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)"))
+  db <- file_db(function(con) {
+    texec(con, "CREATE TABLE users (login TEXT, password TEXT, role TEXT)")
+  })
   res <- aa_migrate_plaintext_passwords(db)
 
   expect_identical(res$migrated, character())
   expect_identical(res$skipped, character())
 
   db2 <- file_db(function(con) texec(con, "CREATE TABLE other (x INTEGER)"))
-  expect_error(aa_migrate_plaintext_passwords(db2), "no `users` table", class = "appauth_error_migration")
+  expect_error(
+    aa_migrate_plaintext_passwords(db2),
+    "no `users` table",
+    class = "appauth_error_migration"
+  )
 })
 
 test_that("invalid migration arguments are rejected", {
-  expect_error(aa_migrate_plaintext_passwords("no-such-file.db"), "not found", class = "appauth_error_migration")
-  expect_error(aa_migrate_plaintext_passwords(NA_character_), class = "appauth_error_migration")
-  expect_error(aa_migrate_plaintext_passwords(c("a", "b")), class = "appauth_error_migration")
+  expect_error(
+    aa_migrate_plaintext_passwords("no-such-file.db"),
+    "not found",
+    class = "appauth_error_migration"
+  )
+  expect_error(
+    aa_migrate_plaintext_passwords(NA_character_),
+    class = "appauth_error_migration"
+  )
+  expect_error(
+    aa_migrate_plaintext_passwords(c("a", "b")),
+    class = "appauth_error_migration"
+  )
 
   db <- file_db(fixture_legacy_plain)
 
-  expect_error(aa_migrate_plaintext_passwords(db, backup = NA), class = "appauth_error_migration")
-  expect_error(aa_migrate_plaintext_passwords(db, backup = 5), class = "appauth_error_migration")
-  expect_error(aa_migrate_plaintext_passwords(db, dry_run = "yes"), class = "appauth_error_settings")
+  expect_error(
+    aa_migrate_plaintext_passwords(db, backup = NA),
+    class = "appauth_error_migration"
+  )
+  expect_error(
+    aa_migrate_plaintext_passwords(db, backup = 5),
+    class = "appauth_error_migration"
+  )
+  expect_error(
+    aa_migrate_plaintext_passwords(db, dry_run = "yes"),
+    class = "appauth_error_settings"
+  )
 })
 
 # ---- weak accounts ------------------------------------------------------
 
 add_user <- function(con, login, password, role = "user", hash = TRUE) {
   aa_execute(
-    con, "INSERT INTO users (login, password, role) VALUES (?, ?, ?)",
-    params = list(login, if (hash) aa_hash_password(password) else password, role)
+    con,
+    "INSERT INTO users (login, password, role) VALUES (?, ?, ?)",
+    params = list(
+      login,
+      if (hash) aa_hash_password(password) else password,
+      role
+    )
   )
 }
 
@@ -376,7 +485,10 @@ test_that("plain-text passwords are found, root/root gives two reasons", {
 
   res <- aa_check_default_accounts(con)
 
-  expect_setequal(res$reason[res$login == "root"], c("plaintext", "login_as_password"))
+  expect_setequal(
+    res$reason[res$login == "root"],
+    c("plaintext", "login_as_password")
+  )
   expect_identical(res$reason[res$login == "hr_one"], "plaintext")
 })
 
@@ -414,17 +526,29 @@ test_that("the list of weak passwords can be replaced", {
   add_user(con, "u1", "company2026")
 
   expect_identical(nrow(aa_check_default_accounts(con)), 0L)
-  expect_identical(aa_check_default_accounts(con, common = "company2026")$reason, "common_password")
+  expect_identical(
+    aa_check_default_accounts(con, common = "company2026")$reason,
+    "common_password"
+  )
 })
 
 test_that("aa_check_default_accounts validates its arguments", {
-  expect_error(aa_check_default_accounts(list()), class = "appauth_error_connection")
+  expect_error(
+    aa_check_default_accounts(list()),
+    class = "appauth_error_connection"
+  )
 
   con <- new_db()
   aa_init_db(con)
 
-  expect_error(aa_check_default_accounts(con, common = 1:3), class = "appauth_error_password")
-  expect_error(aa_check_default_accounts(con, common = c("a", NA)), class = "appauth_error_password")
+  expect_error(
+    aa_check_default_accounts(con, common = 1:3),
+    class = "appauth_error_password"
+  )
+  expect_error(
+    aa_check_default_accounts(con, common = c("a", NA)),
+    class = "appauth_error_password"
+  )
 })
 
 test_that("aa_common_passwords returns a character vector with obvious passwords", {

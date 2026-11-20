@@ -22,7 +22,10 @@ test_that("an unknown, empty and corrupted role gets no permissions", {
   expect_equal(provider(list(login = "x", role = "ghost")), character(0))
   expect_equal(provider(list(login = "x", role = "")), character(0))
   expect_equal(provider(list(login = "x", role = NA_character_)), character(0))
-  expect_equal(provider(list(login = "x", role = c("admin", "user"))), character(0))
+  expect_equal(
+    provider(list(login = "x", role = c("admin", "user"))),
+    character(0)
+  )
   expect_equal(provider(list(login = "x")), character(0))
   expect_equal(provider(NULL), character(0))
 })
@@ -34,7 +37,11 @@ test_that("the administrator role gets no permissions by itself", {
 })
 
 test_that("a permission with an empty role list or NULL is available to nobody", {
-  provider <- aa_permissions_from_matrix(list(A = NULL, B = character(0), C = "user"))
+  provider <- aa_permissions_from_matrix(list(
+    A = NULL,
+    B = character(0),
+    C = "user"
+  ))
 
   expect_equal(provider(u_user), "C")
 })
@@ -49,16 +56,28 @@ test_that("a matrix function is read on every check (permission editor)", {
 })
 
 test_that("an invalid matrix is rejected", {
-  expect_error(aa_permissions_from_matrix(c("admin", "user")), class = "appauth_error_permissions")
-  expect_error(aa_permissions_from_matrix(list("admin", "user")), class = "appauth_error_permissions")
-  expect_error(aa_permissions_from_matrix(NULL), class = "appauth_error_permissions")
+  expect_error(
+    aa_permissions_from_matrix(c("admin", "user")),
+    class = "appauth_error_permissions"
+  )
+  expect_error(
+    aa_permissions_from_matrix(list("admin", "user")),
+    class = "appauth_error_permissions"
+  )
+  expect_error(
+    aa_permissions_from_matrix(NULL),
+    class = "appauth_error_permissions"
+  )
 })
 
 test_that("a broken matrix function closes access instead of opening it", {
   provider <- aa_permissions_from_matrix(function() "garbage")
 
   expect_false(suppressMessages(aa_can(u_admin, "Tasks", provider)))
-  expect_message(aa_can(u_admin, "Tasks", provider), "permission provider failed")
+  expect_message(
+    aa_can(u_admin, "Tasks", provider),
+    "permission provider failed"
+  )
 })
 
 test_that("aa_can: the permission is held only by the listed roles", {
@@ -83,16 +102,27 @@ test_that("aa_can is closed by default on any uncertainty", {
 })
 
 test_that("aa_can: a provider with an error or garbage gives FALSE", {
-  expect_false(suppressMessages(aa_can(u_admin, "Access", function(user) stop("database unavailable"))))
+  expect_false(suppressMessages(aa_can(u_admin, "Access", function(user) {
+    stop("database unavailable")
+  })))
   expect_false(aa_can(u_admin, "Access", function(user) NULL))
   expect_false(aa_can(u_admin, "Access", function(user) 1))
   expect_false(aa_can(u_admin, "Access", function(user) NA_character_))
-  expect_message(aa_can(u_admin, "Access", function(user) stop("database unavailable")), "database unavailable")
+  expect_message(
+    aa_can(u_admin, "Access", function(user) stop("database unavailable")),
+    "database unavailable"
+  )
 })
 
 test_that("aa_can: a missing provider is a programmer error, not a denial", {
-  expect_error(aa_can(u_admin, "Access", NULL), class = "appauth_error_permissions")
-  expect_error(aa_can(u_admin, "Access", list(Access = "admin")), class = "appauth_error_permissions")
+  expect_error(
+    aa_can(u_admin, "Access", NULL),
+    class = "appauth_error_permissions"
+  )
+  expect_error(
+    aa_can(u_admin, "Access", list(Access = "admin")),
+    class = "appauth_error_permissions"
+  )
 })
 
 test_that("a custom provider (per-user permissions) works the same way", {
@@ -101,13 +131,19 @@ test_that("a custom provider (per-user permissions) works the same way", {
 
   expect_true(aa_can(u_user, "Export", provider))
   expect_false(aa_can(u_viewer, "Export", provider))
-  expect_false(aa_can(list(login = "stranger", role = "admin"), "Export", provider))
+  expect_false(aa_can(
+    list(login = "stranger", role = "admin"),
+    "Export",
+    provider
+  ))
 })
 
 test_that("aa_require lets through with the permission and does not call the hook", {
   provider <- aa_permissions_from_matrix(matrix_sm)
   events <- list()
-  hook <- function(event, user, session_id, value) events[[length(events) + 1]] <<- event
+  hook <- function(event, user, session_id, value) {
+    events[[length(events) + 1]] <<- event
+  }
 
   expect_true(aa_require(u_admin, "Access", provider, on_event = hook))
   expect_length(events, 0)
@@ -116,7 +152,9 @@ test_that("aa_require lets through with the permission and does not call the hoo
 test_that("aa_require without the permission quietly aborts the handler and sends access_denied", {
   provider <- aa_permissions_from_matrix(matrix_sm)
   got <- NULL
-  hook <- function(event, user, session_id, value) got <<- list(event, user, session_id, value)
+  hook <- function(event, user, session_id, value) {
+    got <<- list(event, user, session_id, value)
+  }
 
   expect_error(
     suppressMessages(aa_require(u_user, "Access", provider, on_event = hook)),
@@ -132,7 +170,10 @@ test_that("aa_require accepts an auth object with a reactive user", {
   expect_true(aa_require(auth, "Access", provider))
 
   auth_user <- list(user = function() u_user)
-  expect_error(suppressMessages(aa_require(auth_user, "Access", provider)), class = "shiny.silent.error")
+  expect_error(
+    suppressMessages(aa_require(auth_user, "Access", provider)),
+    class = "shiny.silent.error"
+  )
 })
 
 test_that("aa_require without a user (not logged in) denies as anonymous", {
@@ -141,7 +182,12 @@ test_that("aa_require without a user (not logged in) denies as anonymous", {
   hook <- function(event, user, session_id, value) got <<- user
 
   expect_error(
-    suppressMessages(aa_require(list(user = function() NULL), "Tasks", provider, on_event = hook)),
+    suppressMessages(aa_require(
+      list(user = function() NULL),
+      "Tasks",
+      provider,
+      on_event = hook
+    )),
     class = "shiny.silent.error"
   )
   expect_equal(got, "anonymous")

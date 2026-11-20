@@ -17,13 +17,16 @@ aa_verify_second_factor(conn, login, code, settings = aa_settings())
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}} with \code{totp_enabled = TRUE}.}
 }
 \value{
-A list: \code{ok} (\code{TRUE} or \code{FALSE}) and \code{method} (\code{"totp"}, \code{"recovery"}
+A list: \code{ok} (\code{TRUE} or \code{FALSE}) and \code{method} (\code{"totp"},
+\code{"recovery"}
 or \code{NA}).
 }
 \description{
 Accepts a code from the app (6 digits) or a recovery code. An app code
-is accepted once: a repeat of the same code (time step) is rejected. A recovery
-code is one-time. The function \strong{does not limit the number of attempts itself}: call
+is accepted once: a repeat of the same code (time step) is rejected. A
+recovery
+code is one-time. The function \strong{does not limit the number of attempts
+itself}: call
 \code{\link[=aa_login_gate]{aa_login_gate()}} before it and \code{\link[=aa_record_attempt]{aa_record_attempt()}} after a wrong code, as
 the sign-in module does.
 }
@@ -32,7 +35,8 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
   aa_init_db(conn)
   aa_create_first_admin(conn, "boss", "boss-password")
-  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-example")
+  settings <- aa_settings(totp_enabled = TRUE, totp_key =
+  "a-long-random-key-for-the-example")
   aa_verify_second_factor(conn, "boss", "123456", settings)$ok
   DBI::dbDisconnect(conn)
 }

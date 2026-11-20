@@ -34,6 +34,7 @@ previous user disappear.
 \examples{
 \dontrun{
 provider <- aa_permissions_from_matrix(conf$access_management)
-aa_register_module(auth, "Tasks", provider, function() mod_tasks_server("tasks"))
+aa_register_module(auth, "Tasks", provider, function()
+mod_tasks_server("tasks"))
 }
 }

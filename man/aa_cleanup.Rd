@@ -7,22 +7,29 @@
 aa_cleanup(conn, settings = aa_settings())
 }
 \arguments{
-\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
-(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres driver).}
+\item{conn}{Database connection: SQLite, DuckDB, MySQL / MariaDB or
+PostgreSQL
+(\code{DBI::dbConnect()} with the RSQLite, duckdb, RMariaDB or RPostgres
+driver).}
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-A list (invisibly): \code{login_attempts} (the number of deleted login attempts),
-\code{auth_sessions} (the number of deleted tokens), \code{password_resets} (the number of deleted
-password recovery tokens) and \code{oauth_states} (the number of deleted sign-in parameters
+A list (invisibly): \code{login_attempts} (the number of deleted login
+attempts),
+\code{auth_sessions} (the number of deleted tokens), \code{password_resets} (the
+number of deleted
+password recovery tokens) and \code{oauth_states} (the number of deleted sign-in
+parameters
 for Google).
 }
 \description{
 Deletes login attempt records older than \code{attempts_retention_hours} hours, as
-well as expired and revoked auto-login tokens older than \code{token_retention_days}
+well as expired and revoked auto-login tokens older than
+\code{token_retention_days}
 days, as well as used and expired password recovery tokens
-and Google sign-in parameters older than a day. Active tokens and fresh attempts are not touched. Call it
+and Google sign-in parameters older than a day. Active tokens and fresh
+attempts are not touched. Call it
 after \code{\link[=aa_init_db]{aa_init_db()}}.
 }
 \examples{

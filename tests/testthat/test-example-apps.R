@@ -21,7 +21,10 @@ example_app <- function(name, env = parent.frame()) {
   list(app = shiny::shinyAppDir(dir), db = db)
 }
 
-custom_settings <- aa_settings(roles = c("owner", "editor", "viewer"), admin_role = "owner")
+custom_settings <- aa_settings(
+  roles = c("owner", "editor", "viewer"),
+  admin_role = "owner"
+)
 
 html_of <- function(x) paste(as.character(x$html), collapse = "")
 
@@ -33,12 +36,19 @@ db_do <- function(db, fn) {
 
 db_active_tokens <- function(db, login) {
   db_do(db, function(con) {
-    tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = ? AND revoked = 0", params = list(login))$n
+    tquery(
+      con,
+      "SELECT COUNT(*) AS n FROM auth_sessions WHERE user_login = ? AND revoked = 0",
+      params = list(login)
+    )$n
   })
 }
 
 run_app <- function(example, expr) {
-  rlang::inject(suppressMessages(shiny::testServer(example$app, expr = !!rlang::enquo(expr))))
+  rlang::inject(suppressMessages(shiny::testServer(
+    example$app,
+    expr = !!rlang::enquo(expr)
+  )))
 }
 
 test_that("minimal-app: the first start creates an administrator, tabs follow the permission matrix", {
@@ -49,8 +59,10 @@ test_that("minimal-app: the first start creates an administrator, tabs follow th
     expect_match(html_of(output[["auth-form"]]), "setup_btn", fixed = TRUE)
 
     session$setInputs(
-      `auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
     )
     html <- html_of(output$main)
     expect_match(html, "Tasks", fixed = TRUE)
@@ -62,15 +74,21 @@ test_that("minimal-app: the first start creates an administrator, tabs follow th
 
   db_do(ex$db, function(con) {
     expect_equal(aa_get_user(con, "boss")$role, "admin")
-    expect_true(aa_is_password_hash(tquery(con, "SELECT password FROM users")$password))
+    expect_true(aa_is_password_hash(
+      tquery(con, "SELECT password FROM users")$password
+    ))
   })
 })
 
 test_that("minimal-app: the user and viewer roles see different tabs and buttons", {
   ex <- example_app("minimal-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
   db_do(ex$db, function(con) {
     aa_create_user(con, "ivan", "secret123", "user")
@@ -78,14 +96,22 @@ test_that("minimal-app: the user and viewer roles see different tabs and buttons
   })
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "ivan", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "ivan",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     html <- html_of(output$main)
     expect_match(html, "Run task", fixed = TRUE)
     expect_false(grepl("Access", html, fixed = TRUE))
   })
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "olga", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "olga",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     html <- html_of(output$main)
     expect_match(html, "Tasks", fixed = TRUE)
     expect_false(grepl("Run task", html, fixed = TRUE))
@@ -96,15 +122,23 @@ test_that("minimal-app: the user and viewer roles see different tabs and buttons
 test_that("minimal-app: the handler is protected on the server even if the button is hidden", {
   ex <- example_app("minimal-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
   db_do(ex$db, function(con) aa_create_user(con, "olga", "secret123", "viewer"))
 
   msgs <- character()
   withCallingHandlers(
     shiny::testServer(ex$app, {
-      session$setInputs(`auth-login` = "olga", `auth-password` = "secret123", `auth-login_btn` = 1)
+      session$setInputs(
+        `auth-login` = "olga",
+        `auth-password` = "secret123",
+        `auth-login_btn` = 1
+      )
       session$setInputs(run = 1)
     }),
     message = function(m) {
@@ -113,29 +147,45 @@ test_that("minimal-app: the handler is protected on the server even if the butto
     }
   )
 
-  expect_true(any(grepl("access_denied user=olga value=Run", msgs, fixed = TRUE)))
+  expect_true(any(grepl(
+    "access_denied user=olga value=Run",
+    msgs,
+    fixed = TRUE
+  )))
   expect_false(any(grepl("Task started", msgs, fixed = TRUE)))
 })
 
 test_that("minimal-app: password change in a window and sign-out on all devices after confirmation", {
   ex <- example_app("minimal-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
   other_device <- NULL
   db_do(ex$db, function(con) other_device <<- aa_issue_token(con, "boss"))
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "boss",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     expect_match(html_of(output$main), "Change password", fixed = TRUE)
-    session$setInputs(change_password = 1)               # opens the password change window
-    session$setInputs(`password-old` = "secret123", `password-new` = "brand-new-1",
-                      `password-confirm` = "brand-new-1", `password-change` = 1)
+    session$setInputs(change_password = 1) # opens the password change window
+    session$setInputs(
+      `password-old` = "secret123",
+      `password-new` = "brand-new-1",
+      `password-confirm` = "brand-new-1",
+      `password-change` = 1
+    )
 
-    session$setInputs(logout_all = 1)                   # only the confirmation window
+    session$setInputs(logout_all = 1) # only the confirmation window
     expect_true(db_active_tokens(ex$db, "boss") >= 1)
-    session$setInputs(logout_all_confirm = 1)           # confirmation
+    session$setInputs(logout_all_confirm = 1) # confirmation
   })
 
   expect_equal(db_active_tokens(ex$db, "boss"), 0)
@@ -149,13 +199,21 @@ test_that("minimal-app: password change in a window and sign-out on all devices 
 test_that("minimal-app: an administrator blocks a user through the app", {
   ex <- example_app("minimal-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
   db_do(ex$db, function(con) aa_create_user(con, "ivan", "secret123", "user"))
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "boss",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     session$flushReact()
     session$setInputs(`users-open` = "ivan")
     session$setInputs(`users-block` = 1)
@@ -173,8 +231,10 @@ test_that("custom-permissions-app: custom roles, English interface, permissions 
     expect_match(html, "Create administrator", fixed = TRUE)
 
     session$setInputs(
-      `auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
     )
     html <- html_of(output$main)
     expect_match(html, "Reports", fixed = TRUE)
@@ -183,20 +243,32 @@ test_that("custom-permissions-app: custom roles, English interface, permissions 
     expect_match(html, "Sign out", fixed = TRUE)
   })
 
-  db_do(ex$db, function(con) expect_equal(aa_get_user(con, "boss")$role, "owner"))
+  db_do(ex$db, function(con) {
+    expect_equal(aa_get_user(con, "boss")$role, "owner")
+  })
 })
 
 test_that("custom-permissions-app: editor permissions come from the table, the card slot saves them", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
-  db_do(ex$db, function(con) aa_create_user(con, "ann", "secret123", "editor", custom_settings))
+  db_do(ex$db, function(con) {
+    aa_create_user(con, "ann", "secret123", "editor", custom_settings)
+  })
 
   # the editor has no permissions yet
   run_app(ex, {
-    session$setInputs(`auth-login` = "ann", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "ann",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     html <- html_of(output$main)
     expect_false(grepl("Export to CSV", html, fixed = TRUE))
     expect_false(grepl("Quarterly report", html, fixed = TRUE))
@@ -205,17 +277,34 @@ test_that("custom-permissions-app: editor permissions come from the table, the c
 
   # the owner grants a permission through the card slot
   run_app(ex, {
-    session$setInputs(`auth-login` = "boss", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "boss",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     session$flushReact()
     session$setInputs(`users-open` = "ann")
-    session$setInputs(`users-permissions` = "export", `users-save_permissions` = 1)
+    session$setInputs(
+      `users-permissions` = "export",
+      `users-save_permissions` = 1
+    )
   })
   db_do(ex$db, function(con) {
-    expect_equal(tquery(con, "SELECT permission FROM user_permissions WHERE login = 'ann'")$permission, "export")
+    expect_equal(
+      tquery(
+        con,
+        "SELECT permission FROM user_permissions WHERE login = 'ann'"
+      )$permission,
+      "export"
+    )
   })
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "ann", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "ann",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     html <- html_of(output$main)
     expect_match(html, "Export to CSV", fixed = TRUE)
     expect_false(grepl("Quarterly report", html, fixed = TRUE))
@@ -225,8 +314,12 @@ test_that("custom-permissions-app: editor permissions come from the table, the c
 test_that("custom-permissions-app: only the owner can save permissions", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
   db_do(ex$db, function(con) {
     aa_create_user(con, "ann", "secret123", "editor", custom_settings)
@@ -234,9 +327,16 @@ test_that("custom-permissions-app: only the owner can save permissions", {
   })
 
   run_app(ex, {
-    session$setInputs(`auth-login` = "ann", `auth-password` = "secret123", `auth-login_btn` = 1)
+    session$setInputs(
+      `auth-login` = "ann",
+      `auth-password` = "secret123",
+      `auth-login_btn` = 1
+    )
     session$setInputs(`users-open` = "bob")
-    session$setInputs(`users-permissions` = c("reports", "export"), `users-save_permissions` = 1)
+    session$setInputs(
+      `users-permissions` = c("reports", "export"),
+      `users-save_permissions` = 1
+    )
   })
 
   db_do(ex$db, function(con) {
@@ -247,15 +347,25 @@ test_that("custom-permissions-app: only the owner can save permissions", {
 test_that("custom-permissions-app: an editor without the permission is refused by the export handler", {
   ex <- example_app("custom-permissions-app")
   run_app(ex, {
-    session$setInputs(`auth-setup_login` = "boss", `auth-setup_password` = "secret123",
-                      `auth-setup_confirm` = "secret123", `auth-setup_btn` = 1)
+    session$setInputs(
+      `auth-setup_login` = "boss",
+      `auth-setup_password` = "secret123",
+      `auth-setup_confirm` = "secret123",
+      `auth-setup_btn` = 1
+    )
   })
-  db_do(ex$db, function(con) aa_create_user(con, "ann", "secret123", "editor", custom_settings))
+  db_do(ex$db, function(con) {
+    aa_create_user(con, "ann", "secret123", "editor", custom_settings)
+  })
 
   msgs <- character()
   withCallingHandlers(
     shiny::testServer(ex$app, {
-      session$setInputs(`auth-login` = "ann", `auth-password` = "secret123", `auth-login_btn` = 1)
+      session$setInputs(
+        `auth-login` = "ann",
+        `auth-password` = "secret123",
+        `auth-login_btn` = 1
+      )
       session$setInputs(export = 1)
     }),
     message = function(m) {
@@ -264,7 +374,11 @@ test_that("custom-permissions-app: an editor without the permission is refused b
     }
   )
 
-  expect_true(any(grepl("access_denied user=ann value=export", msgs, fixed = TRUE)))
+  expect_true(any(grepl(
+    "access_denied user=ann value=export",
+    msgs,
+    fixed = TRUE
+  )))
 })
 
 test_that("a database with a home-grown schema (old schema, plain-text passwords, root/root) works with the English interface", {
@@ -276,7 +390,10 @@ test_that("a database with a home-grown schema (old schema, plain-text passwords
   fixture_legacy_plain(con)
   DBI::dbDisconnect(con)
 
-  settings <- aa_settings(texts = aa_texts("en"), roles = c("admin", "user", "viewer"))
+  settings <- aa_settings(
+    texts = aa_texts("en"),
+    roles = c("admin", "user", "viewer")
+  )
 
   # before the migration the passwords are plain text: nobody can sign in
   con <- DBI::dbConnect(RSQLite::SQLite(), db)
@@ -304,7 +421,9 @@ test_that("a database with a home-grown schema (old schema, plain-text passwords
   })
 
   expect_true(all(vapply(
-    tquery(con, "SELECT password FROM users")$password, aa_is_password_hash, logical(1)
+    tquery(con, "SELECT password FROM users")$password,
+    aa_is_password_hash,
+    logical(1)
   )))
   expect_true("action_log" %in% DBI::dbListTables(con))
 })

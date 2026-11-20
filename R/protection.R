@@ -13,18 +13,21 @@
 # success is based on the monotonic row number, not on time: time is stored with
 # one-second precision, and fast events would lose their order.
 
-#' Login key in the login attempts table
-#'
-#' The exact login truncated to `login_max` characters. Empty and
-#' whitespace-only logins are not recorded (key `""`).
-#'
-#' @param login The entered login.
-#' @param settings Settings, the result of [aa_settings()].
-#'
-#' @returns A string.
-#' @noRd
+# Login key in the login attempts table
+#
+# The exact login truncated to `login_max` characters. Empty and
+# whitespace-only logins are not recorded (key `""`).
+#
+# @param login The entered login.
+# @param settings Settings, the result of [aa_settings()].
+#
+# @returns A string.
+# @noRd
 aa_login_key <- function(login, settings) {
-  if (!(is.character(login) && length(login) == 1 && !is.na(login)) || !nzchar(trimws(login))) {
+  if (
+    !(is.character(login) && length(login) == 1 && !is.na(login)) ||
+      !nzchar(trimws(login))
+  ) {
     return("")
   }
 
@@ -66,13 +69,14 @@ aa_record_attempt <- function(conn, login, success, settings = aa_settings()) {
     return(invisible(FALSE))
   }
 
-  aa_execute(
-    conn,
-    "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, ?)",
-    params = list(key, as.integer(success), aa_utc())
-  )
-
-  invisible(TRUE)
+  invisible(aa_write_section(conn, function() {
+    aa_execute(
+      conn,
+      "INSERT INTO login_attempts (login, success, attempted_at) VALUES (?, ?, ?)",
+      params = list(key, as.integer(success), aa_utc())
+    )
+    TRUE
+  }))
 }
 
 #' Seconds left until a login lockout ends
@@ -130,7 +134,9 @@ aa_login_lock_remaining <- function(conn, login, settings = aa_settings()) {
   }
 
   last_fail <- as.POSIXct(r$last_fail, tz = "UTC", format = "%Y-%m-%d %H:%M:%S")
-  remaining <- as.numeric(last_fail) + window_seconds - floor(as.numeric(Sys.time()))
+  remaining <- as.numeric(last_fail) +
+    window_seconds -
+    floor(as.numeric(Sys.time()))
 
   max(0L, as.integer(remaining))
 }
@@ -192,15 +198,17 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
 
   key <- aa_login_key(login, settings)
 
-  if (!nzchar(key)) {
+  if (!nzchar(key) || !("login_attempts" %in% DBI::dbListTables(conn))) {
     return(invisible(0L))
   }
 
-  invisible(aa_execute(
-    conn,
-    "DELETE FROM login_attempts WHERE login = ? AND success = 0",
-    params = list(key)
-  ))
+  invisible(aa_write_section(conn, function() {
+    aa_execute(
+      conn,
+      "DELETE FROM login_attempts WHERE login = ? AND success = 0",
+      params = list(key)
+    )
+  }))
 }
 
 #' Can a login be attempted right now
@@ -218,7 +226,8 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
 #' @inheritParams aa_record_attempt
 #'
 #' @returns A list: `allowed` (`TRUE` or `FALSE`), `reason` (`NA`, `"throttled"`
-#'   for the global limit or `"locked"` for a login lockout), `seconds` (how many
+#'   for the global limit or `"locked"` for a login lockout), `seconds` (how
+#'   many
 #'   seconds are left until the login lockout ends, otherwise 0) and `message`
 #'   (text to show to the user in the settings language, `NA` if login is
 #'   allowed).
@@ -236,30 +245,49 @@ aa_clear_attempts <- function(conn, login, settings = aa_settings()) {
 aa_login_gate <- function(conn, login, settings = aa_settings()) {
   aa_check_conn(conn)
 
-  allowed <- list(allowed = TRUE, reason = NA_character_, seconds = 0L, message = NA_character_)
+  allowed <- list(
+    allowed = TRUE,
+    reason = NA_character_,
+    seconds = 0L,
+    message = NA_character_
+  )
 
-  tryCatch({
-    if (aa_global_throttled(conn, settings)) {
-      return(list(
-        allowed = FALSE, reason = "throttled", seconds = 0L,
-        message = aa_text(settings, "throttled")
-      ))
+  tryCatch(
+    {
+      if (aa_global_throttled(conn, settings)) {
+        return(list(
+          allowed = FALSE,
+          reason = "throttled",
+          seconds = 0L,
+          message = aa_text(settings, "throttled")
+        ))
+      }
+
+      seconds <- aa_login_lock_remaining(conn, login, settings)
+
+      if (seconds > 0) {
+        return(list(
+          allowed = FALSE,
+          reason = "locked",
+          seconds = seconds,
+          message = aa_text(
+            settings,
+            "locked",
+            max(1L, as.integer(ceiling(seconds / 60)))
+          )
+        ))
+      }
+
+      allowed
+    },
+    error = function(e) {
+      message(
+        "appauth: the login lockout check is unavailable: ",
+        conditionMessage(e)
+      )
+      allowed
     }
-
-    seconds <- aa_login_lock_remaining(conn, login, settings)
-
-    if (seconds > 0) {
-      return(list(
-        allowed = FALSE, reason = "locked", seconds = seconds,
-        message = aa_text(settings, "locked", max(1L, as.integer(ceiling(seconds / 60))))
-      ))
-    }
-
-    allowed
-  }, error = function(e) {
-    message("appauth: the login lockout check is unavailable: ", conditionMessage(e))
-    allowed
-  })
+  )
 }
 
 #' Users with statuses for a table
@@ -300,11 +328,19 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
 
   if (nrow(users) == 0) {
     return(data.frame(
-      login = character(), role = character(), blocked = integer(),
-      state = character(), lock_seconds = integer(), status = character(),
-      created_at = character(), last_login_at = character(),
-      created = character(), last_login = character(),
-      has_email = integer(), totp_on = integer(), autologins = integer(),
+      login = character(),
+      role = character(),
+      blocked = integer(),
+      state = character(),
+      lock_seconds = integer(),
+      status = character(),
+      created_at = character(),
+      last_login_at = character(),
+      created = character(),
+      last_login = character(),
+      has_email = integer(),
+      totp_on = integer(),
+      autologins = integer(),
       stringsAsFactors = FALSE
     ))
   }
@@ -335,35 +371,61 @@ aa_users_overview <- function(conn, settings = aa_settings()) {
   autologins <- autologin_counts$n[match(users$login, autologin_counts$login)]
   autologins[is.na(autologins)] <- 0L
 
-  lock_seconds <- vapply(users$login, function(login) {
-    tryCatch(aa_login_lock_remaining(conn, login, settings), error = function(e) 0L)
-  }, integer(1), USE.NAMES = FALSE)
+  lock_seconds <- vapply(
+    users$login,
+    function(login) {
+      tryCatch(
+        aa_login_lock_remaining(conn, login, settings),
+        error = function(e) 0L
+      )
+    },
+    integer(1),
+    USE.NAMES = FALSE
+  )
 
-  state <- ifelse(users$blocked == 1, "blocked", ifelse(lock_seconds > 0, "locked", "ok"))
+  state <- ifelse(
+    users$blocked == 1,
+    "blocked",
+    ifelse(lock_seconds > 0, "locked", "ok")
+  )
 
-  status <- vapply(seq_len(nrow(users)), function(i) {
-    switch(
-      state[i],
-      blocked = aa_text(settings, "status_blocked"),
-      locked  = aa_text(settings, "status_locked", max(1L, as.integer(ceiling(lock_seconds[i] / 60)))),
-      ""
-    )
-  }, character(1))
+  status <- vapply(
+    seq_len(nrow(users)),
+    function(i) {
+      switch(
+        state[i],
+        blocked = aa_text(settings, "status_blocked"),
+        locked = aa_text(
+          settings,
+          "status_locked",
+          max(1L, as.integer(ceiling(lock_seconds[i] / 60)))
+        ),
+        ""
+      )
+    },
+    character(1)
+  )
 
   data.frame(
-    login        = users$login,
-    role         = users$role,
-    blocked      = as.integer(users$blocked),
-    state        = state,
+    login = users$login,
+    role = users$role,
+    blocked = as.integer(users$blocked),
+    state = state,
     lock_seconds = lock_seconds,
-    status       = status,
-    created_at    = as.character(users$created_at),
+    status = status,
+    created_at = as.character(users$created_at),
     last_login_at = as.character(users$last_login_at),
-    created       = aa_format_db_time(users$created_at, aa_text(settings, "date_unknown")),
-    last_login    = aa_format_db_time(users$last_login_at, aa_text(settings, "date_never")),
-    has_email     = has_email,
-    totp_on       = totp_on,
-    autologins    = as.integer(autologins),
+    created = aa_format_db_time(
+      users$created_at,
+      aa_text(settings, "date_unknown")
+    ),
+    last_login = aa_format_db_time(
+      users$last_login_at,
+      aa_text(settings, "date_never")
+    ),
+    has_email = has_email,
+    totp_on = totp_on,
+    autologins = as.integer(autologins),
     stringsAsFactors = FALSE
   )
 }

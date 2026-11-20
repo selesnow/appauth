@@ -21,8 +21,10 @@ A vector of recovery codes (invisibly).
 }
 \description{
 Checks the app code against the pending secret (\code{\link[=aa_totp_setup]{aa_totp_setup()}}) and
-enables 2FA. Creates 10 recovery codes: \strong{they are returned once}, only hashes
-stay in the database. A wrong code raises an error of class \code{appauth_error_user}
+enables 2FA. Creates 10 recovery codes: \strong{they are returned once}, only
+hashes
+stay in the database. A wrong code raises an error of class
+\code{appauth_error_user}
 (\code{reason = "totp_wrong"}).
 }
 \examples{
@@ -30,7 +32,8 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   conn <- DBI::dbConnect(RSQLite::SQLite(), ":memory:")
   aa_init_db(conn)
   aa_create_first_admin(conn, "boss", "boss-password")
-  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-example")
+  settings <- aa_settings(totp_enabled = TRUE, totp_key =
+  "a-long-random-key-for-the-example")
   setup <- aa_totp_setup(conn, "boss", settings)
   codes <- aa_totp_enable(conn, "boss", aa_totp_code(setup$secret), settings)
   length(codes)

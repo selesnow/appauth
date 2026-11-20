@@ -95,7 +95,10 @@ test_that("after a series of failures the login is locked, the correct password 
     expect_false(session$returned$logged_in())
   })
 
-  expect_equal(log$names(), c("login_failed", "login_failed", "login_locked", "login_locked"))
+  expect_equal(
+    log$names(),
+    c("login_failed", "login_failed", "login_locked", "login_locked")
+  )
   # attempts during a lock are not recorded and do not extend it
   expect_equal(count_attempts(con), 3)
 })
@@ -119,7 +122,10 @@ test_that("locking one login does not affect another, login case matters", {
 
 test_that("the global failure limit per minute stops sign-in", {
   con <- auth_db()
-  settings <- aa_settings(max_failed_logins_per_minute = 2, max_failed_logins = 50)
+  settings <- aa_settings(
+    max_failed_logins_per_minute = 2,
+    max_failed_logins = 50
+  )
 
   log <- run_auth(con, settings = settings, {
     session$setInputs(login = "a", password = "x", login_btn = 1)
@@ -173,15 +179,30 @@ test_that("empty database: administrator creation form, checks and creation", {
     expect_match(html, "Create administrator", fixed = TRUE)
     expect_false(grepl("login_btn", html, fixed = TRUE))
 
-    session$setInputs(setup_login = "boss", setup_password = "secret123", setup_confirm = "other", setup_btn = 1)
+    session$setInputs(
+      setup_login = "boss",
+      setup_password = "secret123",
+      setup_confirm = "other",
+      setup_btn = 1
+    )
     expect_equal(output$message, "Passwords do not match")
     expect_equal(count_users(con), 0)
 
-    session$setInputs(setup_login = "boss", setup_password = "123", setup_confirm = "123", setup_btn = 2)
+    session$setInputs(
+      setup_login = "boss",
+      setup_password = "123",
+      setup_confirm = "123",
+      setup_btn = 2
+    )
     expect_match(output$message, "Password")
     expect_equal(count_users(con), 0)
 
-    session$setInputs(setup_login = "boss", setup_password = "secret123", setup_confirm = "secret123", setup_btn = 3)
+    session$setInputs(
+      setup_login = "boss",
+      setup_password = "secret123",
+      setup_confirm = "secret123",
+      setup_btn = 3
+    )
     expect_true(session$returned$logged_in())
     expect_equal(session$returned$user(), list(login = "boss", role = "admin"))
   })
@@ -197,7 +218,12 @@ test_that("administrator creation does not work if a user has appeared already",
   run_auth(con, {
     session$flushReact()
     aa_create_user(con, "early", "secret123", "admin")
-    session$setInputs(setup_login = "late", setup_password = "secret123", setup_confirm = "secret123", setup_btn = 1)
+    session$setInputs(
+      setup_login = "late",
+      setup_password = "secret123",
+      setup_confirm = "secret123",
+      setup_btn = 1
+    )
     expect_false(session$returned$logged_in())
   })
 
@@ -294,14 +320,20 @@ test_that("after sign-out the cookie no longer works", {
 test_that("title and texts come from the settings, logo and Russian language", {
   con <- auth_db()
 
-  run_auth(con, settings = aa_settings(texts = aa_texts("ru")), title = "My App", logo = "logo.png", {
-    session$flushReact()
-    html <- form_html(output)
-    expect_match(html, "My App", fixed = TRUE)
-    expect_match(html, "logo.png", fixed = TRUE)
-    expect_match(html, aa_text(aa_texts("ru"), "login_button"), fixed = TRUE)
-    expect_false(grepl("Sign in", html, fixed = TRUE))
-  })
+  run_auth(
+    con,
+    settings = aa_settings(texts = aa_texts("ru")),
+    title = "My App",
+    logo = "logo.png",
+    {
+      session$flushReact()
+      html <- form_html(output)
+      expect_match(html, "My App", fixed = TRUE)
+      expect_match(html, "logo.png", fixed = TRUE)
+      expect_match(html, aa_text(aa_texts("ru"), "login_button"), fixed = TRUE)
+      expect_false(grepl("Sign in", html, fixed = TRUE))
+    }
+  )
 })
 
 test_that("an event hook failure does not prevent sign-in", {

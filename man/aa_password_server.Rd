@@ -15,16 +15,21 @@ aa_password_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
 
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 
-\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or \code{NULL}.}
+\item{on_event}{Event hook \verb{function(event, user, session_id, value)} or
+\code{NULL}.}
 }
 \value{
-A list with the reactive value \code{changed}: the number of successful password changes in
+A list with the reactive value \code{changed}: the number of successful
+password changes in
 this session (can be used to close a window or show a message).
 }
 \description{
-The user confirms the current password and sets a new one (\code{\link[=aa_change_own_password]{aa_change_own_password()}}).
-Auto-login tokens of the other sessions are revoked, the current session keeps
-working. The module reports the change to the \code{on_event} hook with the \code{password_changed} event.
+The user confirms the current password and sets a new one
+(\code{\link[=aa_change_own_password]{aa_change_own_password()}}).
+Auto-login tokens of the other sessions are revoked, the current session
+keeps
+working. The module reports the change to the \code{on_event} hook with the
+\code{password_changed} event.
 }
 \examples{
 \dontrun{

@@ -5,7 +5,9 @@ capture_card <- function(env = parent.frame()) {
   store <- new.env()
   store$html <- NULL
   testthat::local_mocked_bindings(
-    showModal = function(ui, ...) store$html <- paste(as.character(ui), collapse = ""),
+    showModal = function(ui, ...) {
+      store$html <- paste(as.character(ui), collapse = "")
+    },
     .package = "shiny",
     .env = env
   )
@@ -22,7 +24,9 @@ card_users <- function(env = parent.frame()) {
 
 open_card <- function(con, login, acting = "alsey", ..., prepare = NULL) {
   card <- capture_card(parent.frame())
-  if (is.function(prepare)) prepare(con)
+  if (is.function(prepare)) {
+    prepare(con)
+  }
   run_users(con, auth = fake_auth(acting, "admin"), ..., {
     session$setInputs(open = login)
   })
@@ -44,7 +48,9 @@ test_that("card of an active user: actions, role, password, deletion", {
 
 test_that("card of a blocked user: only unblocking", {
   con <- card_users()
-  html <- open_card(con, "ivan", prepare = function(con) aa_set_blocked(con, "ivan", TRUE, acting_login = "alsey"))
+  html <- open_card(con, "ivan", prepare = function(con) {
+    aa_set_blocked(con, "ivan", TRUE, acting_login = "alsey")
+  })
 
   expect_match(html, "proxy1-unblock", fixed = TRUE)
   expect_false(grepl("proxy1-block\"", html, fixed = TRUE))
@@ -76,7 +82,9 @@ test_that("own card has no block and delete buttons, the deletion reason is show
 test_that("a login with HTML and scripts is escaped in the card", {
   con <- card_users()
   evil <- "<img src=x onerror=alert(1)>"
-  html <- open_card(con, evil, prepare = function(con) raw_user(con, evil, "user"))
+  html <- open_card(con, evil, prepare = function(con) {
+    raw_user(con, evil, "user")
+  })
 
   expect_false(grepl("<img src=x", html, fixed = TRUE))
   expect_match(html, "&lt;img src=x onerror=alert(1)&gt;", fixed = TRUE)
@@ -85,8 +93,14 @@ test_that("a login with HTML and scripts is escaped in the card", {
 test_that("the card slot is rendered in the window, ids get the namespace", {
   con <- card_users()
   html <- open_card(
-    con, "ivan",
-    extra_card_ui = function(login, ns) shiny::div(class = "my-extra", shiny::actionButton(ns("my_btn"), paste("Projects", login)))
+    con,
+    "ivan",
+    extra_card_ui = function(login, ns) {
+      shiny::div(
+        class = "my-extra",
+        shiny::actionButton(ns("my_btn"), paste("Projects", login))
+      )
+    }
   )
 
   expect_match(html, "my-extra", fixed = TRUE)
@@ -96,7 +110,13 @@ test_that("the card slot is rendered in the window, ids get the namespace", {
 
 test_that("card with a custom text override", {
   con <- card_users()
-  html <- open_card(con, "ivan", settings = aa_settings(texts = aa_texts("en", button_block = "Lock account")))
+  html <- open_card(
+    con,
+    "ivan",
+    settings = aa_settings(
+      texts = aa_texts("en", button_block = "Lock account")
+    )
+  )
 
   expect_match(html, "User: ivan", fixed = TRUE)
   expect_match(html, "Lock account", fixed = TRUE)
@@ -120,7 +140,11 @@ test_that("temporary password checkbox on reset: on by default, a setting turns 
   con <- card_users()
 
   html_on <- open_card(con, "ivan")
-  html_off <- open_card(con, "ivan", settings = aa_settings(must_change_default = FALSE))
+  html_off <- open_card(
+    con,
+    "ivan",
+    settings = aa_settings(must_change_default = FALSE)
+  )
 
   expect_true(checkbox_checked(html_on, "proxy1-reset_must_change"))
   expect_match(html_off, "proxy1-reset_must_change", fixed = TRUE)

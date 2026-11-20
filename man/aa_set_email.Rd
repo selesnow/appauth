@@ -17,13 +17,16 @@ aa_set_email(conn, login, email, settings = aa_settings())
 \item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}.}
 }
 \value{
-\code{TRUE} if the address was saved and \code{FALSE} if it was removed (invisibly).
+\code{TRUE} if the address was saved and \code{FALSE} if it was removed
+(invisibly).
 }
 \description{
 The address is needed for password recovery (\code{\link[=aa_request_password_reset]{aa_request_password_reset()}}).
 It is stored in lower case, and two users cannot have the same address.
-An empty value (\code{NULL}, \code{NA} or \code{""}) removes the address. Errors (invalid format,
-address taken, no such user) have the class \code{appauth_error_user} and a text in the
+An empty value (\code{NULL}, \code{NA} or \code{""}) removes the address. Errors (invalid
+format,
+address taken, no such user) have the class \code{appauth_error_user} and a text
+in the
 settings language.
 }
 \examples{

@@ -85,7 +85,7 @@ Weak passwords such as `root`/`root` after a migration will be found by `aa_chec
 
 # Password reset by email and nginx
 
-If `reset_enabled` is on, the link in the email is built from `reset_base_url`. It must match what the user sees in the browser: the `https://` scheme, the host name and the prefix under which the app is published in nginx. If the address is wrong, the user will get a link that leads past the app.
+If `reset_enabled` is on, the link in the email is built from `reset_base_url`. It must match what the user sees in the browser: the `https://` scheme, the host name and the prefix under which the app is published in nginx. The package rejects addresses that do not start with `https://`, except for `http://127.0.0.1` and `http://localhost` in local development, because a recovery token in an `http://` link can be intercepted. If the address is wrong, the user will get a link that leads past the app.
 
 * The link token is single-use and lives for `reset_ttl_minutes` minutes, but while it is valid it is visible in the nginx access log (`$request_uri`). Do not hand logs to outsiders, and if needed write only the path without parameters to the log (`$uri` instead of `$request_uri` in `log_format`).
 * Emails are sent from the app session, so the process needs mail credentials (environment variables, not a file in the repository).

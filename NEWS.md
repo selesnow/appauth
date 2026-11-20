@@ -1,3 +1,29 @@
+# 2026-11-19 | CLAUDE CODE (Alsey)
+Implemented the remaining audit recommendations: transaction wrappers for
+login protection and user management, atomic Google sign-in with
+`must_change`, expanded tests and snapshots, generated a hex logo, configured
+pkgdown at https://alexey-seleznev.pro/appauth/, and added CI package checks.
+
+# appauth 0.10.1
+
+A maintenance release with audit fixes and documentation improvements. The
+database schema is unchanged.
+
+* Login attempts, account protection, password changes and user management
+  writes now run in database transactions; MySQL and PostgreSQL use lock
+  primitives, and DuckDB uses a reentrant write section without savepoints.
+* After a Google sign-in, a user with `must_change = 1` is asked for a new
+  password before a session is created. The form does not ask for the old
+  password because ownership was confirmed by Google.
+* `aa_settings(reset_base_url = ...)` now rejects addresses that do not start
+  with `https://`, so recovery tokens are not sent over an unencrypted link.
+* Added regression tests, snapshots of user-facing errors, database backend
+  test documentation and tests for the bundled skills.
+* Regenerated AI skill references for 0.10.1 and added `aa_install_skills()`
+  to the pkgdown reference index.
+* Added a hex logo, configured the pkgdown site and enabled package checks in
+  GitLab CI.
+
 # appauth 0.10.0
 
 A release that prepares the package for CRAN: everything is now in English. The database schema and the function signatures (except the new arguments below) do not change.

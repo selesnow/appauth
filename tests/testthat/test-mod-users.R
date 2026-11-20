@@ -8,12 +8,19 @@ test_that("an administrator sees the table, other roles see nothing", {
   run_users(con, {
     session$flushReact()
     expect_false(is.null(output$main$html))
-    expect_match(paste(as.character(output$main$html), collapse = ""), "table", fixed = TRUE)
+    expect_match(
+      paste(as.character(output$main$html), collapse = ""),
+      "table",
+      fixed = TRUE
+    )
   })
 
   run_users(con, auth = fake_auth("ivan", "user"), {
     session$flushReact()
-    expect_true(is.null(output$main$html) || !nzchar(paste(as.character(output$main$html), collapse = "")))
+    expect_true(
+      is.null(output$main$html) ||
+        !nzchar(paste(as.character(output$main$html), collapse = ""))
+    )
   })
 })
 
@@ -27,7 +34,10 @@ test_that("the table contains users and highlights blocks", {
     data <- overview()
     expect_setequal(data$login, c("alsey", "boss", "ivan"))
     expect_equal(data$state[data$login == "ivan"], "blocked")
-    expect_equal(data$status[data$login == "ivan"], "Blocked by an administrator")
+    expect_equal(
+      data$status[data$login == "ivan"],
+      "Blocked by an administrator"
+    )
     expect_false("password" %in% names(data))
 
     json <- paste(as.character(output$table), collapse = "")
@@ -43,19 +53,41 @@ test_that("adding: password mismatch, weak password, duplicate, success", {
   log <- run_users(con, {
     session$setInputs(add = 1)
 
-    session$setInputs(new_login = "olga", new_user_password = "secret123", new_user_confirm = "other", new_user_role = "user", add_confirm = 1)
+    session$setInputs(
+      new_login = "olga",
+      new_user_password = "secret123",
+      new_user_confirm = "other",
+      new_user_role = "user",
+      add_confirm = 1
+    )
     expect_equal(output$add_message, "Passwords do not match")
     expect_equal(count_users(con), 3)
 
-    session$setInputs(new_login = "olga", new_user_password = "123", new_user_confirm = "123", add_confirm = 2)
+    session$setInputs(
+      new_login = "olga",
+      new_user_password = "123",
+      new_user_confirm = "123",
+      add_confirm = 2
+    )
     expect_match(output$add_message, "at least")
     expect_equal(count_users(con), 3)
 
-    session$setInputs(new_login = "IVAN", new_user_password = "secret123", new_user_confirm = "secret123", add_confirm = 3)
+    session$setInputs(
+      new_login = "IVAN",
+      new_user_password = "secret123",
+      new_user_confirm = "secret123",
+      add_confirm = 3
+    )
     expect_match(output$add_message, "already exists")
     expect_equal(count_users(con), 3)
 
-    session$setInputs(new_login = "olga", new_user_password = "secret123", new_user_confirm = "secret123", new_user_role = "viewer", add_confirm = 4)
+    session$setInputs(
+      new_login = "olga",
+      new_user_password = "secret123",
+      new_user_confirm = "secret123",
+      new_user_role = "viewer",
+      add_confirm = 4
+    )
     expect_equal(count_users(con), 4)
   })
 
@@ -71,7 +103,13 @@ test_that("an invalid role is rejected when adding", {
 
   run_users(con, {
     session$setInputs(add = 1)
-    session$setInputs(new_login = "olga", new_user_password = "secret123", new_user_confirm = "secret123", new_user_role = "superuser", add_confirm = 1)
+    session$setInputs(
+      new_login = "olga",
+      new_user_password = "secret123",
+      new_user_confirm = "secret123",
+      new_user_role = "superuser",
+      add_confirm = 1
+    )
     expect_match(output$add_message, "role", ignore.case = TRUE)
   })
 
@@ -134,7 +172,9 @@ test_that("the last active administrator cannot be blocked, deleted or demoted",
 test_that("removing the sign-in lock clears failed attempts", {
   con <- users_fixture()
   settings <- aa_settings(max_failed_logins = 3)
-  for (i in 1:3) add_attempt(con, "ivan", FALSE)
+  for (i in 1:3) {
+    add_attempt(con, "ivan", FALSE)
+  }
   expect_gt(aa_login_lock_remaining(con, "ivan", settings), 0)
 
   log <- run_users(con, settings = settings, {
@@ -169,13 +209,25 @@ test_that("password reset: a mismatch is rejected, success changes the password 
   log <- run_users(con, {
     session$setInputs(open = "ivan")
 
-    session$setInputs(new_password = "newpass123", new_password_confirm = "different", reset_password = 1)
+    session$setInputs(
+      new_password = "newpass123",
+      new_password_confirm = "different",
+      reset_password = 1
+    )
     expect_false(is.null(aa_authenticate(con, "ivan", "secret123")))
 
-    session$setInputs(new_password = "123", new_password_confirm = "123", reset_password = 2)
+    session$setInputs(
+      new_password = "123",
+      new_password_confirm = "123",
+      reset_password = 2
+    )
     expect_false(is.null(aa_authenticate(con, "ivan", "secret123")))
 
-    session$setInputs(new_password = "newpass123", new_password_confirm = "newpass123", reset_password = 3)
+    session$setInputs(
+      new_password = "newpass123",
+      new_password_confirm = "newpass123",
+      reset_password = 3
+    )
   })
 
   expect_null(aa_authenticate(con, "ivan", "secret123"))
@@ -203,7 +255,14 @@ test_that("an action without an open card does nothing: the target does not come
   con <- users_fixture()
 
   log <- run_users(con, {
-    session$setInputs(delete = 1, delete_confirm = 1, block = 1, role = "viewer", change_role = 1, unlock = 1)
+    session$setInputs(
+      delete = 1,
+      delete_confirm = 1,
+      block = 1,
+      role = "viewer",
+      change_role = 1,
+      unlock = 1
+    )
   })
 
   expect_equal(count_users(con), 3)
@@ -233,7 +292,12 @@ test_that("a non-administrator cannot perform actions, the denial goes to events
     session$setInputs(open = "boss")
     session$setInputs(block = 1)
     session$setInputs(add = 1)
-    session$setInputs(new_login = "x1", new_user_password = "secret123", new_user_confirm = "secret123", add_confirm = 1)
+    session$setInputs(
+      new_login = "x1",
+      new_user_password = "secret123",
+      new_user_confirm = "secret123",
+      add_confirm = 1
+    )
   })
 
   expect_equal(blocked_of(con, "boss"), 0)
@@ -276,14 +340,19 @@ test_that("slot: the server part is called once and sees the login of the open c
     seen$login <- login
   }
 
-  run_users(con, extra_card_server = slot_server, extra_card_ui = function(login, ns) NULL, {
-    expect_equal(seen$calls, 1)
-    session$setInputs(open = "ivan")
-    expect_equal(seen$login(), "ivan")
-    session$setInputs(open = "boss")
-    expect_equal(seen$login(), "boss")
-    expect_equal(seen$calls, 1)
-  })
+  run_users(
+    con,
+    extra_card_server = slot_server,
+    extra_card_ui = function(login, ns) NULL,
+    {
+      expect_equal(seen$calls, 1)
+      session$setInputs(open = "ivan")
+      expect_equal(seen$login(), "ivan")
+      session$setInputs(open = "boss")
+      expect_equal(seen$login(), "boss")
+      expect_equal(seen$calls, 1)
+    }
+  )
 })
 
 test_that("the UI slot receives the login and the namespace function", {
@@ -344,7 +413,10 @@ test_that("after sign-out (no user) the table does not record an access denial",
 
 test_that("the table shows email, 2FA and auto-logins as check marks and numbers", {
   con <- users_fixture()
-  settings <- aa_settings(totp_enabled = TRUE, totp_key = "a-long-random-key-for-the-tests")
+  settings <- aa_settings(
+    totp_enabled = TRUE,
+    totp_key = "a-long-random-key-for-the-tests"
+  )
   aa_set_email(con, "ivan", "ivan@example.com", settings)
   aa_issue_token(con, "ivan")
 

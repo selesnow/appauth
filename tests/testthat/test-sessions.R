@@ -22,7 +22,10 @@ test_that("tokens are unique", {
   con <- users_db()
   raw_user(con, "ivan")
 
-  expect_false(identical(aa_issue_token(con, "ivan"), aa_issue_token(con, "ivan")))
+  expect_false(identical(
+    aa_issue_token(con, "ivan"),
+    aa_issue_token(con, "ivan")
+  ))
 })
 
 test_that("the token lifetime comes from the settings", {
@@ -59,7 +62,10 @@ test_that("the token finds the user with the current role", {
   raw_user(con, "ivan", "user")
   token <- aa_issue_token(con, "ivan")
 
-  expect_equal(aa_find_session_user(con, token), list(login = "ivan", role = "user"))
+  expect_equal(
+    aa_find_session_user(con, token),
+    list(login = "ivan", role = "user")
+  )
 
   aa_set_role(con, "ivan", "admin")
   expect_equal(aa_find_session_user(con, token)$role, "admin")
@@ -76,7 +82,10 @@ test_that("a foreign, empty and corrupted token lets nobody in", {
   expect_null(aa_find_session_user(con, NULL))
   expect_null(aa_find_session_user(con, c(token, token)))
   # the hash from the database does not work as a token
-  expect_null(aa_find_session_user(con, rows_of(con, "auth_sessions")$token_hash))
+  expect_null(aa_find_session_user(
+    con,
+    rows_of(con, "auth_sessions")$token_hash
+  ))
 })
 
 test_that("expired and revoked tokens do not work", {
@@ -84,7 +93,10 @@ test_that("expired and revoked tokens do not work", {
   raw_user(con, "ivan")
   token <- aa_issue_token(con, "ivan")
 
-  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')")
+  texec(
+    con,
+    "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds')"
+  )
   expect_null(aa_find_session_user(con, token))
 
   texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '+1 days')")
@@ -167,8 +179,11 @@ test_that("legacy tokens (sha256 as text) keep working", {
   con <- new_db()
   fixture_legacy_full(con)
   aa_init_db(con)
-  texec(con, "UPDATE auth_sessions SET token_hash = ? WHERE token_hash = 'tok1'",
-                 params = list(as.character(openssl::sha256("raw-cookie"))))
+  texec(
+    con,
+    "UPDATE auth_sessions SET token_hash = ? WHERE token_hash = 'tok1'",
+    params = list(as.character(openssl::sha256("raw-cookie")))
+  )
 
   expect_equal(aa_find_session_user(con, "raw-cookie")$login, "alsey")
 })
@@ -215,7 +230,10 @@ test_that("a role change takes effect for a promotion as well", {
   raw_user(con, "ivan", "user")
   aa_set_role(con, "ivan", "admin")
 
-  expect_equal(aa_user_session_valid(con, "ivan", "user")$reason, "role_changed")
+  expect_equal(
+    aa_user_session_valid(con, "ivan", "user")$reason,
+    "role_changed"
+  )
 })
 
 test_that("live session check does not kick out the user on a database failure", {
@@ -259,7 +277,11 @@ test_that("aa_active_autologins counts only active autologin tokens", {
   aa_revoke_token(con, t1)
   expect_identical(aa_active_autologins(con, "ivan"), 1L)
 
-  texec(con, "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds') WHERE token_hash = ?", params = list(aa_token_hash(t2)))
+  texec(
+    con,
+    "UPDATE auth_sessions SET expires_at = datetime('now', '-1 seconds') WHERE token_hash = ?",
+    params = list(aa_token_hash(t2))
+  )
   expect_identical(aa_active_autologins(con, "ivan"), 0L)
   expect_identical(aa_active_autologins(con, "olga"), 1L)
 })

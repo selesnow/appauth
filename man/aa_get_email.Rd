@@ -14,7 +14,8 @@ aa_get_email(conn, login)
 }
 \value{
 The address in lower case or \code{NA_character_} if no address is set or
-the user does not exist. If the schema is not upgraded to version 7, also \code{NA_character_}.
+the user does not exist. If the schema is not upgraded to version 7, also
+\code{NA_character_}.
 }
 \description{
 User email

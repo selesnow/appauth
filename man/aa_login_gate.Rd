@@ -16,7 +16,8 @@ aa_login_gate(conn, login, settings = aa_settings())
 }
 \value{
 A list: \code{allowed} (\code{TRUE} or \code{FALSE}), \code{reason} (\code{NA}, \code{"throttled"}
-for the global limit or \code{"locked"} for a login lockout), \code{seconds} (how many
+for the global limit or \code{"locked"} for a login lockout), \code{seconds} (how
+many
 seconds are left until the login lockout ends, otherwise 0) and \code{message}
 (text to show to the user in the settings language, \code{NA} if login is
 allowed).

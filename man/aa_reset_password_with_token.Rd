@@ -20,16 +20,22 @@ aa_reset_password_with_token(conn, token, password, settings = aa_settings())
 The login of the user whose password was changed (invisibly).
 }
 \description{
-Checks the token (\code{\link[=aa_reset_token_login]{aa_reset_token_login()}}), checks the new password against the rules
-from the settings and writes it. The token is one-time: a weak password is rejected
-with an error and does not spend the token, and after a successful change the link stops
-working. Along with the password, all of the user's auto-login tokens are revoked, the
-other recovery links are consumed, and the password change requirement and the
+Checks the token (\code{\link[=aa_reset_token_login]{aa_reset_token_login()}}), checks the new password against
+the rules
+from the settings and writes it. The token is one-time: a weak password is
+rejected
+with an error and does not spend the token, and after a successful change the
+link stops
+working. Along with the password, all of the user's auto-login tokens are
+revoked, the
+other recovery links are consumed, and the password change requirement and
+the
 lock for failed login attempts are cleared.
 }
 \details{
 A wrong, expired or used link raises an error of class
-\code{appauth_error_user} with \code{reason = "reset_link_invalid"}, a weak password an error
+\code{appauth_error_user} with \code{reason = "reset_link_invalid"}, a weak password an
+error
 of the same class with a password reason.
 }
 \examples{

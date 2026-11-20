@@ -19,17 +19,22 @@ aa_password_ui <- function(id) {
 
 #' Own password change module: server
 #'
-#' The user confirms the current password and sets a new one ([aa_change_own_password()]).
-#' Auto-login tokens of the other sessions are revoked, the current session keeps
-#' working. The module reports the change to the `on_event` hook with the `password_changed` event.
+#' The user confirms the current password and sets a new one
+#' ([aa_change_own_password()]).
+#' Auto-login tokens of the other sessions are revoked, the current session
+#' keeps
+#' working. The module reports the change to the `on_event` hook with the
+#' `password_changed` event.
 #'
 #' @param id Module id, the same as in [aa_password_ui()].
 #' @param conn Database connection.
 #' @param auth Authentication object, the result of [aa_auth_server()].
 #' @param settings Settings, the result of [aa_settings()].
-#' @param on_event Event hook `function(event, user, session_id, value)` or `NULL`.
+#' @param on_event Event hook `function(event, user, session_id, value)` or
+#' `NULL`.
 #'
-#' @returns A list with the reactive value `changed`: the number of successful password changes in
+#' @returns A list with the reactive value `changed`: the number of successful
+#' password changes in
 #'   this session (can be used to close a window or show a message).
 #' @seealso [aa_password_ui()]
 #' @export
@@ -39,7 +44,13 @@ aa_password_ui <- function(id) {
 #' auth <- aa_auth_server("auth", conn)
 #' aa_password_server("password", conn, auth, on_event = log_event)
 #' }
-aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_event = NULL) {
+aa_password_server <- function(
+  id,
+  conn,
+  auth,
+  settings = aa_settings(),
+  on_event = NULL
+) {
   aa_check_conn(conn)
 
   shiny::moduleServer(id, function(input, output, session) {
@@ -56,10 +67,23 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
       shiny::div(
         class = "aa-password",
         shiny::h4(aa_text(settings, "password_change_title")),
-        shiny::passwordInput(ns("old"), aa_text(settings, "password_old_label")),
-        shiny::passwordInput(ns("new"), aa_text(settings, "password_new_label")),
-        shiny::passwordInput(ns("confirm"), aa_text(settings, "password_confirm_label")),
-        shiny::actionButton(ns("change"), aa_text(settings, "password_change_button"), class = "btn btn-primary"),
+        shiny::passwordInput(
+          ns("old"),
+          aa_text(settings, "password_old_label")
+        ),
+        shiny::passwordInput(
+          ns("new"),
+          aa_text(settings, "password_new_label")
+        ),
+        shiny::passwordInput(
+          ns("confirm"),
+          aa_text(settings, "password_confirm_label")
+        ),
+        shiny::actionButton(
+          ns("change"),
+          aa_text(settings, "password_change_button"),
+          class = "btn btn-primary"
+        ),
         shiny::div(class = "aa-login-message", shiny::textOutput(ns("message")))
       )
     })
@@ -81,7 +105,14 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
 
       ok <- tryCatch(
         {
-          aa_change_own_password(conn, user$login, input$old, input$new, settings, keep_token = token)
+          aa_change_own_password(
+            conn,
+            user$login,
+            input$old,
+            input$new,
+            settings,
+            keep_token = token
+          )
           TRUE
         },
         appauth_error_user = function(e) {
@@ -95,12 +126,21 @@ aa_password_server <- function(id, conn, auth, settings = aa_settings(), on_even
         message_text("")
         form_version(form_version() + 1)
         changed(changed() + 1)
-        shiny::showNotification(aa_text(settings, "done_password_changed"), type = "message")
+        shiny::showNotification(
+          aa_text(settings, "done_password_changed"),
+          type = "message"
+        )
 
         # with password_policy = "warn" a weak password is accepted, but we report it
         weak <- aa_password_warning(new_password, settings, user$login)
         if (!is.null(weak)) {
-          aa_emit(on_event, "weak_password_set", user$login, session$token, paste0(user$login, ": ", weak$reason))
+          aa_emit(
+            on_event,
+            "weak_password_set",
+            user$login,
+            session$token,
+            paste0(user$login, ": ", weak$reason)
+          )
           shiny::showNotification(weak$text, type = "warning")
         }
       }

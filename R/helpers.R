@@ -41,8 +41,13 @@
 #'   auth <- aa_auth_server("auth", conn)
 #' }
 #' }
-aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultReactiveDomain(),
-                                  prepare = FALSE, settings = aa_settings(), connect = NULL) {
+aa_session_connection <- function(
+  db_path = NULL,
+  session = shiny::getDefaultReactiveDomain(),
+  prepare = FALSE,
+  settings = aa_settings(),
+  connect = NULL
+) {
   if (is.null(connect) && !aa_is_string(db_path)) {
     rlang::abort(
       "`db_path` must be a path to the database file (or pass `connect`).",
@@ -66,7 +71,10 @@ aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultRea
 
   if (is.null(connect)) {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
-      rlang::abort("The RSQLite package is required to work with the database.", class = "appauth_error_connection")
+      rlang::abort(
+        "The RSQLite package is required to work with the database.",
+        class = "appauth_error_connection"
+      )
     }
 
     conn <- DBI::dbConnect(RSQLite::SQLite(), db_path)
@@ -118,8 +126,13 @@ aa_session_connection <- function(db_path = NULL, session = shiny::getDefaultRea
 #' auth <- aa_auth_server("auth", conn)
 #' aa_session_guard(auth, conn)
 #' }
-aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE,
-                             cleanup_minutes = 60) {
+aa_session_guard <- function(
+  auth,
+  conn,
+  settings = aa_settings(),
+  reload = TRUE,
+  cleanup_minutes = 60
+) {
   aa_check_conn(conn)
 
   interval <- max(1, settings$session_check_seconds) * 1000
@@ -139,7 +152,10 @@ aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE
     }
 
     # the service runs for months: clean outdated attempts and tokens as we go
-    if (as.numeric(difftime(Sys.time(), last_cleanup, units = "mins")) >= cleanup_minutes) {
+    if (
+      as.numeric(difftime(Sys.time(), last_cleanup, units = "mins")) >=
+        cleanup_minutes
+    ) {
       last_cleanup <<- Sys.time()
       try(aa_cleanup(conn, settings), silent = TRUE)
     }
@@ -170,11 +186,15 @@ aa_session_guard <- function(auth, conn, settings = aa_settings(), reload = TRUE
 #' @examples
 #' \dontrun{
 #' provider <- aa_permissions_from_matrix(conf$access_management)
-#' aa_register_module(auth, "Tasks", provider, function() mod_tasks_server("tasks"))
+#' aa_register_module(auth, "Tasks", provider, function()
+#' mod_tasks_server("tasks"))
 #' }
 aa_register_module <- function(auth, permission, provider, server) {
   if (!is.function(server)) {
-    rlang::abort("`server` must be a function without arguments.", class = "appauth_error_permissions")
+    rlang::abort(
+      "`server` must be a function without arguments.",
+      class = "appauth_error_permissions"
+    )
   }
 
   started <- FALSE

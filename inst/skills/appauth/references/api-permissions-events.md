@@ -1,6 +1,6 @@
 # appauth reference: Permissions and events
 
-Package version: 0.8.0. This file was generated automatically from the package help pages (`dev/skills/build_reference.R`) and is not edited by hand.
+Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()`, `aa_events()`, `aa_event_logger()`
@@ -12,9 +12,9 @@ Permission provider from a "permission -> roles" matrix
 
 Description:
 
-     Creates a permission source ('provider') for 'aa_can()' and 'aa_require()' from a
-     simple scheme: a named list where the name is the permission and the value is the
-     roles it is granted to (a vector or a single string).
+     Creates a permission provider ('provider') for 'aa_can()' and 'aa_require()' from a
+     named list, where the name is a permission and the value is the roles that hold it
+     (a vector or a single string).
 
 Usage:
 
@@ -22,22 +22,22 @@ Usage:
      
 Arguments:
 
-  matrix: A named "permission -> roles" list, or a function without arguments that
+  matrix: A named list "permission -> roles", or a function without arguments that
           returns such a list.
 
 Details:
 
-     The administrator role does not get permissions automatically: a permission belongs
-     only to the roles listed in the matrix.
+     The administrator role does not receive permissions automatically: a permission is
+     held only by the roles listed in the matrix.
 
-     If the matrix changes while the application is running (a permission editor), pass a
+     If the matrix changes while the app is running (a permission editor), pass a
      function without arguments that returns the current matrix, for example 'function()
-     conf_rv()$access_managemet'. Then it is read on every check.
+     conf_rv()$access_matrix'. It is then read on every check.
 
      A permission provider is any function function(user) that returns a vector of the
-     user's permission names. If a matrix does not suit you (permissions per user from
-     the database, by group), write such a function yourself: the other package functions
-     work with it in the same way.
+     user's permission names. If a matrix does not suit you (per-user permissions from a
+     database, group-based permissions), write such a function yourself: the other
+     package functions treat it the same way.
 
 Value:
 
@@ -61,8 +61,8 @@ Does the user have a permission
 
 Description:
 
-     A server-side permission check. Hiding buttons and tabs is not protection, so this
-     must be called in every action handler (see 'aa_require()').
+     Server-side permission check. Hiding buttons and tabs is not protection, so call
+     this in every action handler (see 'aa_require()').
 
 Usage:
 
@@ -70,12 +70,12 @@ Usage:
      
 Arguments:
 
-    user: The user: a list with the fields 'login' and 'role', for example 'auth$user()'.
-          The role must be taken from the server state, not from 'input'.
+    user: The user: a list with 'login' and 'role' fields, for example 'auth$user()'.
+          Take the role from server-side state, not from 'input'.
 
-permission: The permission name (one non-empty string).
+permission: Permission name (a single non-empty string).
 
-provider: The permission source: a function function(user) that returns a vector of
+provider: Permission provider: a function function(user) that returns a vector of
           permission names, for example the result of 'aa_permissions_from_matrix()'.
 
 Details:
@@ -102,10 +102,10 @@ Require a permission in an action handler
 
 Description:
 
-     Called as the first line of a handler. If the permission is present, returns 'TRUE'.
-     If not, reports the 'access_denied' event to the 'on_event' hook (the permission name
-     in 'value'), shows the user a notification and quietly aborts the handler via
-     'shiny::req()'.
+     Call it on the first line of a handler. If the user has the permission, it returns
+     'TRUE'. If not, it reports an 'access_denied' event to the 'on_event' hook (the
+     permission name goes into 'value'), shows the user a notification and quietly aborts
+     the handler through 'shiny::req()'.
 
 Usage:
 
@@ -120,18 +120,18 @@ Usage:
      
 Arguments:
 
-    auth: The authentication object (a list with the reactive 'user' value, as returned
-          by the sign-in module) or the user itself (a list with 'login' and 'role').
+    auth: The authorization object (a list with a reactive 'user' value, as returned by
+          the login module) or the user itself (a list with 'login' and 'role').
 
-permission: The permission name.
+permission: Permission name.
 
-provider: The permission source, see 'aa_can()'.
+provider: Permission provider, see 'aa_can()'.
 
-on_event: The event hook function(event, user, session_id, value) or 'NULL'.
+on_event: Event hook function(event, user, session_id, value) or 'NULL'.
 
 settings: Settings, the result of 'aa_settings()' (language of the denial text).
 
-session_id: The session identifier for the hook. By default it is taken from the current
+session_id: Session identifier for the hook. By default it is taken from the current
           Shiny session.
 
 Value:
@@ -152,28 +152,32 @@ Examples:
 ## aa_events
 
 ```text
-Catalog of authentication events
+Catalog of authorization events
 
 Description:
 
-     The package reports events to the 'on_event(event, user, session_id, value)' hook,
-     which is defined by the application (writing to a log, a Telegram notification,
-     etc.). The function returns the full list of events the package can send.
+     The package reports events to the 'on_event(event, user, session_id, value)' hook
+     defined by the application (writing to a log, a messenger notification, etc.). This
+     function returns the full list of events the package can send.
 
 Usage:
 
-     aa_events()
+     aa_events(lang = c("en", "ru"))
      
+Arguments:
+
+    lang: Language of the 'description' and 'value' columns: '"en"' (default) or '"ru"'.
+
 Details:
 
      The 'user' field in the hook is the login on whose behalf the event happens (for a
      failed sign-in it is the entered login, and if there is no login, '"anonymous"'),
-     'value' holds the detail from the 'value' column. Passwords and tokens never get into
-     events.
+     and 'value' holds the detail described in the 'value' column. Passwords and tokens
+     never appear in events.
 
 Value:
 
-     A table with the columns 'event' (key), 'description' (what happened) and 'value'
+     A data frame with columns 'event' (key), 'description' (what happened) and 'value'
      (what is in the 'value' field).
 
 Examples:
@@ -189,11 +193,11 @@ Ready-made event handler for writing to a log
 
 Description:
 
-     The package reports events to the function 'on_event(event, user, session_id, value)'
-     (catalog: 'aa_events()'). This function builds such a handler from the writer
-     function 'writer', so that the application does not have to write the same thing
-     every time: selecting the needed events, action names for your log, switching
-     logging on and off, and transforming the value.
+     The package reports events to the function 'on_event(event, user, session_id,
+     value)' (catalog: 'aa_events()'). This function builds such a handler from a
+     'writer' function, so that the application does not have to write the same code
+     every time: selecting the events needed, action names for your log, switching
+     writing on and off, and transforming the value.
 
 Usage:
 
@@ -207,18 +211,18 @@ Usage:
      
 Arguments:
 
-  writer: The writer function function(action, user, session_id, value): writes a row to
-          your database, file, Telegram, etc. All four arguments are strings.
+  writer: Writer function function(action, user, session_id, value): writes a row to your
+          database, file, messenger, etc. All four arguments are strings.
 
- actions: A named character vector: the name is the event key from 'aa_events()', the
+ actions: A named character vector: the name is an event key from 'aa_events()', the
           value is the action name in your log. If set, only the listed events are
-          written. If 'NULL', all events are written, and the action name is the event
-          key.
+          written. If 'NULL', all events are written and the event key serves as the
+          action name.
 
   events: A vector of event keys to write. If 'NULL', all are taken (or those listed in
           'actions').
 
- enabled: Whether logging is on: 'TRUE', 'FALSE' or a function function(event) that
+ enabled: Whether writing is on: 'TRUE', 'FALSE' or a function function(event) that
           decides by event (for example, by switches from a config). The function is
           called on every event, so config changes take effect immediately.
 
@@ -228,12 +232,12 @@ format_value: An optional function function(event, user, value) that returns the
 
 Details:
 
-     What the handler does on each event:
+     What the handler does for each event:
 
-       1. skips an event that is not in 'events' (if 'events' is set) or that has no name
-          in 'actions' (if 'actions' is set);
+       1. skips the event if it is not in 'events' (when 'events' is set) or has no name
+          in 'actions' (when 'actions' is set);
 
-       2. asks 'enabled': if logging is off, writes nothing;
+       2. asks 'enabled': if writing is off, writes nothing;
 
        3. determines the action name: from 'actions', and if 'actions' is not set, it is
           the event key;
@@ -241,13 +245,13 @@ Details:
        4. calls 'writer(action, user, session_id, value)', where 'value' has passed
           through 'format_value(event, user, value)' if that function is set.
 
-     An error in 'writer' does not interrupt the package action (the package catches it
-     and prints it as a message), so a logging failure does not get in the way of
-     sign-in and users' work.
+     An error in 'writer' does not interrupt a package action (the package catches it and
+     prints a message), so a logging failure does not get in the way of sign-in and of
+     users' work.
 
 Value:
 
-     A function function(event, user, session_id, value) to pass to 'on_event' of the
+     A function function(event, user, session_id, value) to pass as 'on_event' to the
      package modules.
 
 Examples:
