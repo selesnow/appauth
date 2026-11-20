@@ -2,7 +2,8 @@
 Updated the package hex logo: corrected letter casing to lowercase 'appauth',
 redesigned the emblem with a modern 3D faceted cyber shield and metallic lock,
 updated man/figures/logo.svg and man/figures/logo.png, regenerated pkgdown
-favicons and added dev/create_logo.R.
+favicons and added dev/create_logo.R. Switched pkgdown site theme to Bootswatch
+Darkly with custom cyan and teal brand accents and arrow-dark syntax theme.
 
 # 2026-11-19 | CLAUDE CODE (Alsey)
 Implemented the remaining audit recommendations: transaction wrappers for

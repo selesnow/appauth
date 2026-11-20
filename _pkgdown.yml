@@ -2,12 +2,13 @@ url: https://alexey-seleznev.pro/appauth/
 title: appauth
 template:
   bootstrap: 5
-  bootswatch: cosmo
+  bootswatch: darkly
+  theme: arrow-dark
   bslib:
-    primary: '#0b1f3a'
-    secondary: '#14b8a6'
+    primary: '#14b8a6'
+    secondary: '#38bdf8'
   params:
-    bootswatch: cosmo
+    bootswatch: darkly
 home:
   title: Secure authentication for Shiny
   description: |
