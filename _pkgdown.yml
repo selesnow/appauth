@@ -9,6 +9,16 @@ template:
     secondary: '#38bdf8'
   params:
     bootswatch: darkly
+  includes:
+    in_header: |
+      <!-- Google tag (gtag.js) -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z56YHE916N"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-Z56YHE916N');
+      </script>
 home:
   title: Secure authentication for Shiny
   description: |

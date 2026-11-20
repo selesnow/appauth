@@ -1,3 +1,7 @@
+# 2026-11-20 | OPENCODE (Alsey)
+Added the shared Google Analytics 4 tag `G-Z56YHE916N` to the pkgdown site so
+`/appauth/` pages are tracked together with the main site.
+
 # 2026-11-20 | GEMINI CLI (Alsey)
 Updated the package hex logo: corrected letter casing to lowercase 'appauth',
 redesigned the emblem with a modern 3D faceted cyber shield and metallic lock,
