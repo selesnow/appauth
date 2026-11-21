@@ -5,6 +5,14 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()`, `aa_events()`, `aa_event_logger()`
 
+## Contents
+
+- [aa_permissions_from_matrix](#aa_permissions_from_matrix)
+- [aa_can](#aa_can)
+- [aa_require](#aa_require)
+- [aa_events](#aa_events)
+- [aa_event_logger](#aa_event_logger)
+
 ## aa_permissions_from_matrix
 
 ```text

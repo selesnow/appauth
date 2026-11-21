@@ -5,6 +5,14 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()`
 
+## Contents
+
+- [aa_set_email](#aa_set_email)
+- [aa_get_email](#aa_get_email)
+- [aa_request_password_reset](#aa_request_password_reset)
+- [aa_reset_token_login](#aa_reset_token_login)
+- [aa_reset_password_with_token](#aa_reset_password_with_token)
+
 ## aa_set_email
 
 ```text

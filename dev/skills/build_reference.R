@@ -205,6 +205,14 @@ for (g in groups) {
     out,
     "Functions in this section: ",
     paste0("`", g$fns, "()`", collapse = ", "),
+    "",
+    "## Contents",
+    "",
+    vapply(
+      g$fns,
+      function(fn) sprintf("- [%s](#%s)", fn, fn),
+      character(1)
+    ),
     ""
   )
   for (fn in g$fns) {

@@ -5,6 +5,14 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_init_db()`, `aa_prepare_db()`, `aa_schema_version()`, `aa_cleanup()`, `aa_session_connection()`
 
+## Contents
+
+- [aa_init_db](#aa_init_db)
+- [aa_prepare_db](#aa_prepare_db)
+- [aa_schema_version](#aa_schema_version)
+- [aa_cleanup](#aa_cleanup)
+- [aa_session_connection](#aa_session_connection)
+
 ## aa_init_db
 
 ```text

@@ -5,6 +5,20 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`, `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_active_autologins()`, `aa_user_session_valid()`
 
+## Contents
+
+- [aa_login_gate](#aa_login_gate)
+- [aa_record_attempt](#aa_record_attempt)
+- [aa_login_lock_remaining](#aa_login_lock_remaining)
+- [aa_global_throttled](#aa_global_throttled)
+- [aa_clear_attempts](#aa_clear_attempts)
+- [aa_issue_token](#aa_issue_token)
+- [aa_find_session_user](#aa_find_session_user)
+- [aa_revoke_token](#aa_revoke_token)
+- [aa_revoke_sessions](#aa_revoke_sessions)
+- [aa_active_autologins](#aa_active_autologins)
+- [aa_user_session_valid](#aa_user_session_valid)
+
 ## aa_login_gate
 
 ```text

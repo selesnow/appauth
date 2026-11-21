@@ -5,6 +5,10 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_install_skills()`
 
+## Contents
+
+- [aa_install_skills](#aa_install_skills)
+
 ## aa_install_skills
 
 ```text

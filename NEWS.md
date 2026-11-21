@@ -1,3 +1,10 @@
+# 2026-11-21 | OPENCODE (Alsey)
+Aligned both bundled AI skills with the skill-creator rules: shortened the
+frontmatter descriptions to the 1024-character limit while preserving the full
+triggering rules in a new `When to activate (full rules)` section, and added a
+generated table of contents to every API reference file, and marked those
+generated files with `whitespace=cr-at-eol` in `.gitattributes`.
+
 # 2026-11-20 | OPENCODE (Alsey)
 Added the shared Google Analytics 4 tag `G-Z56YHE916N` to the pkgdown site so
 `/appauth/` pages are tracked together with the main site.

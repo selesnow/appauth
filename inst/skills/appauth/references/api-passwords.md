@@ -5,6 +5,18 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()`, `aa_weak_password_warning()`
 
+## Contents
+
+- [aa_hash_password](#aa_hash_password)
+- [aa_verify_password](#aa_verify_password)
+- [aa_is_password_hash](#aa_is_password_hash)
+- [aa_validate_password](#aa_validate_password)
+- [aa_validate_login](#aa_validate_login)
+- [aa_migrate_plaintext_passwords](#aa_migrate_plaintext_passwords)
+- [aa_check_default_accounts](#aa_check_default_accounts)
+- [aa_common_passwords](#aa_common_passwords)
+- [aa_weak_password_warning](#aa_weak_password_warning)
+
 ## aa_hash_password
 
 ```text

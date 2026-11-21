@@ -5,6 +5,14 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_settings()`, `aa_settings_from_list()`, `aa_texts()`, `aa_text()`, `aa_text_keys()`
 
+## Contents
+
+- [aa_settings](#aa_settings)
+- [aa_settings_from_list](#aa_settings_from_list)
+- [aa_texts](#aa_texts)
+- [aa_text](#aa_text)
+- [aa_text_keys](#aa_text_keys)
+
 ## aa_settings
 
 ```text

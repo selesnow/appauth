@@ -5,6 +5,20 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_app_head()`, `aa_auth_ui()`, `aa_auth_server()`, `aa_users_ui()`, `aa_users_server()`, `aa_password_ui()`, `aa_password_server()`, `aa_totp_ui()`, `aa_totp_server()`, `aa_session_guard()`, `aa_register_module()`
 
+## Contents
+
+- [aa_app_head](#aa_app_head)
+- [aa_auth_ui](#aa_auth_ui)
+- [aa_auth_server](#aa_auth_server)
+- [aa_users_ui](#aa_users_ui)
+- [aa_users_server](#aa_users_server)
+- [aa_password_ui](#aa_password_ui)
+- [aa_password_server](#aa_password_server)
+- [aa_totp_ui](#aa_totp_ui)
+- [aa_totp_server](#aa_totp_server)
+- [aa_session_guard](#aa_session_guard)
+- [aa_register_module](#aa_register_module)
+
 ## aa_app_head
 
 ```text

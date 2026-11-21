@@ -5,6 +5,18 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()`
 
+## Contents
+
+- [aa_totp_setup](#aa_totp_setup)
+- [aa_totp_enable](#aa_totp_enable)
+- [aa_totp_disable](#aa_totp_disable)
+- [aa_totp_enabled](#aa_totp_enabled)
+- [aa_verify_second_factor](#aa_verify_second_factor)
+- [aa_recovery_codes_left](#aa_recovery_codes_left)
+- [aa_totp_secret](#aa_totp_secret)
+- [aa_totp_uri](#aa_totp_uri)
+- [aa_totp_code](#aa_totp_code)
+
 ## aa_totp_setup
 
 ```text

@@ -5,6 +5,25 @@ Package version: 0.10.1. This file is generated automatically from the package h
 Functions in this section: 
 `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()`
 
+## Contents
+
+- [aa_get_user](#aa_get_user)
+- [aa_list_users](#aa_list_users)
+- [aa_users_exist](#aa_users_exist)
+- [aa_users_overview](#aa_users_overview)
+- [aa_create_user](#aa_create_user)
+- [aa_create_first_admin](#aa_create_first_admin)
+- [aa_validate_new_user](#aa_validate_new_user)
+- [aa_authenticate](#aa_authenticate)
+- [aa_set_password](#aa_set_password)
+- [aa_change_own_password](#aa_change_own_password)
+- [aa_set_role](#aa_set_role)
+- [aa_set_blocked](#aa_set_blocked)
+- [aa_delete_user](#aa_delete_user)
+- [aa_check_can_block](#aa_check_can_block)
+- [aa_check_can_delete](#aa_check_can_delete)
+- [aa_check_can_change_role](#aa_check_can_change_role)
+
 ## aa_get_user
 
 ```text
