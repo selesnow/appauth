@@ -1,5 +1,10 @@
 # Changelog
 
+## appauth 0.11.1
+
+Maintenance release. No API or schema changes; fixes the MySQL
+write-lock leak introduced by the transaction wrappers.
+
 ## appauth 0.11.0
 
 A feature release; the 0.10.1 submission to CRAN is left untouched.
