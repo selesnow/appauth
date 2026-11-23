@@ -10,7 +10,7 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/selesnow/appauth/blob/HEAD/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/selesnow/appauth/blob/master/DESCRIPTION)
 
 Seleznev A (2026). *appauth: Secure Authentication and User Management
 for 'shiny' Applications*. R package version 0.11.1,
