@@ -1,8 +1,8 @@
 # appauth reference: Passwords
 
-Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
-Functions in this section: 
+Functions in this section:
 `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()`, `aa_weak_password_warning()`
 
 ## Contents

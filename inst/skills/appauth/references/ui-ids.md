@@ -2,7 +2,7 @@
 
 Input and output identifiers of the modules are built as `<module id>-<name>`. The table lists names without the prefix; the prefix is set by the application: `aa_auth_ui("auth")` gives `auth-login`, `aa_users_ui("users")` gives `users-add`, and if a module is nested in another one (`mod_access_ui` with `ns("users")`), it is `access-users-add`. In a test of a single module via `testServer` there is no prefix (`login`, `login_btn`); in a test of the whole app it is needed (`auth-login`).
 
-The list was checked against the package source code (version 0.11.0; the sign-in form gained registration identifiers in 0.11.0). Browser selector: `#<prefix>-<name>`, for example `page.fill("#auth-login", "ivan")`.
+The list was checked against the package source code (version 0.11.1; the sign-in form gained registration identifiers in 0.11.0). Browser selector: `#<prefix>-<name>`, for example `page.fill("#auth-login", "ivan")`.
 
 Visible labels below are the package defaults for `aa_texts("en")`.
 

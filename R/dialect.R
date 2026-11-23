@@ -248,14 +248,12 @@ aa_write_section <- function(conn, fun) {
         assign(key, depth, envir = aa_write_state)
       }
       if (locked) {
-        try(
-          DBI::dbExecute(
-            conn,
-            "SELECT RELEASE_LOCK(?)",
-            params = list(lock_name)
-          ),
-          silent = TRUE
+        release_sql <- paste0(
+          "SELECT RELEASE_LOCK('",
+          gsub("'", "''", lock_name, fixed = TRUE),
+          "')"
         )
+        try(DBI::dbExecute(conn, release_sql), silent = TRUE)
       }
       if (started) {
         if (ok) {

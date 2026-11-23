@@ -1,8 +1,8 @@
 # appauth reference: Self-registration
 
-Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
-Functions in this section: 
+Functions in this section:
 `aa_register_user()`, `aa_registration_token_login()`, `aa_confirm_registration()`
 
 ## Contents

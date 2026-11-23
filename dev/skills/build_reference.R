@@ -213,7 +213,7 @@ for (g in groups) {
   out <- header(g$title)
   out <- c(
     out,
-    "Functions in this section: ",
+    "Functions in this section:",
     paste0("`", g$fns, "()`", collapse = ", "),
     "",
     "## Contents",

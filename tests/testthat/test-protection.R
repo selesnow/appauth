@@ -120,6 +120,16 @@ test_that("the login is matched EXACTLY: other case and whitespace are different
   expect_gt(aa_login_lock_remaining(con2, "Alsey"), 0)
 })
 
+test_that("the MySQL write lock is released after a write", {
+  testthat::skip_if(test_backend() != "mysql", "MySQL-only test")
+
+  con <- users_db()
+  aa_record_attempt(con, "alsey", FALSE)
+  holder <- DBI::dbGetQuery(con, "SELECT IS_USED_LOCK('appauth:write') AS holder")$holder
+
+  expect_identical(as.character(holder), NA_character_)
+})
+
 test_that("login pairs differing in case (like kiruka and Kiruka in a legacy app) do not interfere", {
   con <- users_db()
 

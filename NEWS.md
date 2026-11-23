@@ -1,4 +1,16 @@
 # 2026-11-23 | OPENCODE (Alsey)
+Fixed a MySQL write-lock leak in `0.11.1`: `RELEASE_LOCK()` was called with a
+bound parameter and RMariaDB silently ignored it, so a second connection could
+not acquire `appauth:write` after the first one had written. The lock is now
+released with a literal SQL call, with a MySQL-only regression test and full
+test runs on SQLite, DuckDB, MySQL 8.0 and PostgreSQL 16.4.
+
+# appauth 0.11.1
+
+Maintenance release. No API or schema changes; fixes the MySQL write-lock leak
+introduced by the transaction wrappers.
+
+# 2026-11-23 | OPENCODE (Alsey)
 Implemented opt-in self-registration in `0.11.0`: a "Create an account" link on
 the login form, one-time email confirmation with a hashed token, configurable
 domains and registration role, an hourly limit, automatic account creation from

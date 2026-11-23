@@ -1,13 +1,14 @@
 ## Submission
 
-This is a new submission of appauth 0.11.0.
+This is a new submission of appauth 0.11.1.
 
 appauth provides login, user management and access control for 'shiny'
 applications. It stores users in 'SQLite' (the default), 'DuckDB',
-'MySQL' / 'MariaDB' or 'PostgreSQL'. Version 0.11.0 adds optional
+'MySQL' / 'MariaDB' or 'PostgreSQL'. Version 0.11.0 added optional
 self-registration by one-time email link and automatic creation of
 non-admin accounts on the first verified Google sign-in; both are off
-by default and require explicit settings.
+by default and require explicit settings. Version 0.11.1 fixes a MySQL
+write-lock leak without changing the API or the schema.
 
 ## Test environments
 
