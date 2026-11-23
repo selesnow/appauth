@@ -41,6 +41,13 @@ aa_settings(
   google_redirect_uri = NULL,
   google_domains = NULL,
   password_login = TRUE,
+  registration_enabled = FALSE,
+  registration_verify_email = TRUE,
+  registration_role = "viewer",
+  registration_domains = NULL,
+  registration_max_per_hour = 10,
+  google_signup = FALSE,
+  google_signup_require_domains = TRUE,
   texts = aa_texts("en")
 )
 ```
@@ -186,10 +193,11 @@ aa_settings(
   button appears on the sign-in form. Default `FALSE`. Requires
   `google_client_id`, `google_client_secret` and `google_redirect_uri`.
   Only a user who already exists in the database and whose email equals
-  the Google account address can sign in: sign-in never creates new
-  users, the role is taken from the database. The application's
-  two-factor code is not requested for Google sign-in (Google does the
-  verification itself).
+  the Google account address can sign in. With `google_signup = TRUE` a
+  new user is created from the verified email; otherwise sign-in never
+  creates users. The role of existing users is taken from the database.
+  The application's two-factor code is not requested for Google sign-in
+  (Google does the verification itself).
 
 - google_client_id, google_client_secret:
 
@@ -225,6 +233,49 @@ aa_settings(
   `google_enabled = TRUE`, otherwise there would be no way to sign in.
   Creating the first administrator on an empty database is still
   available.
+
+- registration_enabled:
+
+  Allow visitors to create their own accounts from the sign-in form.
+  Default `FALSE`. The link appears only when the database already has
+  users: on an empty database the first administrator is created as
+  before.
+
+- registration_verify_email:
+
+  Require visitors to confirm their email address before the account is
+  created. Default `TRUE`. Requires `send_reset` and `reset_base_url`;
+  with `FALSE` the account is created immediately.
+
+- registration_role:
+
+  Role given to self-registered users. Default `"viewer"`. It must be
+  one of `roles` and cannot be `admin_role`, so registration never
+  grants administrative rights. Used for both the button and Google
+  sign-up.
+
+- registration_domains:
+
+  Allowed email domains for self-registration (a vector like
+  `c("example.com")`). `NULL` (default) allows any domain.
+
+- registration_max_per_hour:
+
+  Maximum number of registration requests per hour across all visitors.
+
+- google_signup:
+
+  Create an account automatically on the first sign-in with Google if
+  the email is not in the database. Default `FALSE`. Requires
+  `google_enabled = TRUE`; the login is derived from the email address,
+  the email is taken from the verified Google token, and the role is
+  `registration_role`.
+
+- google_signup_require_domains:
+
+  Require a non-empty `google_domains` when `google_signup = TRUE`.
+  Default `TRUE`: without a domain check any Google account could create
+  an account. Set to `FALSE` only for a deliberately open application.
 
 - texts:
 
@@ -269,6 +320,21 @@ settings <- aa_settings(
   google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret"),
   google_redirect_uri  = "https://apps.example.com/",
   google_domains       = c("example.com", "example.net")
+)
+
+# open registration with email confirmation and Google sign-up
+settings <- aa_settings(
+  registration_enabled = TRUE,
+  google_enabled       = TRUE,
+  google_signup        = TRUE,
+  google_client_id     = "1234-abc.apps.googleusercontent.com",
+  google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret"),
+  google_redirect_uri  = "https://apps.example.com/",
+  google_domains       = c("example.com"),
+  reset_base_url       = "https://apps.example.com/my_app",
+  send_reset = function(email, link, login) {
+    message("Email for ", login, ": ", link)
+  }
 )
 
 # stricter protection, Russian interface and custom roles

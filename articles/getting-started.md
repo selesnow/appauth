@@ -153,8 +153,8 @@ aa_create_user(conn, "ivan", "ivan-password", "user")
 
 aa_list_users(conn)                                # password hashes are not returned
 #>   login  role blocked          created_at last_login_at
-#> 1  boss admin       0 2026-11-20 08:15:19          <NA>
-#> 2  ivan  user       0 2026-11-20 08:15:19          <NA>
+#> 1  boss admin       0 2026-11-23 17:06:37          <NA>
+#> 2  ivan  user       0 2026-11-23 17:06:37          <NA>
 
 aa_authenticate(conn, "ivan", "ivan-password")     # user data
 #>   login role blocked must_change

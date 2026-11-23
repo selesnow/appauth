@@ -40,5 +40,5 @@ if (requireNamespace("RSQLite", quietly = TRUE)) {
   aa_prepare_db(conn, aa_settings())
   DBI::dbDisconnect(conn)
 }
-#> appauth: schema migrations applied: 1, 2, 3, 4, 5, 6, 7, 8, 9
+#> appauth: schema migrations applied: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 ```

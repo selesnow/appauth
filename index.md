@@ -58,9 +58,13 @@ browser checks.
   authenticator app and 10 recovery codes, the secret is encrypted in
   the database, wrong codes lock the login, reset by an administrator
   (off by default).
-- Sign-in with Google (OpenID Connect): only for existing users by
-  email, with an organisation domain check, no auto-creation; password
-  login can be disabled (off by default).
+- Sign-in with Google (OpenID Connect): for existing users by email,
+  with an organisation domain check; password login can be disabled (off
+  by default).
+- Opt-in self-registration: a “Create an account” link, one-time email
+  confirmation, configurable domains and role, an hourly limit, and
+  optional automatic account creation for verified Google users (off by
+  default).
 - Server-side permission checks
   ([`aa_can()`](https://alexey-seleznev.pro/appauth/reference/aa_can.md),
   [`aa_require()`](https://alexey-seleznev.pro/appauth/reference/aa_require.md)),
@@ -114,6 +118,7 @@ The first run on an empty database offers to create an administrator.
 | Passwords | [`aa_hash_password()`](https://alexey-seleznev.pro/appauth/reference/aa_hash_password.md), [`aa_verify_password()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_password.md), [`aa_is_password_hash()`](https://alexey-seleznev.pro/appauth/reference/aa_is_password_hash.md), [`aa_validate_password()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_password.md), [`aa_validate_login()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_login.md), [`aa_migrate_plaintext_passwords()`](https://alexey-seleznev.pro/appauth/reference/aa_migrate_plaintext_passwords.md), [`aa_check_default_accounts()`](https://alexey-seleznev.pro/appauth/reference/aa_check_default_accounts.md), [`aa_common_passwords()`](https://alexey-seleznev.pro/appauth/reference/aa_common_passwords.md) |
 | Users | [`aa_get_user()`](https://alexey-seleznev.pro/appauth/reference/aa_get_user.md), [`aa_list_users()`](https://alexey-seleznev.pro/appauth/reference/aa_list_users.md), [`aa_users_exist()`](https://alexey-seleznev.pro/appauth/reference/aa_users_exist.md), [`aa_users_overview()`](https://alexey-seleznev.pro/appauth/reference/aa_users_overview.md), [`aa_active_autologins()`](https://alexey-seleznev.pro/appauth/reference/aa_active_autologins.md), [`aa_create_user()`](https://alexey-seleznev.pro/appauth/reference/aa_create_user.md), [`aa_create_first_admin()`](https://alexey-seleznev.pro/appauth/reference/aa_create_first_admin.md), [`aa_validate_new_user()`](https://alexey-seleznev.pro/appauth/reference/aa_validate_new_user.md), [`aa_authenticate()`](https://alexey-seleznev.pro/appauth/reference/aa_authenticate.md), [`aa_set_password()`](https://alexey-seleznev.pro/appauth/reference/aa_set_password.md), [`aa_change_own_password()`](https://alexey-seleznev.pro/appauth/reference/aa_change_own_password.md), [`aa_set_role()`](https://alexey-seleznev.pro/appauth/reference/aa_set_role.md), [`aa_set_blocked()`](https://alexey-seleznev.pro/appauth/reference/aa_set_blocked.md), [`aa_delete_user()`](https://alexey-seleznev.pro/appauth/reference/aa_delete_user.md), [`aa_check_can_block()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_block.md), [`aa_check_can_delete()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_delete.md), [`aa_check_can_change_role()`](https://alexey-seleznev.pro/appauth/reference/aa_check_can_change_role.md) |
 | Password recovery | [`aa_set_email()`](https://alexey-seleznev.pro/appauth/reference/aa_set_email.md), [`aa_get_email()`](https://alexey-seleznev.pro/appauth/reference/aa_get_email.md), [`aa_request_password_reset()`](https://alexey-seleznev.pro/appauth/reference/aa_request_password_reset.md), [`aa_reset_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_token_login.md), [`aa_reset_password_with_token()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_password_with_token.md) |
+| Self-registration | [`aa_register_user()`](https://alexey-seleznev.pro/appauth/reference/aa_register_user.md), [`aa_registration_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_registration_token_login.md), [`aa_confirm_registration()`](https://alexey-seleznev.pro/appauth/reference/aa_confirm_registration.md) |
 | Two-factor authentication | [`aa_totp_setup()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.md), [`aa_totp_enable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enable.md), [`aa_totp_disable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_disable.md), [`aa_totp_enabled()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enabled.md), [`aa_verify_second_factor()`](https://alexey-seleznev.pro/appauth/reference/aa_verify_second_factor.md), [`aa_recovery_codes_left()`](https://alexey-seleznev.pro/appauth/reference/aa_recovery_codes_left.md), [`aa_totp_secret()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_secret.md), [`aa_totp_uri()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_uri.md), [`aa_totp_code()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_code.md) |
 | Login protection | [`aa_login_gate()`](https://alexey-seleznev.pro/appauth/reference/aa_login_gate.md), [`aa_record_attempt()`](https://alexey-seleznev.pro/appauth/reference/aa_record_attempt.md), [`aa_login_lock_remaining()`](https://alexey-seleznev.pro/appauth/reference/aa_login_lock_remaining.md), [`aa_global_throttled()`](https://alexey-seleznev.pro/appauth/reference/aa_global_throttled.md), [`aa_clear_attempts()`](https://alexey-seleznev.pro/appauth/reference/aa_clear_attempts.md) |
 | Sessions | [`aa_issue_token()`](https://alexey-seleznev.pro/appauth/reference/aa_issue_token.md), [`aa_find_session_user()`](https://alexey-seleznev.pro/appauth/reference/aa_find_session_user.md), [`aa_revoke_token()`](https://alexey-seleznev.pro/appauth/reference/aa_revoke_token.md), [`aa_revoke_sessions()`](https://alexey-seleznev.pro/appauth/reference/aa_revoke_sessions.md), [`aa_user_session_valid()`](https://alexey-seleznev.pro/appauth/reference/aa_user_session_valid.md) |
@@ -132,6 +137,7 @@ and so on.
 Vignettes (`browseVignettes("appauth")`):
 
 - `getting-started` - quick start and core concepts;
+- `self-registration` - enable visitor sign-up by email and with Google;
 - `integrating-existing-app` - how to move an existing application off
   hand-written authentication, including plaintext passwords;
 - `extension-points` - permissions, roles, events, card slots, texts,
@@ -224,6 +230,9 @@ no independent audit has been done) are listed in the
 
 ## Development
 
-Automated tests: `devtools::test()`; full check: `devtools::check()`.
+Automated tests:
+[`devtools::test()`](https://devtools.r-lib.org/reference/test.html);
+full check:
+[`devtools::check()`](https://devtools.r-lib.org/reference/check.html).
 Module checks in a real browser (Chrome and Playwright) are described in
 `dev/e2e/README.md`. Change history is in `NEWS.md`.

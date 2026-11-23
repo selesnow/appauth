@@ -116,6 +116,23 @@ automatically. The module reports the events `password_reset_requested`,
 and
 [`aa_reset_password_with_token()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_password_with_token.md).
 
+## Self-registration
+
+With `registration_enabled = TRUE` in the settings
+([`aa_settings()`](https://alexey-seleznev.pro/appauth/reference/aa_settings.md)),
+a "Create an account" link appears on the sign-in form when the database
+already has users. A visitor enters a login, an email address and a
+password; the account is created after following the one-time link from
+the email (`registration_verify_email = TRUE`, the default) or
+immediately when email confirmation is disabled. The role comes from
+`registration_role`, never from the form. After creation the module
+signs the new user in. The module reports `registration_requested`,
+`registration_confirmed`, `registration_failed` and `login_success` with
+the value `registration`. Logic without UI:
+[`aa_register_user()`](https://alexey-seleznev.pro/appauth/reference/aa_register_user.md)
+and
+[`aa_confirm_registration()`](https://alexey-seleznev.pro/appauth/reference/aa_confirm_registration.md).
+
 ## Sign-in with Google
 
 With `google_enabled = TRUE` in the settings
@@ -124,14 +141,15 @@ a "Sign in with Google" button appears on the sign-in form. The user
 confirms the sign-in with Google and returns to `google_redirect_uri`;
 the package checks the signature and contents of the Google token, the
 organization domain (`google_domains`) and finds the user **by email
-among already created ones**: sign-in does not create new users, the
-role is taken from the database, a blocked user does not get in. The
-two-factor code is not asked for in this case (Google does the
-confirmation). `state` from the address is compared with a short cookie
-of the browser that started the sign-in, so someone else's return link
-cannot be slipped in. With `password_login = FALSE` the password form is
-hidden and password sign-in attempts are rejected on the server. The
-module reports `login_success` with the value `google` and
+among already created ones**: sign-in does not create new users unless
+`google_signup = TRUE`, and then the new account gets the
+`registration_role` role. A blocked user does not get in. The two-factor
+code is not asked for in this case (Google does the confirmation).
+`state` from the address is compared with a short cookie of the browser
+that started the sign-in, so someone else's return link cannot be
+slipped in. With `password_login = FALSE` the password form is hidden
+and password sign-in attempts are rejected on the server. The module
+reports `login_success` with the value `google` and
 `google_login_failed` (reason and email in `value`); on refusal the user
 sees a generic text. If the page is opened not at the
 `google_redirect_uri` address (for example, the app is opened by IP

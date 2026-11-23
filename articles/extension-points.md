@@ -148,7 +148,7 @@ knitr::kable(aa_events())
 
 | event | description | value |
 |:---|:---|:---|
-| login_success | Successful sign-in (by password, with Google or by an auto sign-in cookie) | cookie (auto sign-in) or google (Google sign-in) |
+| login_success | Successful sign-in (by password, with Google or by an auto sign-in cookie) | cookie (auto sign-in), google (Google sign-in) or registration (self-registration) |
 | login_failed | Incorrect login or password | password_disabled if password sign-in is disabled |
 | login_locked | Sign-in attempt for a login locked after failed attempts | seconds until the lock ends |
 | login_blocked_user | Sign-in attempt by a user blocked by an administrator |  |
@@ -175,8 +175,12 @@ knitr::kable(aa_events())
 | totp_failed | Incorrect code when confirming sign-in or disabling 2FA |  |
 | totp_reset | An administrator reset a user’s 2FA | user login |
 | recovery_code_used | Sign-in confirmed with a recovery code |  |
-| google_login_failed | Failed Google sign-in (the user is shown a generic text) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; followed by a space and the email if known |
+| google_login_failed | Failed Google sign-in (the user is shown a generic text) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known |
 | weak_password_set | A weak password was accepted (password_policy = “warn” mode) | login and reason: password_common, password_equals_login, password_repeated |
+| registration_requested | Self-registration requested (the user is shown a generic answer) | reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason |
+| registration_confirmed | Account created from the email confirmation link | login of the new user |
+| registration_failed | Failed attempt to confirm a registration | reason: registration_link_invalid, user_exists, email_exists |
+| google_user_created | Account created automatically on first Google sign-in | login of the new user |
 
 The hook can be used for more than logging: for example, to send a
 Telegram notification on `login_locked` or `user_blocked`. The hook can
@@ -566,7 +570,7 @@ All interface texts and messages are available in English and Russian
 ``` r
 
 length(aa_text_keys())
-#> [1] 149
+#> [1] 161
 texts <- aa_texts(login_button = "Log in", login_title = "Team sign-in")
 texts$login_button
 #> [1] "Log in"

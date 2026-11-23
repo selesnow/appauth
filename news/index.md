@@ -1,5 +1,47 @@
 # Changelog
 
+## appauth 0.11.0
+
+A feature release; the 0.10.1 submission to CRAN is left untouched.
+Existing settings, function signatures and data are unchanged, and all
+new features must be enabled explicitly.
+
+- Added self-registration:
+  [`aa_register_user()`](https://alexey-seleznev.pro/appauth/reference/aa_register_user.md),
+  [`aa_confirm_registration()`](https://alexey-seleznev.pro/appauth/reference/aa_confirm_registration.md)
+  and
+  [`aa_registration_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_registration_token_login.md).
+  A visitor submits a login, email and password; the account is created
+  after following a one-time link from the email. The link can also be
+  used through `?register=<token>` without a Shiny form. Only the
+  password hash and the token hash are stored.
+- New settings: `registration_enabled`, `registration_verify_email`,
+  `registration_role`, `registration_domains`,
+  `registration_max_per_hour`, `google_signup` and
+  `google_signup_require_domains`. Registration cannot grant
+  `admin_role`, requires password login and, with email confirmation, a
+  `send_reset` function and `reset_base_url`.
+- `google_signup = TRUE` creates an account on first sign-in with Google
+  from the verified email and assigns `registration_role`; by default a
+  non-empty `google_domains` list is required. The login is derived from
+  the email and gets a numeric suffix if it is taken. Google-created
+  accounts get a random password hash, so password sign-in is not
+  possible until an administrator sets one.
+- Schema migration 10 adds the `registrations` table;
+  [`aa_cleanup()`](https://alexey-seleznev.pro/appauth/reference/aa_cleanup.md)
+  removes expired and used registrations. Creating a user with the same
+  email consumes stale registration links.
+- New events: `registration_requested`, `registration_confirmed`,
+  `registration_failed` and `google_user_created`. `login_success` now
+  also uses the value `registration`. New interface texts are available
+  in English and Russian.
+- Updated both bundled AI skills and regenerated their function
+  references for 0.11.0; empty example lines in generated reference
+  files no longer contain trailing whitespace.
+- Added Shiny `testServer` and snapshot coverage for the registration
+  form, immediate registration, the generic confirmation response and
+  the `?register=<token>` deep link.
+
 ## appauth 0.10.1
 
 A maintenance release with audit fixes and documentation improvements.
@@ -861,7 +903,8 @@ settings leave the rest of the behaviour unchanged.
   - in the `architecture-and-security` vignette the limitations and the
     cookie description were updated (`SameSite=Lax`, `Secure` on HTTPS);
   - all vignette examples are executed during the build, and
-    `devtools::check()` is clean.
+    [`devtools::check()`](https://devtools.r-lib.org/reference/check.html)
+    is clean.
 - The failure counter is kept per exact login, case-sensitively (`alice`
   and `Alice` are different people), and not per IP: behind nginx it is
   not visible.

@@ -64,6 +64,10 @@ aa_events()
 #> 27       recovery_code_used
 #> 28      google_login_failed
 #> 29        weak_password_set
+#> 30   registration_requested
+#> 31   registration_confirmed
+#> 32      registration_failed
+#> 33      google_user_created
 #>                                                                      description
 #> 1     Successful sign-in (by password, with Google or by an auto sign-in cookie)
 #> 2                                                    Incorrect login or password
@@ -94,36 +98,44 @@ aa_events()
 #> 27                                        Sign-in confirmed with a recovery code
 #> 28                      Failed Google sign-in (the user is shown a generic text)
 #> 29                  A weak password was accepted (password_policy = "warn" mode)
-#>                                                                                                                                                                                               value
-#> 1                                                                                                                                                  cookie (auto sign-in) or google (Google sign-in)
-#> 2                                                                                                                                                 password_disabled if password sign-in is disabled
-#> 3                                                                                                                                                                       seconds until the lock ends
-#> 4                                                                                                                                                                                                  
-#> 5                                                                                                                                                                                                  
-#> 6                                                                                                                                                                   login the lock was removed from
-#> 7                                                                                                                                                                                                  
-#> 8                                                                                                                                             reason: deleted, blocked, role_changed, token_revoked
-#> 9                                                                                                                                                                                                  
-#> 10                                                                                                                                                               login of the new user and the role
-#> 11                                                                                                                                                                        login of the deleted user
-#> 12                                                                                                                                                                           login and the new role
-#> 13                                                                                                                                                                                                 
-#> 14                                                                                                                                                                                       user login
-#> 15                                                                                                                                                                                       user login
-#> 16                                                                                                                                                                                       user login
-#> 17                                                                                                                                                                                       user login
-#> 18                                                                                                                                                                                  permission name
-#> 19                                                                                                                                 result: sent, no_user, no_email, blocked, throttled, send_failed
-#> 20                                                                                                                                                                                                 
-#> 21                                                                                                                                                                                                 
-#> 22                                                                                                                                                                                       user login
-#> 23                                                                                                                                                                                                 
-#> 24                                                                                                                                                                                                 
-#> 25                                                                                                                                                                                                 
-#> 26                                                                                                                                                                                       user login
-#> 27                                                                                                                                                                                                 
-#> 28 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; followed by a space and the email if known
-#> 29                                                                                                                      login and reason: password_common, password_equals_login, password_repeated
+#> 30              Self-registration requested (the user is shown a generic answer)
+#> 31                              Account created from the email confirmation link
+#> 32                                      Failed attempt to confirm a registration
+#> 33                         Account created automatically on first Google sign-in
+#>                                                                                                                                                                                                                   value
+#> 1                                                                                                                                    cookie (auto sign-in), google (Google sign-in) or registration (self-registration)
+#> 2                                                                                                                                                                     password_disabled if password sign-in is disabled
+#> 3                                                                                                                                                                                           seconds until the lock ends
+#> 4                                                                                                                                                                                                                      
+#> 5                                                                                                                                                                                                                      
+#> 6                                                                                                                                                                                       login the lock was removed from
+#> 7                                                                                                                                                                                                                      
+#> 8                                                                                                                                                                 reason: deleted, blocked, role_changed, token_revoked
+#> 9                                                                                                                                                                                                                      
+#> 10                                                                                                                                                                                   login of the new user and the role
+#> 11                                                                                                                                                                                            login of the deleted user
+#> 12                                                                                                                                                                                               login and the new role
+#> 13                                                                                                                                                                                                                     
+#> 14                                                                                                                                                                                                           user login
+#> 15                                                                                                                                                                                                           user login
+#> 16                                                                                                                                                                                                           user login
+#> 17                                                                                                                                                                                                           user login
+#> 18                                                                                                                                                                                                      permission name
+#> 19                                                                                                                                                     result: sent, no_user, no_email, blocked, throttled, send_failed
+#> 20                                                                                                                                                                                                                     
+#> 21                                                                                                                                                                                                                     
+#> 22                                                                                                                                                                                                           user login
+#> 23                                                                                                                                                                                                                     
+#> 24                                                                                                                                                                                                                     
+#> 25                                                                                                                                                                                                                     
+#> 26                                                                                                                                                                                                           user login
+#> 27                                                                                                                                                                                                                     
+#> 28 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known
+#> 29                                                                                                                                          login and reason: password_common, password_equals_login, password_repeated
+#> 30                                                   reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason
+#> 31                                                                                                                                                                                                login of the new user
+#> 32                                                                                                                                                         reason: registration_link_invalid, user_exists, email_exists
+#> 33                                                                                                                                                                                                login of the new user
 aa_events()$event
 #>  [1] "login_success"            "login_failed"            
 #>  [3] "login_locked"             "login_blocked_user"      
@@ -139,5 +151,7 @@ aa_events()$event
 #> [23] "totp_enabled"             "totp_disabled"           
 #> [25] "totp_failed"              "totp_reset"              
 #> [27] "recovery_code_used"       "google_login_failed"     
-#> [29] "weak_password_set"       
+#> [29] "weak_password_set"        "registration_requested"  
+#> [31] "registration_confirmed"   "registration_failed"     
+#> [33] "google_user_created"     
 ```

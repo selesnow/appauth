@@ -109,6 +109,15 @@
 - [`aa_reset_password_with_token()`](https://alexey-seleznev.pro/appauth/reference/aa_reset_password_with_token.md)
   : Set a new password by the link from the email
 
+## Self-registration
+
+- [`aa_register_user()`](https://alexey-seleznev.pro/appauth/reference/aa_register_user.md)
+  : Request self-registration
+- [`aa_registration_token_login()`](https://alexey-seleznev.pro/appauth/reference/aa_registration_token_login.md)
+  : User who owns a registration link
+- [`aa_confirm_registration()`](https://alexey-seleznev.pro/appauth/reference/aa_confirm_registration.md)
+  : Create an account from a registration link
+
 ## Two-factor authentication
 
 - [`aa_totp_setup()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.md)
