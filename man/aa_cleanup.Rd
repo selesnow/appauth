@@ -19,17 +19,17 @@ A list (invisibly): \code{login_attempts} (the number of deleted login
 attempts),
 \code{auth_sessions} (the number of deleted tokens), \code{password_resets} (the
 number of deleted
-password recovery tokens) and \code{oauth_states} (the number of deleted sign-in
-parameters
+password recovery tokens), \code{registrations} (the number of deleted pending
+registrations) and \code{oauth_states} (the number of deleted sign-in parameters
 for Google).
 }
 \description{
 Deletes login attempt records older than \code{attempts_retention_hours} hours, as
 well as expired and revoked auto-login tokens older than
 \code{token_retention_days}
-days, as well as used and expired password recovery tokens
-and Google sign-in parameters older than a day. Active tokens and fresh
-attempts are not touched. Call it
+days, as well as used and expired password recovery tokens,
+pending registrations and Google sign-in parameters older than a day. Active
+tokens and fresh attempts are not touched. Call it
 after \code{\link[=aa_init_db]{aa_init_db()}}.
 }
 \examples{

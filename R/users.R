@@ -318,33 +318,71 @@ aa_create_user <- function(
       if (!is.null(problem)) aa_abort_problem(settings, problem, call = call)
     }
 
-    tryCatch(
-      aa_execute(
-        conn,
-        "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, ?)",
-        params = list(
-          login,
-          aa_hash_password(password),
-          role,
-          as.integer(isTRUE(must_change)),
-          aa_utc()
-        )
-      ),
-      error = function(e) {
-        if (aa_is_unique_violation(e)) {
-          aa_abort_user(settings, "user_exists", call = call)
-        }
-
-        stop(e)
-      }
+    aa_insert_user(
+      conn,
+      login,
+      aa_hash_password(password),
+      role,
+      settings,
+      must_change = must_change,
+      email = email,
+      call = call
     )
-
-    if (nzchar(email)) {
-      aa_set_email(conn, login, email, settings)
-    }
-
-    invisible(TRUE)
   })
+}
+
+# Insert a user with an already hashed password
+#
+# @param conn Database connection.
+# @param login Login.
+# @param password_hash Password hash (never a plain-text password).
+# @param role Role from the settings.
+# @param settings Settings, the result of [aa_settings()].
+# @param must_change Require a password change at the first sign-in.
+# @param email Normalized email or `NULL`.
+# @param call Environment for the error message.
+#
+# @returns TRUE (invisibly).
+# @noRd
+aa_insert_user <- function(
+  conn,
+  login,
+  password_hash,
+  role,
+  settings,
+  must_change = FALSE,
+  email = NULL,
+  call = rlang::caller_env()
+) {
+  tryCatch(
+    aa_execute(
+      conn,
+      "INSERT INTO users (login, password, role, must_change, created_at) VALUES (?, ?, ?, ?, ?)",
+      params = list(
+        login,
+        password_hash,
+        role,
+        as.integer(isTRUE(must_change)),
+        aa_utc()
+      )
+    ),
+    error = function(e) {
+      if (aa_is_unique_violation(e)) {
+        aa_abort_user(settings, "user_exists", call = call)
+      }
+
+      stop(e)
+    }
+  )
+
+  email <- aa_normalize_email(email)
+  if (nzchar(email)) {
+    aa_set_email(conn, login, email, settings)
+  }
+
+  aa_invalidate_registrations(conn, login, email)
+
+  invisible(TRUE)
 }
 
 #' Create the first user (administrator)

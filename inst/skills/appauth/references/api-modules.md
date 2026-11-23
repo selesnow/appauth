@@ -1,6 +1,6 @@
 # appauth reference: UI modules and app helpers
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_app_head()`, `aa_auth_ui()`, `aa_auth_server()`, `aa_users_ui()`, `aa_users_server()`, `aa_password_ui()`, `aa_password_server()`, `aa_totp_ui()`, `aa_totp_server()`, `aa_session_guard()`, `aa_register_module()`
@@ -33,7 +33,7 @@ Description:
 Usage:
 
      aa_app_head()
-     
+
 Details:
 
      The look is changed with --aa-* CSS variables (for example '--aa-primary'), which
@@ -68,7 +68,7 @@ Description:
 Usage:
 
      aa_auth_ui(id)
-     
+
 Arguments:
 
       id: Module id.
@@ -109,7 +109,7 @@ Usage:
        logo = NULL,
        cookie_name = "appauth_token"
      )
-     
+
 Arguments:
 
       id: Module id, the same as in 'aa_auth_ui()'.
@@ -173,25 +173,39 @@ Password recovery by email:
      'password_reset_requested', 'password_reset_done' and 'password_reset_failed'. Logic
      without UI: 'aa_request_password_reset()' and 'aa_reset_password_with_token()'.
 
+Self-registration:
+
+     With 'registration_enabled = TRUE' in the settings ('aa_settings()'), a "Create an
+     account" link appears on the sign-in form when the database already has users. A
+     visitor enters a login, an email address and a password; the account is created
+     after following the one-time link from the email ('registration_verify_email =
+     TRUE', the default) or immediately when email confirmation is disabled. The role
+     comes from 'registration_role', never from the form. After creation the module signs
+     the new user in. The module reports 'registration_requested',
+     'registration_confirmed', 'registration_failed' and 'login_success' with the value
+     'registration'. Logic without UI: 'aa_register_user()' and
+     'aa_confirm_registration()'.
+
 Sign-in with Google:
 
      With 'google_enabled = TRUE' in the settings ('aa_settings()'), a "Sign in with
      Google" button appears on the sign-in form. The user confirms the sign-in with
      Google and returns to 'google_redirect_uri'; the package checks the signature and
      contents of the Google token, the organization domain ('google_domains') and finds
-     the user *by email among already created ones*: sign-in does not create new users,
-     the role is taken from the database, a blocked user does not get in. The two-factor
-     code is not asked for in this case (Google does the confirmation). 'state' from the
-     address is compared with a short cookie of the browser that started the sign-in, so
-     someone else's return link cannot be slipped in. With 'password_login = FALSE' the
-     password form is hidden and password sign-in attempts are rejected on the server.
-     The module reports 'login_success' with the value 'google' and 'google_login_failed'
-     (reason and email in 'value'); on refusal the user sees a generic text. If the page
-     is opened not at the 'google_redirect_uri' address (for example, the app is opened
-     by IP while the return is configured for a domain), the button sends the user to the
-     return address and sign-in starts there on its own (parameter '?google=1'): 'state'
-     is stored in the cookie of the site address, and cookies for an IP and for a domain
-     are different. Password sign-in and cookie auto-login work independently at each
+     the user *by email among already created ones*: sign-in does not create new users
+     unless 'google_signup = TRUE', and then the new account gets the 'registration_role'
+     role. A blocked user does not get in. The two-factor code is not asked for in this
+     case (Google does the confirmation). 'state' from the address is compared with a
+     short cookie of the browser that started the sign-in, so someone else's return link
+     cannot be slipped in. With 'password_login = FALSE' the password form is hidden and
+     password sign-in attempts are rejected on the server. The module reports
+     'login_success' with the value 'google' and 'google_login_failed' (reason and email
+     in 'value'); on refusal the user sees a generic text. If the page is opened not at
+     the 'google_redirect_uri' address (for example, the app is opened by IP while the
+     return is configured for a domain), the button sends the user to the return address
+     and sign-in starts there on its own (parameter '?google=1'): 'state' is stored in
+     the cookie of the site address, and cookies for an IP and for a domain are
+     different. Password sign-in and cookie auto-login work independently at each
      address.
 
      The role and login are taken from the database, not from the entered string. The
@@ -204,12 +218,12 @@ See Also:
 Examples:
 
      ## Not run:
-     
+
      server <- function(input, output, session) {
        conn <- DBI::dbConnect(RSQLite::SQLite(), "app.db")
        aa_init_db(conn)
        session$onSessionEnded(function() DBI::dbDisconnect(conn))
-     
+
        auth <- aa_auth_server("auth", conn, on_event = log_event)
        output$app <- shiny::renderUI(if (auth$logged_in()) main_ui())
      }
@@ -230,7 +244,7 @@ Description:
 Usage:
 
      aa_users_ui(id)
-     
+
 Arguments:
 
       id: Module id.
@@ -277,7 +291,7 @@ Usage:
        extra_card_ui = NULL,
        extra_card_server = NULL
      )
-     
+
 Arguments:
 
       id: Module id, the same as in 'aa_users_ui()'.
@@ -323,7 +337,7 @@ See Also:
 Examples:
 
      ## Not run:
-     
+
      auth <- aa_auth_server("auth", conn)
      shiny::observe({
        if (auth$logged_in()) aa_users_server("users", conn, auth, on_event =
@@ -346,7 +360,7 @@ Description:
 Usage:
 
      aa_password_ui(id)
-     
+
 Arguments:
 
       id: Module id.
@@ -379,7 +393,7 @@ Description:
 Usage:
 
      aa_password_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
-     
+
 Arguments:
 
       id: Module id, the same as in 'aa_password_ui()'.
@@ -404,7 +418,7 @@ See Also:
 Examples:
 
      ## Not run:
-     
+
      auth <- aa_auth_server("auth", conn)
      aa_password_server("password", conn, auth, on_event = log_event)
      ## End(Not run)
@@ -424,7 +438,7 @@ Description:
 Usage:
 
      aa_totp_ui(id)
-     
+
 Arguments:
 
       id: Module id.
@@ -454,7 +468,7 @@ Description:
 Usage:
 
      aa_totp_server(id, conn, auth, settings = aa_settings(), on_event = NULL)
-     
+
 Arguments:
 
       id: Module id, the same as in 'aa_totp_ui()'.
@@ -493,7 +507,7 @@ See Also:
 Examples:
 
      ## Not run:
-     
+
      auth <- aa_auth_server("auth", conn, settings)
      shiny::observe({
        if (auth$logged_in()) aa_totp_server("totp", conn, auth, settings, on_event
@@ -525,7 +539,7 @@ Usage:
        reload = TRUE,
        cleanup_minutes = 60
      )
-     
+
 Arguments:
 
     auth: A result of 'aa_auth_server()'.
@@ -554,7 +568,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      auth <- aa_auth_server("auth", conn)
      aa_session_guard(auth, conn)
      ## End(Not run)
@@ -575,7 +589,7 @@ Description:
 Usage:
 
      aa_register_module(auth, permission, provider, server)
-     
+
 Arguments:
 
     auth: A result of 'aa_auth_server()'.
@@ -600,7 +614,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      provider <- aa_permissions_from_matrix(conf$access_management)
      aa_register_module(auth, "Tasks", provider, function()
      mod_tasks_server("tasks"))

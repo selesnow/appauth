@@ -1,6 +1,6 @@
 # appauth reference: Settings and texts
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_settings()`, `aa_settings_from_list()`, `aa_texts()`, `aa_text()`, `aa_text_keys()`
@@ -59,9 +59,16 @@ Usage:
        google_redirect_uri = NULL,
        google_domains = NULL,
        password_login = TRUE,
+       registration_enabled = FALSE,
+       registration_verify_email = TRUE,
+       registration_role = "viewer",
+       registration_domains = NULL,
+       registration_max_per_hour = 10,
+       google_signup = FALSE,
+       google_signup_require_domains = TRUE,
        texts = aa_texts("en")
      )
-     
+
 Arguments:
 
 max_failed_logins: Number of failed sign-in attempts before the login is locked.
@@ -151,9 +158,10 @@ google_enabled: Enable sign-in with Google (OpenID Connect): a "Sign in with Goo
           button appears on the sign-in form. Default 'FALSE'. Requires
           'google_client_id', 'google_client_secret' and 'google_redirect_uri'. Only a
           user who already exists in the database and whose email equals the Google
-          account address can sign in: sign-in never creates new users, the role is taken
-          from the database. The application's two-factor code is not requested for
-          Google sign-in (Google does the verification itself).
+          account address can sign in. With 'google_signup = TRUE' a new user is created
+          from the verified email; otherwise sign-in never creates users. The role of
+          existing users is taken from the database. The application's two-factor code is
+          not requested for Google sign-in (Google does the verification itself).
 
 google_client_id, google_client_secret: Identifier and secret of the OAuth client (type
           "Web application") from the Google Cloud Console. *Store the secret outside the
@@ -178,6 +186,33 @@ password_login: Allow sign-in with a login and password. Default 'TRUE'. 'FALSE'
           would be no way to sign in. Creating the first administrator on an empty
           database is still available.
 
+registration_enabled: Allow visitors to create their own accounts from the sign-in form.
+          Default 'FALSE'. The link appears only when the database already has users: on
+          an empty database the first administrator is created as before.
+
+registration_verify_email: Require visitors to confirm their email address before the
+          account is created. Default 'TRUE'. Requires 'send_reset' and 'reset_base_url';
+          with 'FALSE' the account is created immediately.
+
+registration_role: Role given to self-registered users. Default '"viewer"'. It must be
+          one of 'roles' and cannot be 'admin_role', so registration never grants
+          administrative rights. Used for both the button and Google sign-up.
+
+registration_domains: Allowed email domains for self-registration (a vector like
+          'c("example.com")'). 'NULL' (default) allows any domain.
+
+registration_max_per_hour: Maximum number of registration requests per hour across all
+          visitors.
+
+google_signup: Create an account automatically on the first sign-in with Google if the
+          email is not in the database. Default 'FALSE'. Requires 'google_enabled =
+          TRUE'; the login is derived from the email address, the email is taken from the
+          verified Google token, and the role is 'registration_role'.
+
+google_signup_require_domains: Require a non-empty 'google_domains' when 'google_signup =
+          TRUE'. Default 'TRUE': without a domain check any Google account could create
+          an account. Set to 'FALSE' only for a deliberately open application.
+
    texts: Interface texts, a result of 'aa_texts()'.
 
 Value:
@@ -198,7 +233,7 @@ Examples:
 
      # default settings
      settings <- aa_settings()
-     
+
      # password recovery by email
      settings <- aa_settings(
        reset_enabled  = TRUE,
@@ -207,7 +242,7 @@ Examples:
          message("Email for ", login, ": ", link)
        }
      )
-     
+
      # sign-in with Google (secret from an environment variable), password stays
      # as a fallback
      settings <- aa_settings(
@@ -217,7 +252,22 @@ Examples:
        google_redirect_uri  = "https://apps.example.com/",
        google_domains       = c("example.com", "example.net")
      )
-     
+
+     # open registration with email confirmation and Google sign-up
+     settings <- aa_settings(
+       registration_enabled = TRUE,
+       google_enabled       = TRUE,
+       google_signup        = TRUE,
+       google_client_id     = "1234-abc.apps.googleusercontent.com",
+       google_client_secret = Sys.getenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret"),
+       google_redirect_uri  = "https://apps.example.com/",
+       google_domains       = c("example.com"),
+       reset_base_url       = "https://apps.example.com/my_app",
+       send_reset = function(email, link, login) {
+         message("Email for ", login, ": ", link)
+       }
+     )
+
      # stricter protection, Russian interface and custom roles
      settings <- aa_settings(
        max_failed_logins = 3,
@@ -243,7 +293,7 @@ Description:
 Usage:
 
      aa_settings_from_list(x = NULL, ...)
-     
+
 Arguments:
 
        x: A list of settings, for example 'yaml::read_yaml("config.yaml")$security', or
@@ -277,7 +327,7 @@ Description:
 Usage:
 
      aa_texts(lang = c("en", "ru"), ...)
-     
+
 Arguments:
 
     lang: Language of the texts: '"en"' (default) or '"ru"'.
@@ -296,11 +346,11 @@ Examples:
 
      # English texts (default)
      texts <- aa_texts()
-     
+
      # English texts with a custom sign-in button label
      texts <- aa_texts("en", login_button = "Log in")
      texts$login_button
-     
+
      # Russian texts
      texts <- aa_texts("ru")
 ```
@@ -318,7 +368,7 @@ Description:
 Usage:
 
      aa_text(x, key, ...)
-     
+
 Arguments:
 
        x: A set of texts (result of 'aa_texts()') or settings (result of
@@ -351,7 +401,7 @@ Description:
 Usage:
 
      aa_text_keys()
-     
+
 Value:
 
      A vector of key names that can be overridden in 'aa_texts()'.

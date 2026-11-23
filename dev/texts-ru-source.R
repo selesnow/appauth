@@ -126,6 +126,19 @@ aa_texts_ru <- list(
   google_no_user = "Для этого аккаунта Google доступ не предоставлен. Обратитесь к администратору.",
   google_domain = "Этот аккаунт Google не относится к разрешённым доменам организации.",
   password_login_disabled = "Вход по паролю отключён. Используйте вход через Google.",
+  # самостоятельная регистрация
+  registration_link = "Создать аккаунт",
+  registration_title = "Создание аккаунта",
+  registration_hint = "Введите логин, email и пароль. На адрес будет отправлена ссылка для подтверждения.",
+  registration_email_label = "Email",
+  registration_button = "Создать аккаунт",
+  registration_done = "Если адрес свободен, на него отправлена ссылка для подтверждения. Ссылка действует %d мин.",
+  registration_confirmed = "Аккаунт создан. Войдите с вашим паролем.",
+  registration_link_invalid = "Ссылка для регистрации недействительна или устарела. Запросите регистрацию заново.",
+  registration_domain = "Регистрация разрешена только для доменов: %s",
+  registration_throttled = "Слишком много запросов на регистрацию. Попробуйте позже.",
+  registration_failed = "Не удалось создать аккаунт. Попробуйте ещё раз.",
+  google_signup_login_taken = "Этот логин уже принадлежит другому аккаунту. Обратитесь к администратору.",
   # email пользователя
   email_section = "Email для восстановления пароля",
   email_label = "Email",
@@ -171,7 +184,7 @@ aa_texts_ru <- list(
 aa_events_ru_source <- list(
   login_success = c(
     "Успешный вход (по паролю, через Google или по cookie автовхода)",
-    "cookie (автовход) или google (вход через Google)"
+    "cookie (автовход), google (вход через Google) или registration (самостоятельная регистрация)"
   ),
   login_failed = c(
     "Неверный логин или пароль",
@@ -263,5 +276,21 @@ aa_events_ru_source <- list(
   weak_password_set = c(
     "Принят слабый пароль (режим password_policy = \"warn\")",
     "логин и причина: password_common, password_equals_login, password_repeated"
+  ),
+  registration_requested = c(
+    "Запрос самостоятельной регистрации (пользователю ответ всегда одинаковый)",
+    "результат: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed или причина проверки логина и пароля"
+  ),
+  registration_confirmed = c(
+    "Аккаунт создан по ссылке из письма",
+    "логин нового пользователя"
+  ),
+  registration_failed = c(
+    "Неудачная попытка подтвердить регистрацию",
+    "причина: registration_link_invalid, user_exists, email_exists"
+  ),
+  google_user_created = c(
+    "Аккаунт создан автоматически при входе через Google",
+    "логин нового пользователя"
   )
 )

@@ -569,6 +569,54 @@ test_that("sign-in does not create users", {
   expect_equal(tquery(con, "SELECT COUNT(*) AS n FROM users")$n, before)
 })
 
+test_that("Google sign-up creates a viewer from a verified email", {
+  g_fake_jwks()
+  con <- g_db()
+  settings <- g_settings(google_signup = TRUE)
+  g_fake_exchange(con, email = "dana@example.com")
+
+  started <- aa_google_start(con, settings)
+  res <- aa_google_complete(con, settings, "c", started$state)
+
+  expect_true(res$ok)
+  expect_true(res$created)
+  expect_identical(res$email, "dana@example.com")
+  expect_identical(res$login, "dana")
+  expect_identical(res$role, "viewer")
+  expect_false(res$must_change)
+  expect_identical(aa_get_user(con, "dana")$role, "viewer")
+
+  hash <- aa_query(
+    con, "SELECT password FROM users WHERE login = ?",
+    params = list("dana")
+  )$password
+  expect_true(aa_is_password_hash(hash))
+  expect_false(aa_verify_password("any password", hash))
+})
+
+test_that("Google sign-up adds a suffix when the derived login is taken", {
+  g_fake_jwks()
+  con <- g_db()
+  raw_user(con, "dana", role = "viewer")
+  settings <- g_settings(google_signup = TRUE)
+  g_fake_exchange(con, email = "dana@example.com")
+
+  started <- aa_google_start(con, settings)
+  res <- aa_google_complete(con, settings, "c", started$state)
+
+  expect_true(res$ok)
+  expect_identical(res$login, "dana.2")
+  expect_identical(aa_get_user(con, "dana.2")$role, "viewer")
+})
+
+test_that("a Google sign-up refusal has a text key", {
+  expect_identical(
+    aa_google_text_key("signup_login_taken"),
+    "google_signup_login_taken"
+  )
+  expect_identical(aa_google_text_key("signup_disabled"), "google_no_user")
+})
+
 test_that("exchange errors, an empty code and Google off give a refusal without an exception", {
   g_fake_jwks()
   con <- g_db()

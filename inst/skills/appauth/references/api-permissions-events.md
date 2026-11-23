@@ -1,6 +1,6 @@
 # appauth reference: Permissions and events
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_permissions_from_matrix()`, `aa_can()`, `aa_require()`, `aa_events()`, `aa_event_logger()`
@@ -27,7 +27,7 @@ Description:
 Usage:
 
      aa_permissions_from_matrix(matrix)
-     
+
 Arguments:
 
   matrix: A named list "permission -> roles", or a function without arguments that
@@ -75,7 +75,7 @@ Description:
 Usage:
 
      aa_can(user, permission, provider)
-     
+
 Arguments:
 
     user: The user: a list with 'login' and 'role' fields, for example 'auth$user()'.
@@ -125,7 +125,7 @@ Usage:
        settings = aa_settings(),
        session_id = NULL
      )
-     
+
 Arguments:
 
     auth: The authorization object (a list with a reactive 'user' value, as returned by
@@ -149,7 +149,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      observeEvent(input$run_task, {
        aa_require(auth, "Run", provider, on_event = log_event)
        # ... the action ...
@@ -171,7 +171,7 @@ Description:
 Usage:
 
      aa_events(lang = c("en", "ru"))
-     
+
 Arguments:
 
     lang: Language of the 'description' and 'value' columns: '"en"' (default) or '"ru"'.
@@ -216,7 +216,7 @@ Usage:
        enabled = TRUE,
        format_value = NULL
      )
-     
+
 Arguments:
 
   writer: Writer function function(action, user, session_id, value): writes a row to your
@@ -271,7 +271,7 @@ Examples:
      })
      handler("login_failed", "boss", "s1", "")
      length(rows)
-     
+
      # only selected events with their own action names and a switch
      log_on <- TRUE
      handler <- aa_event_logger(

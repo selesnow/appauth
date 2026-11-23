@@ -105,6 +105,20 @@ Logic without UI: \code{\link[=aa_request_password_reset]{aa_request_password_re
 \code{\link[=aa_reset_password_with_token]{aa_reset_password_with_token()}}.
 }
 
+\section{Self-registration}{
+
+With \code{registration_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a
+"Create an account" link appears on the sign-in form when the database
+already has users. A visitor enters a login, an email address and a password;
+the account is created after following the one-time link from the email
+(\code{registration_verify_email = TRUE}, the default) or immediately when email
+confirmation is disabled. The role comes from \code{registration_role}, never from
+the form. After creation the module signs the new user in. The module reports
+\code{registration_requested}, \code{registration_confirmed}, \code{registration_failed}
+and \code{login_success} with the value \code{registration}. Logic without UI:
+\code{\link[=aa_register_user]{aa_register_user()}} and \code{\link[=aa_confirm_registration]{aa_confirm_registration()}}.
+}
+
 \section{Sign-in with Google}{
 
 With \code{google_enabled = TRUE} in the settings (\code{\link[=aa_settings]{aa_settings()}}), a "Sign in
@@ -115,8 +129,8 @@ to \code{google_redirect_uri}; the package checks the signature and contents of
 the Google token, the organization
 domain (\code{google_domains}) and finds the user \strong{by email among already created
 ones}:
-sign-in does not create new users, the role is taken from the database, a
-blocked
+sign-in does not create new users unless \code{google_signup = TRUE}, and then the
+new account gets the \code{registration_role} role. A blocked
 user does not get in. The two-factor code is not asked for in this case
 (Google does the confirmation). \code{state} from the address is compared with a
 short cookie

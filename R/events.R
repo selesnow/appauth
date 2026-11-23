@@ -83,7 +83,7 @@ aa_events <- function(lang = c("en", "ru")) {
     c(
       "login_success",
       "Successful sign-in (by password, with Google or by an auto sign-in cookie)",
-      "cookie (auto sign-in) or google (Google sign-in)"
+      "cookie (auto sign-in), google (Google sign-in) or registration (self-registration)"
     ),
     c(
       "login_failed",
@@ -178,12 +178,32 @@ aa_events <- function(lang = c("en", "ru")) {
     c(
       "google_login_failed",
       "Failed Google sign-in (the user is shown a generic text)",
-      "reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; followed by a space and the email if known"
+      "reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known"
     ),
     c(
       "weak_password_set",
       "A weak password was accepted (password_policy = \"warn\" mode)",
       "login and reason: password_common, password_equals_login, password_repeated"
+    ),
+    c(
+      "registration_requested",
+      "Self-registration requested (the user is shown a generic answer)",
+      "reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason"
+    ),
+    c(
+      "registration_confirmed",
+      "Account created from the email confirmation link",
+      "login of the new user"
+    ),
+    c(
+      "registration_failed",
+      "Failed attempt to confirm a registration",
+      "reason: registration_link_invalid, user_exists, email_exists"
+    ),
+    c(
+      "google_user_created",
+      "Account created automatically on first Google sign-in",
+      "login of the new user"
     )
   )
 

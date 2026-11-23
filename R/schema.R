@@ -1,12 +1,13 @@
 # Schema of the authentication tables and its versioned migrations.
 #
-# The package owns seven tables:
+# The package owns eight tables:
 #   users             - users (login, password hash, role, blocked flag, email);
 #   auth_sessions     - auto-login tokens (the sha256 of the token is stored);
 #   login_attempts    - login attempts for protection against password guessing;
 #   password_resets   - one-time password recovery tokens (the sha256 of the token is stored);
 #   totp_recovery     - two-factor authentication recovery codes (the sha256 of the code is stored);
 #   oauth_states      - one-time Google sign-in parameters (the sha256 of state is stored);
+#   registrations     - pending self-registrations (password hash and token sha256);
 #   appauth_migrations - a service table of migration versions.
 #
 # Table names and columns are compatible with schemas created by earlier versions
@@ -380,6 +381,61 @@ aa_migrations <- function() {
           unique = TRUE
         )
       }
+    ),
+    list(
+      version = 10L,
+      name = "registrations",
+      up = function(conn) {
+        t <- aa_col_types(conn)
+
+        aa_execute(
+          conn,
+          paste0(
+            "
+          CREATE TABLE IF NOT EXISTS registrations (
+            ",
+            aa_pk_column(conn, "registrations"),
+            ",
+            login       ",
+            t$key,
+            " NOT NULL,
+            email       ",
+            t$key,
+            " NOT NULL,
+            password    ",
+            t$text,
+            " NOT NULL,
+            role        ",
+            t$key,
+            " NOT NULL,
+            token_hash  ",
+            t$key,
+            " NOT NULL,
+            created_at  ",
+            t$ts_now,
+            " NOT NULL,
+            expires_at  ",
+            t$ts,
+            " NOT NULL,
+            used        INTEGER NOT NULL DEFAULT 0
+          )
+        "
+          )
+        )
+        aa_create_index(
+          conn,
+          "idx_registrations_token",
+          "registrations",
+          "token_hash",
+          unique = TRUE
+        )
+        aa_create_index(
+          conn,
+          "idx_registrations_email",
+          "registrations",
+          "email"
+        )
+      }
     )
   )
 }
@@ -513,9 +569,9 @@ aa_schema_version <- function(conn) {
 #' Deletes login attempt records older than `attempts_retention_hours` hours, as
 #' well as expired and revoked auto-login tokens older than
 #' `token_retention_days`
-#' days, as well as used and expired password recovery tokens
-#' and Google sign-in parameters older than a day. Active tokens and fresh
-#' attempts are not touched. Call it
+#' days, as well as used and expired password recovery tokens,
+#' pending registrations and Google sign-in parameters older than a day. Active
+#' tokens and fresh attempts are not touched. Call it
 #' after [aa_init_db()].
 #'
 #' @inheritParams aa_init_db
@@ -525,8 +581,8 @@ aa_schema_version <- function(conn) {
 #' attempts),
 #'   `auth_sessions` (the number of deleted tokens), `password_resets` (the
 #'   number of deleted
-#'   password recovery tokens) and `oauth_states` (the number of deleted sign-in
-#'   parameters
+#'   password recovery tokens), `registrations` (the number of deleted pending
+#'   registrations) and `oauth_states` (the number of deleted sign-in parameters
 #'   for Google).
 #' @export
 #'
@@ -571,6 +627,16 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     error = function(e) 0L
   )
 
+  registrations <- tryCatch(
+    aa_execute(
+      conn,
+      "DELETE FROM registrations WHERE expires_at < ?
+         OR (used = 1 AND created_at < ?)",
+      params = list(day_cutoff, day_cutoff)
+    ),
+    error = function(e) 0L
+  )
+
   oauth <- tryCatch(
     aa_execute(
       conn,
@@ -584,6 +650,7 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     login_attempts = attempts,
     auth_sessions = sessions,
     password_resets = resets,
+    registrations = registrations,
     oauth_states = oauth
   ))
 }
@@ -624,7 +691,8 @@ aa_prepare_db <- function(conn, settings = aa_settings()) {
       if (
         cleaned$login_attempts +
           cleaned$auth_sessions +
-          cleaned$password_resets >
+          cleaned$password_resets +
+          cleaned$registrations >
           0
       ) {
         message(
@@ -633,7 +701,9 @@ aa_prepare_db <- function(conn, settings = aa_settings()) {
           ", tokens ",
           cleaned$auth_sessions,
           ", password recovery tokens ",
-          cleaned$password_resets
+          cleaned$password_resets,
+          ", registrations ",
+          cleaned$registrations
         )
       }
 

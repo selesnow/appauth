@@ -62,6 +62,18 @@ aa_auth_ui <- function(id) {
 #' Logic without UI: [aa_request_password_reset()] and
 #' [aa_reset_password_with_token()].
 #'
+#' @section Self-registration:
+#' With `registration_enabled = TRUE` in the settings ([aa_settings()]), a
+#' "Create an account" link appears on the sign-in form when the database
+#' already has users. A visitor enters a login, an email address and a password;
+#' the account is created after following the one-time link from the email
+#' (`registration_verify_email = TRUE`, the default) or immediately when email
+#' confirmation is disabled. The role comes from `registration_role`, never from
+#' the form. After creation the module signs the new user in. The module reports
+#' `registration_requested`, `registration_confirmed`, `registration_failed`
+#' and `login_success` with the value `registration`. Logic without UI:
+#' [aa_register_user()] and [aa_confirm_registration()].
+#'
 #' @section Sign-in with Google:
 #' With `google_enabled = TRUE` in the settings ([aa_settings()]), a "Sign in
 #' with Google"
@@ -71,8 +83,8 @@ aa_auth_ui <- function(id) {
 #' the Google token, the organization
 #' domain (`google_domains`) and finds the user **by email among already created
 #' ones**:
-#' sign-in does not create new users, the role is taken from the database, a
-#' blocked
+#' sign-in does not create new users unless `google_signup = TRUE`, and then the
+#' new account gets the `registration_role` role. A blocked
 #' user does not get in. The two-factor code is not asked for in this case
 #' (Google does the confirmation). `state` from the address is compared with a
 #' short cookie
@@ -171,6 +183,7 @@ aa_auth_server <- function(
     google_on <- isTRUE(settings$google_enabled)
     # settings are built by aa_settings(), but just in case a missing field does not disable the password
     password_on <- !identical(settings$password_login, FALSE)
+    registration_on <- isTRUE(settings$registration_enabled)
     oauth_cookie <- paste0(cookie_name, "_oauth")
 
     users_exist <- shiny::reactiveVal(
@@ -251,6 +264,40 @@ aa_auth_server <- function(
             message_text("")
             reset_pending(token)
           }
+        },
+        once = TRUE
+      )
+    }
+
+    # confirmation link from the registration email: ?register=<token>
+    if (registration_on && password_on) {
+      shiny::observeEvent(
+        aa_url_search(session),
+        {
+          token <- shiny::parseQueryString(aa_url_search(session))[["register"]]
+
+          if (!aa_is_string(token) || !is.null(shiny::isolate(user()))) {
+            return()
+          }
+
+          shiny::updateQueryString("?", mode = "replace", session = session)
+
+          login <- tryCatch(
+            aa_confirm_registration(conn, token, settings),
+            appauth_error_user = function(e) NULL
+          )
+
+          if (is.null(login)) {
+            message_text(aa_text(settings, "registration_link_invalid"))
+            emit("registration_failed", NULL, "registration_link_invalid")
+            return()
+          }
+
+          user_row <- aa_get_user(conn, login)
+          role <- if (is.null(user_row)) settings$registration_role else user_row$role[1]
+          emit("registration_confirmed", login)
+          emit("login_success", login, "registration")
+          finish_login(login, role)
         },
         once = TRUE
       )
@@ -444,6 +491,10 @@ aa_auth_server <- function(
             return()
           }
 
+          if (isTRUE(res$created)) {
+            emit("google_user_created", res$login)
+          }
+
           finish_login(res$login, res$role)
           emit("login_success", res$login, "google")
         },
@@ -622,6 +673,51 @@ aa_auth_server <- function(
             )
           )
         )
+      } else if (
+        users_exist() &&
+          identical(mode(), "register") &&
+          registration_on &&
+          password_on
+      ) {
+        heading <- aa_text(settings, "registration_title")
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "registration_hint")
+        )
+        shiny::tagList(
+          shiny::textInput(
+            ns("register_login"),
+            aa_text(settings, "login_label")
+          ),
+          shiny::textInput(
+            ns("register_email"),
+            aa_text(settings, "registration_email_label")
+          ),
+          shiny::passwordInput(
+            ns("register_password"),
+            aa_text(settings, "password_label")
+          ),
+          shiny::passwordInput(
+            ns("register_confirm"),
+            aa_text(settings, "password_confirm_label")
+          ),
+          shiny::actionButton(
+            ns("register_btn"),
+            aa_text(settings, "registration_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
+          ),
+          shiny::div(
+            class = "aa-login-hint",
+            shiny::actionLink(
+              ns("back_link"),
+              aa_text(settings, "back_to_login")
+            )
+          )
+        )
       } else if (users_exist()) {
         heading <- title %||% aa_text(settings, "login_title")
         shiny::tagList(
@@ -667,6 +763,15 @@ aa_auth_server <- function(
               shiny::actionLink(
                 ns("forgot_link"),
                 aa_text(settings, "forgot_link")
+              )
+            )
+          },
+          if (registration_on && password_on) {
+            shiny::div(
+              class = "aa-login-hint",
+              shiny::actionLink(
+                ns("register_link"),
+                aa_text(settings, "registration_link")
               )
             )
           }
@@ -855,6 +960,73 @@ aa_auth_server <- function(
       shiny::req(isTRUE(settings$reset_enabled), password_on)
       message_text("")
       mode("forgot")
+    })
+
+    shiny::observeEvent(input$register_link, {
+      shiny::req(registration_on, password_on)
+      message_text("")
+      mode("register")
+    })
+
+    shiny::observeEvent(input$register_btn, {
+      shiny::req(registration_on, password_on)
+
+      if (!identical(input$register_password, input$register_confirm)) {
+        message_text(aa_text(settings, "passwords_mismatch"))
+        return()
+      }
+
+      res <- tryCatch(
+        aa_register_user(
+          conn,
+          input$register_login,
+          input$register_password,
+          input$register_email,
+          settings
+        ),
+        error = function(e) {
+          message(
+            "appauth: could not process the registration request: ",
+            conditionMessage(e)
+          )
+          list(reason = "registration_failed", login = NA_character_)
+        }
+      )
+
+      emit(
+        "registration_requested",
+        if (is.na(res$login)) NULL else res$login,
+        res$reason
+      )
+
+      if (identical(res$reason, "created")) {
+        warn_weak(input$register_password, res$login)
+        emit("registration_confirmed", res$login)
+        emit("login_success", res$login, "registration")
+        finish_login(res$login, settings$registration_role)
+        return()
+      }
+
+      if (identical(res$reason, "sent")) {
+        message_text(aa_text(
+          settings,
+          "registration_done",
+          as.integer(round(settings$reset_ttl_minutes))
+        ))
+        mode("login")
+        return()
+      }
+
+      if (res$reason %in% c("disabled", "send_failed", "registration_failed")) {
+        message_text(aa_text(settings, "registration_failed"))
+      } else if (identical(res$reason, "registration_throttled")) {
+        message_text(aa_text(settings, "registration_throttled"))
+      } else {
+        message_text(aa_problem_text(
+          settings,
+          list(reason = res$reason, args = list())
+        ))
+      }
     })
 
     shiny::observeEvent(input$back_link, {

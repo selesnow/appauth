@@ -1,6 +1,6 @@
 # appauth reference: Users
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()`
@@ -37,7 +37,7 @@ Description:
 Usage:
 
      aa_get_user(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -75,7 +75,7 @@ Description:
 Usage:
 
      aa_list_users(conn)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -110,7 +110,7 @@ Description:
 Usage:
 
      aa_users_exist(conn)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -144,7 +144,7 @@ Description:
 Usage:
 
      aa_users_overview(conn, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -199,7 +199,7 @@ Usage:
        must_change = FALSE,
        email = NULL
      )
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -229,7 +229,7 @@ Examples:
        aa_init_db(conn)
        aa_create_user(conn, "worker", "worker-password", "user")
        aa_list_users(conn)
-     
+
        # the error can be shown to the user
        tryCatch(
          aa_create_user(conn, "worker", "another-password", "user"),
@@ -253,7 +253,7 @@ Description:
 Usage:
 
      aa_create_first_admin(conn, login, password, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -297,7 +297,7 @@ Description:
 Usage:
 
      aa_validate_new_user(conn, login, password, role, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -346,7 +346,7 @@ Description:
 Usage:
 
      aa_authenticate(conn, login, password)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -403,7 +403,7 @@ Usage:
        must_change = FALSE,
        keep_token = NULL
      )
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -458,7 +458,7 @@ Usage:
        settings = aa_settings(),
        keep_token = NULL
      )
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -507,7 +507,7 @@ Description:
 Usage:
 
      aa_set_role(conn, login, role, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -561,7 +561,7 @@ Usage:
        acting_login = NULL,
        settings = aa_settings()
      )
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -614,7 +614,7 @@ Description:
 Usage:
 
      aa_delete_user(conn, login, acting_login = NULL, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -662,7 +662,7 @@ Description:
 Usage:
 
      aa_check_can_block(conn, login, acting_login = NULL, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -701,7 +701,7 @@ Description:
 Usage:
 
      aa_check_can_delete(conn, login, acting_login = NULL, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -742,7 +742,7 @@ Description:
 Usage:
 
      aa_check_can_change_role(conn, login, role, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').

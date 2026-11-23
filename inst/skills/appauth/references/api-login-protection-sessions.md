@@ -1,6 +1,6 @@
 # appauth reference: Login protection and sessions
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`, `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_active_autologins()`, `aa_user_session_valid()`
@@ -34,7 +34,7 @@ Description:
 Usage:
 
      aa_login_gate(conn, login, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -83,7 +83,7 @@ Description:
 Usage:
 
      aa_record_attempt(conn, login, success, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -123,7 +123,7 @@ Description:
 Usage:
 
      aa_login_lock_remaining(conn, login, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -167,7 +167,7 @@ Description:
 Usage:
 
      aa_global_throttled(conn, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -202,7 +202,7 @@ Description:
 Usage:
 
      aa_clear_attempts(conn, login, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -241,7 +241,7 @@ Description:
 Usage:
 
      aa_issue_token(conn, login, settings = aa_settings())
-     
+
 Arguments:
 
     conn: Database connection.
@@ -262,7 +262,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      token <- aa_issue_token(conn, "ivan")
      if (!is.null(token)) session$sendCustomMessage("setAuthCookie", token)
      ## End(Not run)
@@ -283,7 +283,7 @@ Description:
 Usage:
 
      aa_find_session_user(conn, token)
-     
+
 Arguments:
 
     conn: Database connection.
@@ -297,7 +297,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      user <- aa_find_session_user(conn, input$auth_cookie)
      if (!is.null(user)) {
        # the user logs in without a password
@@ -317,7 +317,7 @@ Description:
 Usage:
 
      aa_revoke_token(conn, token)
-     
+
 Arguments:
 
     conn: Database connection.
@@ -331,7 +331,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      aa_revoke_token(conn, input$auth_cookie)
      ## End(Not run)
 ```
@@ -349,7 +349,7 @@ Description:
 Usage:
 
      aa_revoke_sessions(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -388,7 +388,7 @@ Description:
 Usage:
 
      aa_active_autologins(conn, login = NULL)
-     
+
 Arguments:
 
     conn: Database connection.
@@ -428,7 +428,7 @@ Description:
 Usage:
 
      aa_user_session_valid(conn, login, role, token = NULL)
-     
+
 Arguments:
 
     conn: Database connection.
@@ -455,7 +455,7 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      check <- aa_user_session_valid(conn, auth$user()$login, auth$user()$role,
      auth$token())
      if (!check$valid) auth$logout(reason = check$reason)

@@ -1,6 +1,6 @@
 # appauth reference: Database
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_init_db()`, `aa_prepare_db()`, `aa_schema_version()`, `aa_cleanup()`, `aa_session_connection()`
@@ -30,7 +30,7 @@ Description:
 Usage:
 
      aa_init_db(conn)
-     
+
 Arguments:
 
     conn: Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
@@ -73,7 +73,7 @@ Description:
 Usage:
 
      aa_prepare_db(conn, settings = aa_settings())
-     
+
 Arguments:
 
     conn: Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
@@ -106,7 +106,7 @@ Description:
 Usage:
 
      aa_schema_version(conn)
-     
+
 Arguments:
 
     conn: Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
@@ -137,14 +137,14 @@ Description:
 
      Deletes login attempt records older than 'attempts_retention_hours' hours, as well
      as expired and revoked auto-login tokens older than 'token_retention_days' days, as
-     well as used and expired password recovery tokens and Google sign-in parameters
-     older than a day. Active tokens and fresh attempts are not touched. Call it after
-     'aa_init_db()'.
+     well as used and expired password recovery tokens, pending registrations and Google
+     sign-in parameters older than a day. Active tokens and fresh attempts are not
+     touched. Call it after 'aa_init_db()'.
 
 Usage:
 
      aa_cleanup(conn, settings = aa_settings())
-     
+
 Arguments:
 
     conn: Database connection: SQLite, DuckDB, MySQL / MariaDB or PostgreSQL
@@ -156,8 +156,9 @@ Value:
 
      A list (invisibly): 'login_attempts' (the number of deleted login attempts),
      'auth_sessions' (the number of deleted tokens), 'password_resets' (the number of
-     deleted password recovery tokens) and 'oauth_states' (the number of deleted sign-in
-     parameters for Google).
+     deleted password recovery tokens), 'registrations' (the number of deleted pending
+     registrations) and 'oauth_states' (the number of deleted sign-in parameters for
+     Google).
 
 Examples:
 
@@ -191,7 +192,7 @@ Usage:
        settings = aa_settings(),
        connect = NULL
      )
-     
+
 Arguments:
 
  db_path: Path to the SQLite database file. Not needed if 'connect' is set.
@@ -218,11 +219,11 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      server <- function(input, output, session) {
        # SQLite (default)
        conn <- aa_session_connection("app.db", prepare = TRUE)
-     
+
        # MySQL / MariaDB
        conn <- aa_session_connection(
          prepare = TRUE,
@@ -231,7 +232,7 @@ Examples:
            user = "app", password = Sys.getenv("APP_DB_PASSWORD")
          )
        )
-     
+
        auth <- aa_auth_server("auth", conn)
      }
      ## End(Not run)

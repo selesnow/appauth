@@ -15,7 +15,7 @@ Since `appauth` 0.8.0 the package works with SQLite (the default), DuckDB, MySQL
 
 ## Connecting
 
-Create a separate (empty) schema for the authentication tables: the package creates seven tables itself. The database user needs the privileges `CREATE`, `ALTER`, `INDEX`, `SELECT`, `INSERT`, `UPDATE`, `DELETE`. The database password comes only from environment variables (`.Renviron`, service secrets), not from code and not from `config.yaml` in git.
+Create a separate (empty) schema for the authentication tables: the package creates eight tables itself. The database user needs the privileges `CREATE`, `ALTER`, `INDEX`, `SELECT`, `INSERT`, `UPDATE`, `DELETE`. The database password comes only from environment variables (`.Renviron`, service secrets), not from code and not from `config.yaml` in git.
 
 ```r
 server <- function(input, output, session) {

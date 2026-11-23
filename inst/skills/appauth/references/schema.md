@@ -1,8 +1,8 @@
 # appauth database schema
 
-Package version: 0.10.1, schema version: 9. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
+Package version: 0.11.0, schema version: 10. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
 
-The package owns seven tables. It does not touch the other tables of the application.
+The package owns eight tables. It does not touch the other tables of the application.
 
 ## users
 
@@ -103,6 +103,26 @@ Google sign-in parameters (since version 0.7.0). A record is created when the "S
 * `state_hash` is the sha256 of the `state` value (the `state` itself is only in a short-lived browser cookie and in the return URL); `nonce` and `code_verifier` (PKCE) are needed when verifying the token and exchanging the code.
 * A record lives for 10 minutes and is consumed by an atomic query (`used = 1`); the `state` is not accepted a second time. `aa_cleanup()` deletes records expired for more than a day. The overall limit on sign-in starts is 60 per minute.
 
+## registrations
+
+Pending self-registrations (since version 0.11.0). A record is created by `aa_register_user()` and consumed when the confirmation link is used.
+
+| Column | Type | Required | Default | Key |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | no |  | PK |
+| `login` | TEXT | yes |  |  |
+| `email` | TEXT | yes |  |  |
+| `password` | TEXT | yes |  |  |
+| `role` | TEXT | yes |  |  |
+| `token_hash` | TEXT | yes |  | UNIQUE index |
+| `created_at` | TEXT | yes | now (UTC) |  |
+| `expires_at` | TEXT | yes |  |  |
+| `used` | INTEGER | yes | `0` |  |
+
+* `password` is already a scrypt hash; a plain-text password never reaches this table.
+* `token_hash` is the sha256 of the one-time confirmation token; the token itself exists only in the email link. The unique index prevents reusing a token.
+* `aa_cleanup()` deletes registrations that expired or were used more than a day ago. Creating a user with the same login or email consumes unused registrations.
+
 ## appauth_migrations
 
 | Column | Type | Required | Default | Key |
@@ -124,7 +144,7 @@ Table names, column names and migration numbers are the same in all databases. T
 
 * Time is always UTC text `YYYY-MM-DD HH:MM:SS`, so comparing deadlines works the same in all databases. The "now" default for `created_at` and similar columns also exists in the other databases (as a database expression).
 * Email uniqueness is enforced everywhere by the regular unique index `idx_users_email` (several `NULL`s are allowed); in SQLite old databases have it as a partial index (`WHERE email IS NOT NULL`), which behaves the same.
-* DuckDB does not allow altering a table that has an index, so `users` is created there with all columns at once (migrations 2, 5, 6, 7 and 8 add nothing).
+* DuckDB does not allow altering a table that has an index, so `users` is created there with all columns at once (migrations 2, 5, 6, 7 and 8 add nothing); migration 10 creates `registrations` as a new table.
 * In MySQL DDL is not rolled back, while in PostgreSQL the migrations run in a single transaction; in both databases they run under a lock, and a repeated run completes whatever is missing.
 
 ## Migrations
@@ -142,6 +162,7 @@ Table names, column names and migration numbers are the same in all databases. T
 | 7 | `password_resets_and_email` |
 | 8 | `totp_two_factor` |
 | 9 | `oauth_states` |
+| 10 | `registrations` |
 
 ## Legacy schemas
 

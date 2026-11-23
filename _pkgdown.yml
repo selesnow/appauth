@@ -53,6 +53,7 @@ articles:
   navbar: ~
   contents:
   - getting-started
+  - self-registration
   - integrating-existing-app
   - extension-points
   - testing-your-app
@@ -112,6 +113,11 @@ reference:
   - aa_request_password_reset
   - aa_reset_token_login
   - aa_reset_password_with_token
+- title: Self-registration
+  contents:
+  - aa_register_user
+  - aa_registration_token_login
+  - aa_confirm_registration
 - title: Two-factor authentication
   contents:
   - aa_totp_setup

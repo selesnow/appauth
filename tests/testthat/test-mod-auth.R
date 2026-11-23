@@ -393,3 +393,134 @@ test_that("after sign-out on all devices the cookie of the open session no longe
     expect_false(session$returned$logged_in())
   })
 })
+
+# --- self-registration -------------------------------------------------------
+
+auth_reg_box <- function() {
+  box <- new.env(parent = emptyenv())
+  box$sent <- list()
+  box
+}
+
+auth_reg_settings <- function(box = auth_reg_box(), ..., verify = TRUE) {
+  args <- list(
+    registration_enabled = TRUE,
+    registration_verify_email = verify,
+    registration_role = "viewer",
+    reset_base_url = "https://apps.example.com/my_app",
+    send_reset = function(email, link, login) {
+      box$sent[[length(box$sent) + 1]] <- list(
+        email = email,
+        link = link,
+        login = login
+      )
+    }
+  )
+  do.call(aa_settings, utils::modifyList(args, list(...)))
+}
+
+with_auth_url <- function(search, env = parent.frame()) {
+  testthat::local_mocked_bindings(
+    aa_url_search = function(session) search,
+    .package = "appauth",
+    .env = env
+  )
+}
+
+test_that("the registration link and form have stable markup", {
+  con <- auth_db()
+  settings <- auth_reg_settings()
+
+  run_auth(con, settings = settings, {
+    session$flushReact()
+    html <- form_html(output)
+    expect_match(html, "register_link", fixed = TRUE)
+    expect_match(html, aa_text(settings, "registration_link"), fixed = TRUE)
+    expect_snapshot(html)
+
+    session$setInputs(register_link = 1)
+    html <- form_html(output)
+    expect_match(html, "register_login", fixed = TRUE)
+    expect_match(html, "register_email", fixed = TRUE)
+    expect_match(html, "register_password", fixed = TRUE)
+    expect_match(html, "register_confirm", fixed = TRUE)
+    expect_match(html, "register_btn", fixed = TRUE)
+    expect_snapshot(html)
+  })
+})
+
+test_that("registration without email confirmation signs the visitor in with the configured role", {
+  con <- auth_db()
+  box <- auth_reg_box()
+  settings <- auth_reg_settings(box, verify = FALSE)
+
+  log <- run_auth(con, settings = settings, {
+    session$setInputs(register_link = 1)
+    session$setInputs(
+      register_login = "worker",
+      register_email = "worker@example.com",
+      register_password = "Zx7!qLm2@wR9#pKs",
+      register_confirm = "Zx7!qLm2@wR9#pKs",
+      register_btn = 1
+    )
+    expect_true(session$returned$logged_in())
+    expect_equal(session$returned$user(), list(login = "worker", role = "viewer"))
+  })
+
+  expect_equal(log$names(), c("registration_requested", "registration_confirmed", "login_success"))
+  expect_equal(log$events[[1]]$value, "created")
+  expect_equal(log$events[[3]]$value, "registration")
+  expect_length(box$sent, 0)
+  expect_equal(
+    tquery(con, "SELECT email, role FROM users WHERE login = ?", params = list("worker")),
+    data.frame(email = "worker@example.com", role = "viewer", stringsAsFactors = FALSE)
+  )
+})
+
+test_that("registration with email confirmation shows a generic answer and creates no account", {
+  con <- auth_db()
+  box <- auth_reg_box()
+  settings <- auth_reg_settings(box)
+
+  log <- run_auth(con, settings = settings, {
+    session$setInputs(register_link = 1)
+    session$setInputs(
+      register_login = "worker",
+      register_email = "worker@example.com",
+      register_password = "Zx7!qLm2@wR9#pKs",
+      register_confirm = "Zx7!qLm2@wR9#pKs",
+      register_btn = 1
+    )
+    expect_match(output$message, "If the address is available", fixed = TRUE)
+    expect_match(form_html(output), "login_btn", fixed = TRUE)
+    expect_false(session$returned$logged_in())
+  })
+
+  expect_equal(log$names(), "registration_requested")
+  expect_equal(log$events[[1]]$value, "sent")
+  expect_length(box$sent, 1)
+  expect_null(aa_get_user(con, "worker"))
+  expect_equal(tquery(con, "SELECT login, email, used FROM registrations")$login, "worker")
+})
+
+test_that("the ?register= link confirms the account and signs the visitor in", {
+  con <- auth_db()
+  box <- auth_reg_box()
+  settings <- auth_reg_settings(box)
+  aa_register_user(con, "worker", "Zx7!qLm2@wR9#pKs", "worker@example.com", settings)
+  token <- sub("^.*register=", "", box$sent[[1]]$link)
+  with_auth_url(paste0("?register=", token))
+
+  log <- run_auth(con, settings = settings, {
+    session$flushReact()
+    expect_true(session$returned$logged_in())
+    expect_equal(session$returned$user(), list(login = "worker", role = "viewer"))
+    expect_false(grepl("register=", form_html(output), fixed = TRUE))
+  })
+
+  expect_equal(log$names(), c("registration_confirmed", "login_success"))
+  expect_equal(log$events[[2]]$value, "registration")
+  expect_false(is.null(aa_get_user(con, "worker")))
+  expect_null(aa_registration_token_login(con, token))
+  expect_equal(tquery(con, "SELECT used FROM registrations")$used, 1L)
+})

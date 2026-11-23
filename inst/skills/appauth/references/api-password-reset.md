@@ -1,6 +1,6 @@
 # appauth reference: Password recovery by email
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()`
@@ -29,7 +29,7 @@ Description:
 Usage:
 
      aa_set_email(conn, login, email, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -68,7 +68,7 @@ Description:
 Usage:
 
      aa_get_email(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -106,7 +106,7 @@ Description:
 Usage:
 
      aa_request_password_reset(conn, identifier, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -139,7 +139,7 @@ Examples:
        aa_init_db(conn)
        aa_create_first_admin(conn, "boss", "boss-password")
        aa_set_email(conn, "boss", "boss@example.com")
-     
+
        settings <- aa_settings(
          reset_enabled  = TRUE,
          reset_base_url = "https://apps.example.com/my_app",
@@ -166,7 +166,7 @@ Description:
 Usage:
 
      aa_reset_token_login(conn, token)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -204,7 +204,7 @@ Description:
 Usage:
 
      aa_reset_password_with_token(conn, token, password, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').

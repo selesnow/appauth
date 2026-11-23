@@ -85,6 +85,15 @@ groups <- list(
     )
   ),
   list(
+    file = "api-self-registration.md",
+    title = "Self-registration",
+    fns = c(
+      "aa_register_user",
+      "aa_registration_token_login",
+      "aa_confirm_registration"
+    )
+  ),
+  list(
     file = "api-two-factor.md",
     title = "Two-factor authentication (TOTP)",
     fns = c(
@@ -179,6 +188,7 @@ rd_text <- function(fn) {
     )
   )
   txt <- readLines(tmp, encoding = "UTF-8", warn = FALSE)
+  txt[!nzchar(trimws(txt))] <- ""
   # drop trailing empty lines
   txt <- txt[nzchar(trimws(paste(txt, collapse = ""))) | TRUE]
   while (length(txt) && !nzchar(trimws(txt[length(txt)]))) {

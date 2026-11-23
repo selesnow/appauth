@@ -137,7 +137,7 @@ tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"))       
 
 ## Google login (since 0.7.0)
 
-Off by default. Only a user who already exists in the database and has an email equal to the Google account address can log in; the role comes from the database, a blocked user cannot log in, login does not create new users, and it does not ask for the package's own 2FA. You need a domain with HTTPS and an OAuth client in Google Cloud Console (consent screen type Internal, client type Web application, redirect URI exactly as `google_redirect_uri`).
+Off by default. Normally only a user who already exists in the database and has an email equal to the Google account address can log in; the role comes from the database, a blocked user cannot log in, login does not create new users unless `google_signup = TRUE` (see below), and it does not ask for the package's own 2FA. You need a domain with HTTPS and an OAuth client in Google Cloud Console (consent screen type Internal, client type Web application, redirect URI exactly as `google_redirect_uri`).
 
 ```r
 settings <- aa_settings(
@@ -156,6 +156,26 @@ settings <- aa_settings(
 * `state` is single-use (10 minutes) and is compared with the cookie of the browser that started the login (protection against login substitution). On rejection the user sees a generic text, while the reason and email go to the `google_login_failed` event; success is `login_success` with the value `google`.
 * `password_login = FALSE` hides the password form and "Forgot password?", and password login attempts and reset links are rejected on the server. Allowed only together with `google_enabled = TRUE`; creation of the first administrator on an empty database remains.
 * Do not call Google in tests: `testthat::local_mocked_bindings(aa_google_exchange_code = ..., aa_google_fetch_jwks = ..., aa_url_search = ..., .package = "appauth")`, sign tokens with a test key (`jose::jwt_encode_sig`); the `nonce` is stored in the `oauth_states` table.
+
+## Self-registration (since 0.11.0)
+
+Off by default. Both routes create users with the non-admin `registration_role` (default `viewer`), never with `admin_role`.
+
+```r
+settings <- aa_settings(
+  registration_enabled      = TRUE,
+  registration_verify_email = TRUE,
+  send_reset                = function(email, link, login) send_mail(email, link),
+  reset_base_url            = "https://apps.example.com"
+)
+```
+
+* The login form shows a "Create an account" link only when `password_login = TRUE` and at least one user already exists; creating the first administrator stays unchanged.
+* With `registration_verify_email = TRUE` (default) the visitor receives a one-time `?register=<token>` link and the user is created after they open it. With `FALSE` the account is created immediately and the visitor is signed in.
+* Only a scrypt hash of the password and a sha256 hash of the token are stored in the `registrations` table; the token itself exists only in the email link. `aa_cleanup()` deletes expired and used rows.
+* Taken logins and emails give the same response to the visitor; the real reason goes only to `registration_requested` or `registration_failed`. `registration_domains` restricts email domains when set; `registration_max_per_hour` throttles requests.
+* For automatic account creation on Google sign-in set `google_signup = TRUE` and `google_domains`. The login is derived from the email local part (with a numeric suffix on collision), the password hash is random, and the new account gets `registration_role`. `registration_domains` does not apply here: `google_domains` is checked instead. A successful creation emits `google_user_created`.
+* Direct API for custom UI: `aa_register_user()`, `aa_registration_token_login()`, `aa_confirm_registration()`. Details: [api-self-registration.md](api-self-registration.md).
 
 ## Another database (since 0.8.0)
 
@@ -210,6 +230,13 @@ All texts are available in Russian and English: `aa_texts("ru")`, `aa_texts("en"
 | `google_redirect_uri` | `NULL` | return address, `https://...` (`http://localhost` for development), exactly as in the OAuth client |
 | `google_domains` | `NULL` | allowed organization domains (`hd` and email domain); empty: domain is not checked |
 | `password_login` | `TRUE` | password login; `FALSE` only together with `google_enabled = TRUE` |
+| `registration_enabled` | `FALSE` | self-registration form (requires `password_login = TRUE`) |
+| `registration_verify_email` | `TRUE` | require a one-time email link (needs `send_reset` and `reset_base_url`); `FALSE` creates the account immediately |
+| `registration_role` | `"viewer"` | role for new accounts, never `admin_role` |
+| `registration_domains` | `NULL` | allowed email domains for self-registration; `NULL` means any valid address |
+| `registration_max_per_hour` | 10 | registration requests per hour |
+| `google_signup` | `FALSE` | create a viewer on first verified Google sign-in (requires `google_enabled`) |
+| `google_signup_require_domains` | `TRUE` | require non-empty `google_domains` when `google_signup = TRUE` |
 
 It is convenient to keep settings in `config.yaml` and read them with `aa_settings_from_list(conf$security, texts = aa_texts("en"))`: extra keys are ignored. An invalid value (zero, text instead of a number) raises an error: if a typo in the config must not crash the application, wrap the call in `tryCatch` with fallback default settings.
 

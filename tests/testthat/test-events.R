@@ -21,7 +21,11 @@ test_that("events catalog: unique keys, all fields filled, required events prese
       "user_unblocked",
       "login_unlocked",
       "access_denied",
-      "first_admin_created"
+      "first_admin_created",
+      "registration_requested",
+      "registration_confirmed",
+      "registration_failed",
+      "google_user_created"
     ) %in%
       ev$event
   ))

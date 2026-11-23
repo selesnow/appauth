@@ -1,6 +1,6 @@
 # appauth reference: Passwords
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()`, `aa_weak_password_warning()`
@@ -32,7 +32,7 @@ Description:
 Usage:
 
      aa_hash_password(password)
-     
+
 Arguments:
 
 password: The password, a non-empty string.
@@ -68,7 +68,7 @@ Description:
 Usage:
 
      aa_verify_password(password, stored)
-     
+
 Arguments:
 
 password: The entered password.
@@ -84,7 +84,7 @@ Examples:
      hash <- aa_hash_password("secret")
      aa_verify_password("secret", hash)
      aa_verify_password("other", hash)
-     
+
      # a plain-text password does not pass verification, even if it matches
      aa_verify_password("root", "root")
 ```
@@ -102,7 +102,7 @@ Description:
 Usage:
 
      aa_is_password_hash(x)
-     
+
 Arguments:
 
        x: A character vector, for example the 'password' column of the 'users' table.
@@ -130,7 +130,7 @@ Description:
 Usage:
 
      aa_validate_password(password, settings = aa_settings(), login = NULL)
-     
+
 Arguments:
 
 password: The password to check.
@@ -172,7 +172,7 @@ Description:
 Usage:
 
      aa_validate_login(login, settings = aa_settings())
-     
+
 Arguments:
 
    login: The login to check.
@@ -205,7 +205,7 @@ Description:
 Usage:
 
      aa_migrate_plaintext_passwords(db_path, backup = TRUE, dry_run = FALSE)
-     
+
 Arguments:
 
  db_path: Path to the SQLite database file.
@@ -244,10 +244,10 @@ Examples:
        DBI::dbExecute(conn, "INSERT INTO users VALUES ('alsey', 'plain-secret',
        'admin')")
        DBI::dbDisconnect(conn)
-     
+
        # what would be migrated
        aa_migrate_plaintext_passwords(db, dry_run = TRUE)
-     
+
        # run without a backup (in this example only; keep the backup in real use)
        aa_migrate_plaintext_passwords(db, backup = FALSE)
      }
@@ -268,7 +268,7 @@ Description:
 Usage:
 
      aa_check_default_accounts(conn, common = aa_common_passwords())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database that already has the 'users' table.
@@ -313,7 +313,7 @@ Description:
 Usage:
 
      aa_common_passwords()
-     
+
 Value:
 
      A character vector.
@@ -339,7 +339,7 @@ Description:
 Usage:
 
      aa_weak_password_warning(password, settings = aa_settings(), login = NULL)
-     
+
 Arguments:
 
 password: The accepted password.

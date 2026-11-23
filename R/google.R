@@ -9,8 +9,10 @@
 #  - the code is exchanged for a token on the server side (client_secret never leaves the server);
 #  - the id_token is verified completely: signature against Google keys (RS256 only), issuer,
 #    audience, expiry, nonce, verified email and organization domain;
-#  - the user is looked up by email among existing ones: new users are not
-#    created automatically, the role is taken from the database, a blocked user does not get in;
+#  - the user is looked up by email among existing ones; with
+#    `google_signup = TRUE` an account is created from the verified email and
+#    gets the `registration_role` role; the role of existing users is taken from
+#    the database, a blocked user does not get in;
 #  - the package writes nothing to logs itself: the reason for a refusal goes to the on_event hook.
 
 # Google addresses
@@ -383,22 +385,126 @@ aa_google_verify_id_token <- function(
   list(ok = TRUE, reason = "ok", email = email)
 }
 
+# Create an account from a verified Google email
+#
+# The login is derived from the email address. If it is already taken, a numeric
+# suffix is tried. The password is random and unknown to anyone, so the account
+# can only be used through Google until the administrator sets a password.
+#
+# @param conn Database connection.
+# @param email Verified and normalized email address.
+# @param settings Settings, the result of [aa_settings()].
+#
+# @returns A list with `ok` and either `login` and `role`, or `reason`.
+# @noRd
+aa_google_signup_user <- function(conn, email, settings) {
+  fail <- function(reason) list(ok = FALSE, reason = reason)
+
+  if (!isTRUE(settings$google_signup)) {
+    return(fail("signup_disabled"))
+  }
+
+  if (!aa_is_string(email) || !nzchar(email)) {
+    return(fail("signup_bad_email"))
+  }
+
+  if (!is.null(aa_email_problem(conn, email))) {
+    return(fail("signup_email_exists"))
+  }
+
+  base <- tolower(sub("@.*$", "", email))
+  base <- gsub("[^a-z0-9._-]", ".", base)
+  base <- sub("\\.+$", "", sub("^\\.+", "", base))
+
+  if (!nzchar(base)) {
+    base <- "user"
+  }
+
+  base <- substr(base, 1, settings$login_max)
+  password_hash <- aa_hash_password(paste(
+    as.character(openssl::rand_bytes(32)),
+    collapse = ""
+  ))
+  login <- NULL
+  created <- FALSE
+
+  created <- tryCatch(
+    aa_write_section(conn, function() {
+      for (i in seq_len(20)) {
+        suffix <- if (i == 1) "" else paste0(".", i)
+
+        if (nchar(suffix) >= settings$login_max) {
+          next
+        }
+
+        candidate <- paste0(
+          substr(base, 1, settings$login_max - nchar(suffix)),
+          suffix
+        )
+
+        problem <- aa_new_user_problem(
+          conn,
+          candidate,
+          NULL,
+          settings$registration_role,
+          settings,
+          check_password = FALSE
+        )
+
+        if (is.null(problem)) {
+          aa_insert_user(
+            conn,
+            candidate,
+            password_hash,
+            settings$registration_role,
+            settings,
+            email = email
+          )
+          login <<- candidate
+          aa_invalidate_registrations(conn, candidate, email)
+          return(TRUE)
+        }
+
+        if (!problem$reason %in% c("user_exists", "user_exists_case")) {
+          return(FALSE)
+        }
+      }
+
+      FALSE
+    }),
+    error = function(e) {
+      message(
+        "appauth: could not create an account from the Google email: ",
+        conditionMessage(e)
+      )
+      FALSE
+    }
+  )
+
+  if (isTRUE(created) && !is.null(login)) {
+    list(ok = TRUE, login = login, role = settings$registration_role)
+  } else {
+    fail("signup_login_taken")
+  }
+}
+
 # Complete sign-in with Google
 #
 # Takes `code` and `state` from the return address, verifies everything and
-# finds
-# the user by email. Comparing `state` with the browser cookie is done in the
-# [aa_auth_server()] module, before this function is called.
+# finds the user by email. With `google_signup = TRUE` an account is created
+# from the verified email when there is no user yet. Comparing `state` with the
+# browser cookie is done in the [aa_auth_server()] module, before this function
+# is called.
 #
 # @param conn Database connection.
 # @param settings Settings, the result of [aa_settings()].
 # @param code,state Parameters from the return address.
 #
-# @returns A list: `ok`, `reason`, `email`, `login`, `role` and `must_change`
-#   (the last three on success). Refusal reasons: `disabled`, `bad_state`,
-#   `bad_code`, `exchange_failed`,
-#   `bad_token`, `bad_nonce`, `email_unverified`, `domain`, `no_user`,
-#   `blocked`.
+# @returns A list: `ok`, `reason`, `email`, `login`, `role`, `must_change` and
+#   `created` (the last four on success). Refusal reasons: `disabled`,
+#   `bad_state`, `bad_code`, `exchange_failed`, `bad_token`, `bad_nonce`,
+#   `email_unverified`, `domain`, `no_user`, `blocked`, `signup_login_taken`,
+#   `signup_disabled`, `signup_bad_email`, `signup_email_exists`.
 # @noRd
 aa_google_complete <- function(conn, settings, code, state) {
   fail <- function(reason, email = NA_character_) {
@@ -408,7 +514,8 @@ aa_google_complete <- function(conn, settings, code, state) {
       email = email,
       login = NA_character_,
       role = NA_character_,
-      must_change = FALSE
+      must_change = FALSE,
+      created = FALSE
     )
   }
 
@@ -463,7 +570,25 @@ aa_google_complete <- function(conn, settings, code, state) {
   )
 
   if (nrow(user) != 1) {
-    return(fail("no_user", verified$email))
+    if (!isTRUE(settings$google_signup)) {
+      return(fail("no_user", verified$email))
+    }
+
+    created <- aa_google_signup_user(conn, verified$email, settings)
+
+    if (!isTRUE(created$ok)) {
+      return(fail(created$reason, verified$email))
+    }
+
+    return(list(
+      ok = TRUE,
+      reason = "ok",
+      email = verified$email,
+      login = created$login,
+      role = created$role,
+      must_change = FALSE,
+      created = TRUE
+    ))
   }
 
   if (isTRUE(user$blocked[1] == 1)) {
@@ -476,7 +601,8 @@ aa_google_complete <- function(conn, settings, code, state) {
     email = verified$email,
     login = user$login[1],
     role = user$role[1],
-    must_change = isTRUE(user$must_change[1] == 1)
+    must_change = isTRUE(user$must_change[1] == 1),
+    created = FALSE
   )
 }
 
@@ -633,6 +759,10 @@ aa_google_text_key <- function(reason) {
     reason,
     blocked = "blocked_user",
     no_user = "google_no_user",
+    signup_disabled = "google_no_user",
+    signup_login_taken = "google_signup_login_taken",
+    signup_bad_email = "google_failed",
+    signup_email_exists = "google_failed",
     domain = "google_domain",
     cancelled = "google_cancelled",
     "google_failed"

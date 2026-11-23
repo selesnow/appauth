@@ -5,8 +5,8 @@ test_that("on an empty database all tables are created and all migrations applie
 
   res <- aa_init_db(con)
 
-  expect_identical(res$applied, 1:9)
-  expect_identical(res$version, 9L)
+  expect_identical(res$applied, 1:10)
+  expect_identical(res$version, 10L)
   expect_false(res$legacy)
   expect_identical(
     table_names(con),
@@ -16,11 +16,12 @@ test_that("on an empty database all tables are created and all migrations applie
       "login_attempts",
       "oauth_states",
       "password_resets",
+      "registrations",
       "totp_recovery",
       "users"
     )
   )
-  expect_identical(aa_schema_version(con), 9L)
+  expect_identical(aa_schema_version(con), 10L)
 })
 
 test_that("table columns match the schema of earlier versions", {
@@ -52,6 +53,13 @@ test_that("table columns match the schema of earlier versions", {
     columns_of(con, "login_attempts"),
     c("id", "login", "success", "attempted_at")
   )
+  expect_identical(
+    columns_of(con, "registrations"),
+    c(
+      "id", "login", "email", "password", "role", "token_hash",
+      "created_at", "expires_at", "used"
+    )
+  )
 })
 
 test_that("a new user has blocked 0 by default, login is unique", {
@@ -81,7 +89,7 @@ test_that("migrations are recorded in the service table", {
     "SELECT version, name FROM appauth_migrations ORDER BY version"
   )
 
-  expect_identical(migrations$version, 1:9)
+  expect_identical(migrations$version, 1:10)
   expect_identical(
     migrations$name,
     c(
@@ -93,7 +101,8 @@ test_that("migrations are recorded in the service table", {
       "users_created_and_last_login_columns",
       "password_resets_and_email",
       "totp_two_factor",
-      "oauth_states"
+      "oauth_states",
+      "registrations"
     )
   )
 })
@@ -119,7 +128,7 @@ test_that("a repeated run changes nothing", {
   )
 
   expect_identical(res$applied, integer())
-  expect_identical(res$version, 9L)
+  expect_identical(res$version, 10L)
   expect_identical(before, after)
 })
 
@@ -134,7 +143,7 @@ test_that("production schema from before login protection: completed, data uncha
   res <- aa_init_db(con)
 
   expect_true(res$legacy)
-  expect_identical(res$applied, 1:9)
+  expect_identical(res$applied, 1:10)
   expect_true("blocked" %in% columns_of(con, "users"))
   expect_true("login_attempts" %in% table_names(con))
 
@@ -182,6 +191,7 @@ test_that("home-grown schema: plain-text passwords and root/root stay as is, app
       "login_attempts",
       "oauth_states",
       "password_resets",
+      "registrations",
       "totp_recovery",
       "users"
     )
@@ -275,15 +285,33 @@ test_that("aa_cleanup deletes only stale attempts and tokens", {
       ('u', 'expired_new',   datetime('now', '-35 days'), datetime('now', '-5 days'),  0),
       ('u', 'active',        datetime('now', '-1 days'),  datetime('now', '+29 days'), 0)"
   )
+  add_registration <- function(token, created, expires, used) {
+    aa_execute(
+      con,
+      "INSERT INTO registrations
+        (login, email, password, role, token_hash, created_at, expires_at, used)
+       VALUES (?, ?, 'hash', 'viewer', ?, ?, ?, ?)",
+      params = list(paste0("u_", token), paste0(token, "@example.com"), token, created, expires, used)
+    )
+  }
+  add_registration("old_used", aa_utc(-90 * 86400), aa_utc(86400), 1)
+  add_registration("old_expired", aa_utc(-50 * 86400), aa_utc(-2 * 86400), 0)
+  add_registration("fresh_used", aa_utc(-12 * 3600), aa_utc(86400), 1)
+  add_registration("active", aa_utc(-3600), aa_utc(86400), 0)
 
   res <- aa_cleanup(con, aa_settings())
 
   expect_identical(res$login_attempts, 1L)
   expect_identical(res$auth_sessions, 2L)
+  expect_identical(res$registrations, 2L)
   expect_identical(tquery(con, "SELECT login FROM login_attempts")$login, "new")
   expect_setequal(
     tquery(con, "SELECT token_hash FROM auth_sessions")$token_hash,
     c("revoked_new", "expired_new", "active")
+  )
+  expect_setequal(
+    tquery(con, "SELECT token_hash FROM registrations")$token_hash,
+    c("fresh_used", "active")
   )
 })
 
@@ -309,7 +337,7 @@ test_that("aa_prepare_db prepares the database and does not throw errors", {
   con <- new_db()
 
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
-  expect_identical(aa_schema_version(con), 9L)
+  expect_identical(aa_schema_version(con), 10L)
 
   expect_message(
     aa_prepare_db(new_db(), aa_settings()),

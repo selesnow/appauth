@@ -6,7 +6,7 @@ Needed when employees already work under corporate Google Workspace accounts and
 
 * Enable it if all users of the app have Google Workspace accounts of your organisation and the app has a domain with HTTPS.
 * Do not enable it if the app is opened by IP address: Google does not allow such an address as a redirect address. First you need a domain and a certificate (step 1).
-* Sign-in with Google creates nothing by itself: the user must be created in the app in advance, with an email equal to the Google address. Roles and permissions stay in `appauth`; Google only confirms identity.
+* By default sign-in with Google creates nothing: the user must be created in the app in advance, with an email equal to the Google address. Since 0.11.0 `google_signup = TRUE` may create a new account from a verified email. Roles and permissions stay in `appauth` in either case; Google only confirms identity.
 
 ## Steps
 
@@ -35,8 +35,8 @@ settings <- aa_settings_from_list(
 
    The app does not need to wire anything else: `aa_auth_ui()` and `aa_auth_server()` themselves show the "Sign in with Google" button and accept the return from Google.
 5. **Domains.** `google_domains` is checked against both the token's `hd` (this is the **primary** domain of the Workspace organisation) and the email domain. If the organisation has secondary domains (an employee with email `@example.net` while the primary is `example.com`), list both. An empty list disables the domain check: then only the match of the email with a user decides, and any Google account fits, Gmail included. A non-empty list does not let personal accounts (without `hd`) through. If the app already has a list of allowed email domains, use the same one so that domains are edited in a single place.
-6. **Email of users.** Sign-in is closed to a user without an email (`no_user`). Fill in the addresses in the user card (`aa_set_email()`); the email must match the Google address, case does not matter.
-7. **Events.** `login_success` arrives with the value `google`; failures arrive as `google_login_failed` with the reason and email in `value`. In `aa_event_logger()` add `google_login_failed` to `actions` if your log uses its own names. Series of `no_user`, `domain` and `bad_browser` are worth showing the same way as `login_failed` series.
+6. **Email of users.** Sign-in is closed to a user without an email (`no_user`). Fill in the addresses in the user card (`aa_set_email()`); the email must match the Google address, case does not matter. With `google_signup = TRUE` an unknown verified address creates an account automatically, with the login derived from the email local part (a numeric suffix is added on collision) and the role from `registration_role`.
+7. **Events.** `login_success` arrives with the value `google`; failures arrive as `google_login_failed` with the reason and email in `value`. A created account also emits `google_user_created` with the login. In `aa_event_logger()` add `google_login_failed` to `actions` if your log uses its own names. Series of `no_user`, `domain`, `bad_browser` and `signup_login_taken` are worth showing the same way as `login_failed` series.
 8. **Disabling the password** (optional): `password_login = FALSE`. The password form and "Forgot password?" are hidden, password login attempts are rejected on the server. Allowed only together with `google_enabled = TRUE`. **Before disabling**, make sure at least one administrator has an email and sign-in with Google works, otherwise there will be no way to log in. A fallback in case Google is unavailable: set `password_login = TRUE` back in the settings (with password login off this cannot be done from the UI; you need access to the config on the server).
 
 ## The app is opened both by IP and by domain
@@ -47,13 +47,22 @@ Often the app stays reachable by the server's IP address too, while sign-in with
 
 The administrator sets the email in the user card with no domain restrictions, no password and no emailed code: only the format and uniqueness of the address are checked (one address cannot belong to two users, otherwise sign-in by email would be ambiguous). A domain restriction and code confirmation exist only when a user changes the address by themselves in the profile (that is app logic, not the package's).
 
+## Automatic account creation (since 0.11.0)
+
+Add `google_signup = TRUE` to `aa_settings()` when new employees should get an account on their first corporate Google sign-in. Requirements: `google_enabled = TRUE`, a valid `registration_role` (any role except `admin_role`, default `viewer`), and a non-empty `google_domains` unless you deliberately set `google_signup_require_domains = FALSE`. Only a verified Google email is used; the package validates the token exactly as for an existing user. `registration_domains` does not apply to this path.
+
+* Keep `google_signup = FALSE` for a closed app: then only pre-created users can sign in.
+* The new user gets a random password hash, so password login can be left enabled without a known default password; the user can reset it by email if `reset_enabled` is on.
+* A login collision is resolved with a numeric suffix (`ivan.ivanov.2`, `ivan.ivanov.3`, ...). Exhaustion fails with `signup_login_taken`; the visitor sees a generic message and the reason goes to `google_login_failed`.
+* A blocked user is never created or admitted. A creation emits `google_user_created`, followed by `login_success` with the value `google`.
+
 ## How it is protected (for checking during an audit)
 
 * Authorization code flow with PKCE. `state`, `nonce` and the PKCE check are single-use and live 10 minutes; in the database `state` is stored only as sha256 (table `oauth_states`), and it is not accepted a second time.
 * The `state` from the return address is compared with a short cookie of the browser that started the login: someone else's return link cannot be slipped into another browser (protection against login substitution, login CSRF).
 * The client secret stays on the server: the code is exchanged for a token by the app's server.
 * The Google token is validated in full: signature against Google's public keys (RS256 only), issuer, audience, expiry, `nonce`, verified email, domain. Token fields are read by exact access (`[["email"]]`), without partial name matching.
-* Sign-in creates no new users, the role comes from the database, a blocked user cannot sign in, and cookie auto-login works as before.
+* By default sign-in creates no new users and the role comes from the database; with `google_signup = TRUE` only a verified email from `google_domains` creates a non-admin account with a random password hash, and a login collision gets a numeric suffix reported as `signup_login_taken`. A blocked user cannot sign in, and cookie auto-login works as before.
 * The package's own 2FA is not asked for on Google sign-in: confirmation is done by Google (its sign-in protection and 2FA are determined by the Workspace policy).
 * The user is shown a generic text on any rejection; the reason goes only into the event.
 

@@ -1,6 +1,6 @@
 # appauth reference: AI agent skills
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_install_skills()`
@@ -30,7 +30,7 @@ Usage:
        global = FALSE,
        overwrite = FALSE
      )
-     
+
 Arguments:
 
     path: Directory to copy to. Computed from 'agent' by default.
@@ -51,10 +51,10 @@ Value:
 Examples:
 
      ## Not run:
-     
+
      # into the current project for Claude Code
      aa_install_skills()
-     
+
      # for Codex and Posit Assistant, overwriting after a package update
      aa_install_skills(agent = "agents", overwrite = TRUE)
      ## End(Not run)

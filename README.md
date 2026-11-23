@@ -28,7 +28,8 @@ A detailed comparison with existing packages such as `shinyauthr` and `shinymana
 * Changing your own password, a mandatory change of a temporary password set by an administrator, and logout on all devices (`auth$logout_all()`).
 * Password recovery by email: a one-time link from the email, email rate limits, the form response does not reveal whether a user exists (off by default; the email is sent by an application function).
 * Two-factor authentication (TOTP): optional, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).
-* Sign-in with Google (OpenID Connect): only for existing users by email, with an organisation domain check, no auto-creation; password login can be disabled (off by default).
+* Sign-in with Google (OpenID Connect): for existing users by email, with an organisation domain check; password login can be disabled (off by default).
+* Opt-in self-registration: a "Create an account" link, one-time email confirmation, configurable domains and role, an hourly limit, and optional automatic account creation for verified Google users (off by default).
 * Server-side permission checks (`aa_can()`, `aa_require()`), with permissions from a "permission -> roles" matrix or from any custom source.
 * Ready-made modules: login, users (with slots for custom blocks), password change; styles with variables and a light theme.
 * A single place for logging: the `on_event` hook and the `aa_events()` event catalogue.
@@ -72,6 +73,7 @@ The first run on an empty database offers to create an administrator.
 | Passwords | `aa_hash_password()`, `aa_verify_password()`, `aa_is_password_hash()`, `aa_validate_password()`, `aa_validate_login()`, `aa_migrate_plaintext_passwords()`, `aa_check_default_accounts()`, `aa_common_passwords()` |
 | Users | `aa_get_user()`, `aa_list_users()`, `aa_users_exist()`, `aa_users_overview()`, `aa_active_autologins()`, `aa_create_user()`, `aa_create_first_admin()`, `aa_validate_new_user()`, `aa_authenticate()`, `aa_set_password()`, `aa_change_own_password()`, `aa_set_role()`, `aa_set_blocked()`, `aa_delete_user()`, `aa_check_can_block()`, `aa_check_can_delete()`, `aa_check_can_change_role()` |
 | Password recovery | `aa_set_email()`, `aa_get_email()`, `aa_request_password_reset()`, `aa_reset_token_login()`, `aa_reset_password_with_token()` |
+| Self-registration | `aa_register_user()`, `aa_registration_token_login()`, `aa_confirm_registration()` |
 | Two-factor authentication | `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()` |
 | Login protection | `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()` |
 | Sessions | `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_user_session_valid()` |
@@ -88,6 +90,7 @@ Help for each function: `?aa_authenticate` and so on.
 Vignettes (`browseVignettes("appauth")`):
 
 * `getting-started` - quick start and core concepts;
+* `self-registration` - enable visitor sign-up by email and with Google;
 * `integrating-existing-app` - how to move an existing application off hand-written authentication, including plaintext passwords;
 * `extension-points` - permissions, roles, events, card slots, texts, styling;
 * `testing-your-app` - how to test an application that uses `appauth`;

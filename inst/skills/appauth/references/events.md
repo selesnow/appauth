@@ -1,6 +1,6 @@
 # appauth event catalog
 
-Package version: 0.10.1. The table is generated from `aa_events()`.
+Package version: 0.11.0. The table is generated from `aa_events()`.
 
 All modules and `aa_require()` report events to a single function `on_event(event, user, session_id, value)`:
 
@@ -13,7 +13,7 @@ An error inside the hook never interrupts the package action (it is printed as a
 
 | Event | What happened | What is in `value` |
 | --- | --- | --- |
-| `login_success` | Successful login (by password, via Google, or via an auto-login cookie) | cookie (auto-login) or google (Google login) |
+| `login_success` | Successful login (by password, via Google, via an auto-login cookie, or after self-registration) | cookie (auto-login), google (Google sign-in) or registration (self-registration) |
 | `login_failed` | Wrong login or password | password_disabled, if password login is disabled |
 | `login_locked` | Login attempt for a login locked after failed attempts | seconds until the lockout ends |
 | `login_blocked_user` | Login attempt by a user blocked by an administrator | (empty) |
@@ -40,8 +40,12 @@ An error inside the hook never interrupts the package action (it is printed as a
 | `totp_failed` | Wrong code when confirming login or disabling 2FA | (empty) |
 | `totp_reset` | An administrator reset a user's 2FA | user login |
 | `recovery_code_used` | Login confirmed with a recovery code | (empty) |
-| `google_login_failed` | Failed Google login (the user sees a generic message) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled; followed by a space and the email, if known |
+| `google_login_failed` | Failed Google login (the user sees a generic message) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email, if known |
 | `weak_password_set` | A weak password was accepted (`password_policy = "warn"` mode) | login and reason: password_common, password_equals_login, password_repeated |
+| `registration_requested` | Self-registration requested (the user always sees the same response) | sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed, or a login or password validation reason |
+| `registration_confirmed` | Account created from the email confirmation link | login of the new user |
+| `registration_failed` | Failed attempt to confirm a registration | reason: registration_link_invalid, user_exists, email_exists |
+| `google_user_created` | Account created automatically on first Google sign-in | login of the new user |
 
 ## Event handler: aa_event_logger()
 

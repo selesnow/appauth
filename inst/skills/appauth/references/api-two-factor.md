@@ -1,6 +1,6 @@
 # appauth reference: Two-factor authentication (TOTP)
 
-Package version: 0.10.1. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.11.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section: 
 `aa_totp_setup()`, `aa_totp_enable()`, `aa_totp_disable()`, `aa_totp_enabled()`, `aa_verify_second_factor()`, `aa_recovery_codes_left()`, `aa_totp_secret()`, `aa_totp_uri()`, `aa_totp_code()`
@@ -32,7 +32,7 @@ Description:
 Usage:
 
      aa_totp_setup(conn, login, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -75,7 +75,7 @@ Description:
 Usage:
 
      aa_totp_enable(conn, login, code, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -119,7 +119,7 @@ Description:
 Usage:
 
      aa_totp_disable(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -153,7 +153,7 @@ Description:
 Usage:
 
      aa_totp_enabled(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -192,7 +192,7 @@ Description:
 Usage:
 
      aa_verify_second_factor(conn, login, code, settings = aa_settings())
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -232,7 +232,7 @@ Description:
 Usage:
 
      aa_recovery_codes_left(conn, login)
-     
+
 Arguments:
 
     conn: A connection to the SQLite database ('DBI::dbConnect(RSQLite::SQLite(), ...)').
@@ -265,7 +265,7 @@ Description:
 Usage:
 
      aa_totp_secret()
-     
+
 Value:
 
      A base32 string of 32 characters (160 bits), the way it is entered into the app
@@ -288,7 +288,7 @@ Description:
 Usage:
 
      aa_totp_uri(secret, login, issuer = "appauth")
-     
+
 Arguments:
 
   secret: Secret in base32.
@@ -319,7 +319,7 @@ Description:
 Usage:
 
      aa_totp_code(secret, time = Sys.time(), digits = 6, period = 30)
-     
+
 Arguments:
 
   secret: Secret in base32.

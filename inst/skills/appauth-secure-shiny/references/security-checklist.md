@@ -16,6 +16,7 @@ Contents: A. Passwords and login, B. Sessions, C. Permissions and handlers, D. U
 | A6 | Password and tokens do not reach logs or the console | audit: no `SECRET_LOGGED` findings; review `app.Rout` after login |
 | A7 | If Google sign-in is enabled: the client secret is not in the repository, the redirect address is `https://` only, there is a `google_domains` list (or it is deliberately empty), incoming users have an email set | `.Renviron` is not in git; `aa_settings()` raises no errors; sign-in with an account from a foreign domain and with an account that has no user in the app is rejected |
 | A8 | If password login is disabled (`password_login = FALSE`): it is rejected on the server, not just hidden, and the administrator's Google sign-in has been verified | `testServer` test: `login_btn` does not sign in; manual administrator sign-in through Google |
+| A9 | If self-registration or Google sign-up is enabled: new accounts can never get `admin_role`, email domains are restricted where required, and taken logins/emails give a generic response | `aa_settings()` raises no error; `registration_role` is not `admin_role`; `testServer`: two registrations with the same email show the same message; review `registration_requested`, `registration_failed` and `google_user_created` events |
 
 ## B. Sessions
 

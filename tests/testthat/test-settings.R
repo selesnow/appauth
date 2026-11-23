@@ -16,6 +16,13 @@ test_that("default settings", {
   expect_identical(s$token_retention_days, 30)
   expect_identical(s$roles, c("admin", "user", "viewer"))
   expect_identical(s$admin_role, "admin")
+  expect_false(s$registration_enabled)
+  expect_true(s$registration_verify_email)
+  expect_identical(s$registration_role, "viewer")
+  expect_length(s$registration_domains, 0)
+  expect_identical(s$registration_max_per_hour, 10)
+  expect_false(s$google_signup)
+  expect_true(s$google_signup_require_domains)
   expect_s3_class(s$texts, "aa_texts")
   expect_identical(attr(s$texts, "lang"), "en")
 })
@@ -203,6 +210,137 @@ test_that("print shows the key settings", {
   expect_output(
     print(aa_settings(texts = aa_texts("ru"))),
     "Interface language: ru"
+  )
+})
+
+test_that("registration settings are validated", {
+  expect_error(
+    aa_settings(registration_enabled = "yes"),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(registration_verify_email = 1),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(registration_max_per_hour = 0),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(registration_enabled = TRUE, password_login = FALSE),
+    "password sign-in",
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(
+      registration_enabled = TRUE,
+      reset_base_url = "https://apps.example.com/app"
+    ),
+    "send_reset",
+    class = "appauth_error_settings"
+  )
+  expect_no_error(aa_settings(
+    registration_enabled = TRUE,
+    registration_verify_email = FALSE
+  ))
+  expect_error(
+    aa_settings(registration_enabled = TRUE, registration_role = "admin"),
+    "admin_role",
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(
+      roles = c("admin", "editor"),
+      registration_role = "viewer",
+      registration_enabled = TRUE,
+      registration_verify_email = FALSE
+    ),
+    "registration_role",
+    class = "appauth_error_settings"
+  )
+})
+
+test_that("registration domains are normalized", {
+  s <- aa_settings(registration_domains = c(" Example.COM ", "example.com", "Sub.Example.com"))
+  expect_identical(s$registration_domains, c("example.com", "sub.example.com"))
+
+  expect_error(
+    aa_settings(registration_domains = "not a domain"),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(registration_domains = 42),
+    class = "appauth_error_settings"
+  )
+})
+
+test_that("Google sign-up settings require Google and, by default, domains", {
+  expect_error(
+    aa_settings(google_signup = TRUE),
+    "google_enabled",
+    class = "appauth_error_settings"
+  )
+
+  args <- list(
+    google_enabled = TRUE,
+    google_client_id = "id",
+    google_client_secret = "secret",
+    google_redirect_uri = "https://apps.example.com/"
+  )
+
+  expect_error(
+    do.call(aa_settings, c(args, list(google_signup = TRUE))),
+    "google_domains",
+    class = "appauth_error_settings"
+  )
+  expect_no_error(do.call(aa_settings, c(
+    args,
+    list(google_signup = TRUE, google_domains = "example.com")
+  )))
+  expect_no_error(do.call(aa_settings, c(
+    args,
+    list(google_signup = TRUE, google_signup_require_domains = FALSE)
+  )))
+  expect_error(
+    do.call(aa_settings, c(args, list(google_signup_require_domains = "yes"))),
+    class = "appauth_error_settings"
+  )
+})
+
+test_that("new registration settings work in aa_settings_from_list", {
+  s <- aa_settings_from_list(list(
+    registration_enabled = TRUE,
+    registration_verify_email = FALSE,
+    registration_domains = "Example.COM",
+    google_signup = TRUE,
+    google_enabled = TRUE,
+    google_client_id = "id",
+    google_client_secret = "secret",
+    google_redirect_uri = "https://apps.example.com/",
+    google_domains = "example.com"
+  ))
+
+  expect_true(s$registration_enabled)
+  expect_identical(s$registration_domains, "example.com")
+  expect_true(s$google_signup)
+})
+
+test_that("print mentions self-registration and Google sign-up", {
+  expect_output(print(aa_settings()), "Self-registration: disabled")
+  expect_output(
+    print(aa_settings(registration_enabled = TRUE, registration_verify_email = FALSE)),
+    "Self-registration: enabled"
+  )
+  expect_output(
+    print(aa_settings(
+      google_enabled = TRUE,
+      google_client_id = "id",
+      google_client_secret = "secret",
+      google_redirect_uri = "https://apps.example.com/",
+      google_domains = "example.com",
+      google_signup = TRUE
+    )),
+    "creates new users"
   )
 })
 
