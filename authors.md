@@ -10,16 +10,16 @@
 ## Citation
 
 Source:
-[`DESCRIPTION`](https://github.com/selesnow/appauth/blob/v0.11.1/DESCRIPTION)
+[`DESCRIPTION`](https://github.com/selesnow/appauth/blob/master/DESCRIPTION)
 
 Seleznev A (2026). *appauth: Secure Authentication and User Management
-for 'shiny' Applications*. R package version 0.11.1,
+for 'shiny' Applications*. R package version 0.11.2,
 <https://alexey-seleznev.pro/appauth/>.
 
     @Manual{,
       title = {appauth: Secure Authentication and User Management for 'shiny' Applications},
       author = {Alexey Seleznev},
       year = {2026},
-      note = {R package version 0.11.1},
+      note = {R package version 0.11.2},
       url = {https://alexey-seleznev.pro/appauth/},
     }

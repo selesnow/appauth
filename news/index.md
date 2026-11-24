@@ -1,5 +1,11 @@
 # Changelog
 
+## appauth 0.11.2
+
+Documentation-only patch: refreshes the bundled AI skills and their
+references. No runtime code or schema changes; tests and `R CMD check`
+pass.
+
 ## appauth 0.11.1
 
 Maintenance release. No API or schema changes; fixes the MySQL
