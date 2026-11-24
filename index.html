@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -95,7 +95,7 @@
 <li>Forced logout: a blocked, deleted, role-changed or password-reset user loses the open session within the check interval (30 seconds by default).</li>
 <li>Changing your own password, a mandatory change of a temporary password set by an administrator, and logout on all devices (<code>auth$logout_all()</code>).</li>
 <li>Password recovery by email: a one-time link from the email, email rate limits, the form response does not reveal whether a user exists (off by default; the email is sent by an application function).</li>
-<li>Two-factor authentication (TOTP): optional, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).</li>
+<li>Two-factor authentication (TOTP): voluntary or mandatory for selected roles, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).</li>
 <li>Sign-in with Google (OpenID Connect): for existing users by email, with an organisation domain check; password login can be disabled (off by default).</li>
 <li>Opt-in self-registration: a “Create an account” link, one-time email confirmation, configurable domains and role, an hourly limit, and optional automatic account creation for verified Google users (off by default).</li>
 <li>Server-side permission checks (<code><a href="reference/aa_can.html">aa_can()</a></code>, <code><a href="reference/aa_require.html">aa_require()</a></code>), with permissions from a “permission -&gt; roles” matrix or from any custom source.</li>
@@ -330,7 +330,7 @@
 <div class="section level2">
 <h2 id="limitations">Limitations<a class="anchor" aria-label="anchor" href="#limitations"></a>
 </h2>
-<p>Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the <code>architecture-and-security</code> vignette. By default the auto-login cookie is written by the server with <code>HttpOnly</code>; <code>cookie_mode = "legacy"</code> keeps the old JavaScript flow.</p>
+<p>Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the <code>architecture-and-security</code> vignette. By default the auto-login cookie is written by the server with <code>HttpOnly</code>; <code>cookie_mode = "legacy"</code> keeps the old JavaScript flow.</p>
 </div>
 <div class="section level2">
 <h2 id="development">Development<a class="anchor" aria-label="anchor" href="#development"></a>

@@ -245,6 +245,8 @@ container is recreated.
 - If two-factor authentication is on: `totp_key` is set through an
   environment variable and stored separately from the database, server
   time is synchronized, administrators have 2FA enabled and recovery
-  codes saved.
+  codes saved. For roles in `totp_required_roles`, a first sign-in
+  reaches the setup wizard and an open session is closed while the
+  role’s 2FA is missing.
 - If password reset is on: `reset_base_url` opens in the browser, a test
   email arrives, and the link in it works only once.

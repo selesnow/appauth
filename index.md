@@ -54,10 +54,10 @@ browser checks.
 - Password recovery by email: a one-time link from the email, email rate
   limits, the form response does not reveal whether a user exists (off
   by default; the email is sent by an application function).
-- Two-factor authentication (TOTP): optional, a code from an
-  authenticator app and 10 recovery codes, the secret is encrypted in
-  the database, wrong codes lock the login, reset by an administrator
-  (off by default).
+- Two-factor authentication (TOTP): voluntary or mandatory for selected
+  roles, a code from an authenticator app and 10 recovery codes, the
+  secret is encrypted in the database, wrong codes lock the login, reset
+  by an administrator (off by default).
 - Sign-in with Google (OpenID Connect): for existing users by email,
   with an organisation domain check; password login can be disabled (off
   by default).
@@ -223,10 +223,10 @@ Tests can run on any supported database:
 ## Limitations
 
 Known limitations (lockout is per login, BigQuery and other analytical
-warehouses are not supported, two-factor authentication is optional and
-TOTP only, single sign-on is Google only, no independent audit has been
-done) are listed in the `architecture-and-security` vignette. By default
-the auto-login cookie is written by the server with `HttpOnly`;
+warehouses are not supported, two-factor authentication is TOTP only,
+single sign-on is Google only, no independent audit has been done) are
+listed in the `architecture-and-security` vignette. By default the
+auto-login cookie is written by the server with `HttpOnly`;
 `cookie_mode = "legacy"` keeps the old JavaScript flow.
 
 ## Development

@@ -155,7 +155,7 @@ knitr::kable(aa_events())
 | login_throttled | Rejected because of the overall per-minute limit of failed attempts |  |
 | login_unlocked | An administrator removed the sign-in attempts lock | login the lock was removed from |
 | logout | The user signed out on their own |  |
-| session_forced_logout | The session was ended forcibly | reason: deleted, blocked, role_changed, token_revoked |
+| session_forced_logout | The session was ended forcibly | reason: deleted, blocked, role_changed, totp_required, token_revoked |
 | first_admin_created | The first administrator was created |  |
 | user_added | An administrator added a user | login of the new user and the role |
 | user_removed | An administrator deleted a user | login of the deleted user |
@@ -174,6 +174,7 @@ knitr::kable(aa_events())
 | totp_disabled | The user disabled two-factor authentication |  |
 | totp_failed | Incorrect code when confirming sign-in or disabling 2FA |  |
 | totp_reset | An administrator reset a user’s 2FA | user login |
+| totp_enrollment_required | The mandatory 2FA setup wizard was shown for a role | user login |
 | recovery_code_used | Sign-in confirmed with a recovery code |  |
 | google_login_failed | Failed Google sign-in (the user is shown a generic text) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known |
 | weak_password_set | A weak password was accepted (password_policy = “warn” mode) | login and reason: password_common, password_equals_login, password_repeated |
@@ -403,16 +404,21 @@ keys
 
 ## Two-factor authentication (TOTP)
 
-Disabled by default and **voluntary**: users enable protection
-themselves, and those who have it enabled enter a code at login. You
-need a secret encryption key and an account area block:
+Disabled by default; when enabled it is **voluntary** or **mandatory for
+selected roles**. Voluntary users enable protection themselves; for
+roles in `totp_required_roles`,
+[`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md)
+shows the setup wizard before the application, after a forced password
+change when one is pending. You need a secret encryption key and an
+account area block:
 
 ``` r
 
 settings <- aa_settings(
-  totp_enabled = TRUE,
-  totp_key     = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters, kept outside the database and the repository
-  totp_issuer  = "Reports portal"              # the name the authenticator app will show
+  totp_enabled        = TRUE,
+  totp_key            = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters, kept outside the database and the repository
+  totp_issuer         = "Reports portal",             # the name the authenticator app will show
+  totp_required_roles = "admin"                       # optional; character() keeps 2FA voluntary
 )
 
 # server: the module is attached once (like password change)
@@ -425,26 +431,32 @@ tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"))
 Nothing else needs to be attached:
 [`aa_auth_server()`](https://alexey-seleznev.pro/appauth/reference/aa_auth_server.md)
 asks for the code itself after a correct password if the user has
-protection enabled.
+protection enabled, and opens the setup wizard first when the role
+requires 2FA and the user has not enabled it yet.
 
 - **Setup**: the “Enable” button shows a QR code (if the optional
   `qrcode` package is installed) and a key for manual entry; after a
   correct code the protection is enabled, and the user is shown 10
   recovery codes once. The user’s other sessions are ended at that
-  point.
+  point. The mandatory setup wizard uses the same steps and also ends
+  any existing auto-login sessions.
 - **Login**: a code from the app (6 digits) or a recovery code. A code
   from the app is accepted once; wrong codes count as failed login
   attempts and lock the login just like password guessing. Auto-login by
-  cookie does not ask for a code.
-- **Disabling** requires the password and a code. **Lost phone**: a
-  recovery code or a 2FA reset by the administrator in the user card
-  (event `totp_reset`).
+  cookie does not ask for a code from users who have already enrolled,
+  but a cookie is revoked and the setup wizard is shown when the role
+  requires 2FA that is still missing.
+- **Disabling** requires the password and a code. A role listed in
+  `totp_required_roles` cannot disable 2FA until that setting is
+  removed. **Lost phone**: a recovery code or a 2FA reset by the
+  administrator in the user card (event `totp_reset`); a required role
+  is then prompted to enrol again at the next sign-in.
 - **The `totp_key` key** encrypts secrets in the database. If it is lost
   or replaced, the secrets become unreadable, and users will have to set
   up 2FA again (reset by the administrator). Store the key separately
   from the database and backups.
 - **Events**: `totp_enabled`, `totp_disabled`, `totp_failed`,
-  `totp_reset`, `recovery_code_used`.
+  `totp_reset`, `totp_enrollment_required`, `recovery_code_used`.
 - **Custom logic without modules**:
   [`aa_totp_setup()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_setup.md),
   [`aa_totp_enable()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_enable.md),
@@ -472,8 +484,10 @@ The form texts are changed with the `totp_*` keys and `card_totp`
 Sign-in with Google (OpenID Connect) is enabled through settings and
 creates nothing by itself: only a user who already exists in the
 database and has an email equal to the Google account address can sign
-in. The role comes from the database, a blocked user cannot sign in, and
-the application’s two-factor code is not requested.
+in. The role comes from the database, and a blocked user cannot sign in.
+The application’s two-factor code is not requested for a user who has
+already enrolled; a role in `totp_required_roles` is sent to the setup
+wizard before entering the application.
 
 **What is needed in Google.** In the Google Cloud Console (a project in
 your Workspace organization), choose the **Internal** type on the
@@ -570,7 +584,7 @@ All interface texts and messages are available in English and Russian
 ``` r
 
 length(aa_text_keys())
-#> [1] 161
+#> [1] 164
 texts <- aa_texts(login_button = "Log in", login_title = "Team sign-in")
 texts$login_button
 #> [1] "Log in"
@@ -647,7 +661,8 @@ with the image from the `www` folder.
 | `reset_enabled` | `FALSE` | password recovery by email (requires `send_reset` and `reset_base_url`) |
 | `reset_ttl_minutes` | 60 | lifetime of the link from the email |
 | `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | email limit per user per hour and overall per minute |
-| `totp_enabled` | `FALSE` | two-factor authentication (TOTP), voluntary; requires `totp_key` |
+| `totp_enabled` | `FALSE` | two-factor authentication (TOTP); requires `totp_key` |
+| `totp_required_roles` | [`character()`](https://rdrr.io/r/base/character.html) | roles that must complete TOTP setup before entering the application; requires `totp_enabled = TRUE` |
 | `totp_key` | `NULL` | TOTP secret encryption key (a string of at least 16 characters), keep outside the database |
 | `totp_issuer`, `totp_window` | `"appauth"`, 1 | name in the authenticator app, allowed clock drift in steps of 30 seconds |
 

@@ -30,7 +30,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,7 +70,7 @@
       <img src="../logo.svg" class="logo" alt=""><h1>Extension points</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.12.0/vignettes/extension-points.Rmd" class="external-link"><code>vignettes/extension-points.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/vignettes/extension-points.Rmd" class="external-link"><code>vignettes/extension-points.Rmd</code></a></small>
       <div class="d-none name"><code>extension-points.Rmd</code></div>
     </div>
 
@@ -320,7 +320,7 @@ failed attempts</td>
 <tr class="even">
 <td align="left">session_forced_logout</td>
 <td align="left">The session was ended forcibly</td>
-<td align="left">reason: deleted, blocked, role_changed,
+<td align="left">reason: deleted, blocked, role_changed, totp_required,
 token_revoked</td>
 </tr>
 <tr class="odd">
@@ -419,11 +419,17 @@ email</td>
 <td align="left">user login</td>
 </tr>
 <tr class="odd">
+<td align="left">totp_enrollment_required</td>
+<td align="left">The mandatory 2FA setup wizard was shown for a
+role</td>
+<td align="left">user login</td>
+</tr>
+<tr class="even">
 <td align="left">recovery_code_used</td>
 <td align="left">Sign-in confirmed with a recovery code</td>
 <td align="left"></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">google_login_failed</td>
 <td align="left">Failed Google sign-in (the user is shown a generic
 text)</td>
@@ -432,14 +438,14 @@ exchange_failed, bad_token, bad_nonce, email_unverified, domain,
 no_user, blocked, cancelled, signup_login_taken; followed by a space and
 the email if known</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">weak_password_set</td>
 <td align="left">A weak password was accepted (password_policy = “warn”
 mode)</td>
 <td align="left">login and reason: password_common,
 password_equals_login, password_repeated</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">registration_requested</td>
 <td align="left">Self-registration requested (the user is shown a
 generic answer)</td>
@@ -447,18 +453,18 @@ generic answer)</td>
 email_invalid, registration_domain, registration_throttled, send_failed
 or a login or password validation reason</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">registration_confirmed</td>
 <td align="left">Account created from the email confirmation link</td>
 <td align="left">login of the new user</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">registration_failed</td>
 <td align="left">Failed attempt to confirm a registration</td>
 <td align="left">reason: registration_link_invalid, user_exists,
 email_exists</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td align="left">google_user_created</td>
 <td align="left">Account created automatically on first Google
 sign-in</td>
@@ -684,14 +690,18 @@ module as <code><a href="../reference/aa_request_password_reset.html">aa_request
 <div class="section level2">
 <h2 id="two-factor-authentication-totp">Two-factor authentication (TOTP)<a class="anchor" aria-label="anchor" href="#two-factor-authentication-totp"></a>
 </h2>
-<p>Disabled by default and <strong>voluntary</strong>: users enable
-protection themselves, and those who have it enabled enter a code at
-login. You need a secret encryption key and an account area block:</p>
+<p>Disabled by default; when enabled it is <strong>voluntary</strong> or
+<strong>mandatory for selected roles</strong>. Voluntary users enable
+protection themselves; for roles in <code>totp_required_roles</code>,
+<code><a href="../reference/aa_auth_server.html">aa_auth_server()</a></code> shows the setup wizard before the
+application, after a forced password change when one is pending. You
+need a secret encryption key and an account area block:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">settings</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/aa_settings.html">aa_settings</a></span><span class="op">(</span></span>
-<span>  totp_enabled <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  totp_key     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"APP_TOTP_KEY"</span><span class="op">)</span>,   <span class="co"># a string of at least 16 characters, kept outside the database and the repository</span></span>
-<span>  totp_issuer  <span class="op">=</span> <span class="st">"Reports portal"</span>              <span class="co"># the name the authenticator app will show</span></span>
+<span>  totp_enabled        <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  totp_key            <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.getenv.html" class="external-link">Sys.getenv</a></span><span class="op">(</span><span class="st">"APP_TOTP_KEY"</span><span class="op">)</span>,   <span class="co"># a string of at least 16 characters, kept outside the database and the repository</span></span>
+<span>  totp_issuer         <span class="op">=</span> <span class="st">"Reports portal"</span>,             <span class="co"># the name the authenticator app will show</span></span>
+<span>  totp_required_roles <span class="op">=</span> <span class="st">"admin"</span>                       <span class="co"># optional; character() keeps 2FA voluntary</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># server: the module is attached once (like password change)</span></span>
@@ -701,23 +711,30 @@ login. You need a secret encryption key and an account area block:</p>
 <span><span class="fu"><a href="https://rdrr.io/pkg/shiny/man/tabPanel.html" class="external-link">tabPanel</a></span><span class="op">(</span><span class="st">"Profile"</span>, <span class="fu"><a href="../reference/aa_password_ui.html">aa_password_ui</a></span><span class="op">(</span><span class="st">"password"</span><span class="op">)</span>, <span class="fu"><a href="https://rstudio.github.io/htmltools/reference/builder.html" class="external-link">hr</a></span><span class="op">(</span><span class="op">)</span>, <span class="fu"><a href="../reference/aa_totp_ui.html">aa_totp_ui</a></span><span class="op">(</span><span class="st">"totp"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Nothing else needs to be attached: <code><a href="../reference/aa_auth_server.html">aa_auth_server()</a></code> asks
 for the code itself after a correct password if the user has protection
-enabled.</p>
+enabled, and opens the setup wizard first when the role requires 2FA and
+the user has not enabled it yet.</p>
 <ul>
 <li>
 <strong>Setup</strong>: the “Enable” button shows a QR code (if the
 optional <code>qrcode</code> package is installed) and a key for manual
 entry; after a correct code the protection is enabled, and the user is
 shown 10 recovery codes once. The user’s other sessions are ended at
-that point.</li>
+that point. The mandatory setup wizard uses the same steps and also ends
+any existing auto-login sessions.</li>
 <li>
 <strong>Login</strong>: a code from the app (6 digits) or a recovery
 code. A code from the app is accepted once; wrong codes count as failed
 login attempts and lock the login just like password guessing.
-Auto-login by cookie does not ask for a code.</li>
+Auto-login by cookie does not ask for a code from users who have already
+enrolled, but a cookie is revoked and the setup wizard is shown when the
+role requires 2FA that is still missing.</li>
 <li>
-<strong>Disabling</strong> requires the password and a code.
-<strong>Lost phone</strong>: a recovery code or a 2FA reset by the
-administrator in the user card (event <code>totp_reset</code>).</li>
+<strong>Disabling</strong> requires the password and a code. A role
+listed in <code>totp_required_roles</code> cannot disable 2FA until that
+setting is removed. <strong>Lost phone</strong>: a recovery code or a
+2FA reset by the administrator in the user card (event
+<code>totp_reset</code>); a required role is then prompted to enrol
+again at the next sign-in.</li>
 <li>
 <strong>The <code>totp_key</code> key</strong> encrypts secrets in
 the database. If it is lost or replaced, the secrets become unreadable,
@@ -726,7 +743,8 @@ Store the key separately from the database and backups.</li>
 <li>
 <strong>Events</strong>: <code>totp_enabled</code>,
 <code>totp_disabled</code>, <code>totp_failed</code>,
-<code>totp_reset</code>, <code>recovery_code_used</code>.</li>
+<code>totp_reset</code>, <code>totp_enrollment_required</code>,
+<code>recovery_code_used</code>.</li>
 <li>
 <strong>Custom logic without modules</strong>:
 <code><a href="../reference/aa_totp_setup.html">aa_totp_setup()</a></code>, <code><a href="../reference/aa_totp_enable.html">aa_totp_enable()</a></code>,
@@ -751,8 +769,10 @@ step (<code>aa_totp_code(secret, Sys.time() + 30)</code>).</li>
 <p>Sign-in with Google (OpenID Connect) is enabled through settings and
 creates nothing by itself: only a user who already exists in the
 database and has an email equal to the Google account address can sign
-in. The role comes from the database, a blocked user cannot sign in, and
-the application’s two-factor code is not requested.</p>
+in. The role comes from the database, and a blocked user cannot sign in.
+The application’s two-factor code is not requested for a user who has
+already enrolled; a role in <code>totp_required_roles</code> is sent to
+the setup wizard before entering the application.</p>
 <p><strong>What is needed in Google.</strong> In the Google Cloud
 Console (a project in your Workspace organization), choose the
 <strong>Internal</strong> type on the consent screen, then create an
@@ -835,7 +855,7 @@ package identifies the database by the connection class.</p>
 (English is the default); any string can be replaced.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="fu"><a href="../reference/aa_text_keys.html">aa_text_keys</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 161</span></span>
+<span><span class="co">#&gt; [1] 164</span></span>
 <span><span class="va">texts</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/aa_texts.html">aa_texts</a></span><span class="op">(</span>login_button <span class="op">=</span> <span class="st">"Log in"</span>, login_title <span class="op">=</span> <span class="st">"Team sign-in"</span><span class="op">)</span></span>
 <span><span class="va">texts</span><span class="op">$</span><span class="va">login_button</span></span>
 <span><span class="co">#&gt; [1] "Log in"</span></span>
@@ -1052,17 +1072,24 @@ from the request</td>
 <tr class="even">
 <td><code>totp_enabled</code></td>
 <td><code>FALSE</code></td>
-<td>two-factor authentication (TOTP), voluntary; requires
+<td>two-factor authentication (TOTP); requires
 <code>totp_key</code>
 </td>
 </tr>
 <tr class="odd">
+<td><code>totp_required_roles</code></td>
+<td><code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code></td>
+<td>roles that must complete TOTP setup before entering the application;
+requires <code>totp_enabled = TRUE</code>
+</td>
+</tr>
+<tr class="even">
 <td><code>totp_key</code></td>
 <td><code>NULL</code></td>
 <td>TOTP secret encryption key (a string of at least 16 characters),
 keep outside the database</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>totp_issuer</code>, <code>totp_window</code>
 </td>

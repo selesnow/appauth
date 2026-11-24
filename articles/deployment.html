@@ -30,7 +30,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,7 +70,7 @@
       <img src="../logo.svg" class="logo" alt=""><h1>Deployment</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.12.0/vignettes/deployment.Rmd" class="external-link"><code>vignettes/deployment.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/vignettes/deployment.Rmd" class="external-link"><code>vignettes/deployment.Rmd</code></a></small>
       <div class="d-none name"><code>deployment.Rmd</code></div>
     </div>
 
@@ -362,7 +362,9 @@ handlers refuse without the permission.</li>
 <li>If two-factor authentication is on: <code>totp_key</code> is set
 through an environment variable and stored separately from the database,
 server time is synchronized, administrators have 2FA enabled and
-recovery codes saved.</li>
+recovery codes saved. For roles in <code>totp_required_roles</code>, a
+first sign-in reaches the setup wizard and an open session is closed
+while the role’s 2FA is missing.</li>
 <li>If password reset is on: <code>reset_base_url</code> opens in the
 browser, a test email arrives, and the link in it works only once.</li>
 </ul>

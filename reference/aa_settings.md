@@ -41,6 +41,7 @@ aa_settings(
   totp_key = NULL,
   totp_issuer = "appauth",
   totp_window = 1,
+  totp_required_roles = character(),
   google_enabled = FALSE,
   google_client_id = NULL,
   google_client_secret = NULL,
@@ -204,10 +205,11 @@ aa_settings(
 
   Enable two-factor authentication (one-time TOTP codes from an
   authenticator app). Default `FALSE`. Requires `totp_key`. Two-factor
-  protection is voluntary: each user enables it in the
+  protection is voluntary unless roles are listed in
+  `totp_required_roles`: each user enables it in the
   [`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md)
-  module, and users who have it enabled enter a code when signing in
-  with a password.
+  module or in the sign-in wizard, and users who have it enabled enter a
+  code when signing in with a password.
 
 - totp_key:
 
@@ -225,6 +227,14 @@ aa_settings(
 
   How many 30-second steps in each direction of clock drift are
   tolerated (0 to 5, default 1).
+
+- totp_required_roles:
+
+  Roles that must set up two-factor authentication before entering the
+  application. Must be a subset of `roles` and requires
+  `totp_enabled = TRUE`. Default
+  [`character()`](https://rdrr.io/r/base/character.html) (voluntary for
+  everyone).
 
 - google_enabled:
 

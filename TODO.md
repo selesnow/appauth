@@ -5,9 +5,6 @@ Planned improvements, in priority order. A finished item is moved to
 
 ## 1. Two-factor authentication follow-ups (after 0.5.0)
 
-- Mandatory enrolment for roles (`totp_required_roles`): when logging in
-  without 2FA, show the setup wizard first, like the forced password
-  change.
 - Issue new recovery codes without disabling 2FA (password and code
   required).
 - Other factors: WebAuthn and hardware keys.

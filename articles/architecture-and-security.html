@@ -30,7 +30,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,7 +70,7 @@
       <img src="../logo.svg" class="logo" alt=""><h1>Architecture and security</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.12.0/vignettes/architecture-and-security.Rmd" class="external-link"><code>vignettes/architecture-and-security.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/vignettes/architecture-and-security.Rmd" class="external-link"><code>vignettes/architecture-and-security.Rmd</code></a></small>
       <div class="d-none name"><code>architecture-and-security.Rmd</code></div>
     </div>
 
@@ -109,8 +109,9 @@ administrator;</li>
 UI);</li>
 <li>password recovery by email: a one-time link from the email (off by
 default);</li>
-<li>two-factor authentication (TOTP): optional, a code from an
-authenticator app plus backup codes (off by default);</li>
+<li>two-factor authentication (TOTP): voluntary or mandatory for
+selected roles, a code from an authenticator app plus backup codes (off
+by default);</li>
 <li>the auth table schema (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL)
 and its versioned migrations;</li>
 <li>UI modules: sign-in (including the first-administrator creation
@@ -699,11 +700,15 @@ changes their own password, also invalidates unused links.</p>
 </h3>
 <p>Enabled with the <code>totp_enabled = TRUE</code> setting; it
 requires an encryption key <code>totp_key</code> (a string of at least
-16 characters, kept outside the database and outside the repository).
-The protection is <strong>optional</strong>: each user enables it
-themselves in the account block (<code><a href="../reference/aa_totp_ui.html">aa_totp_ui()</a></code> and
+16 characters, kept outside the database and outside the repository). By
+default the protection is <strong>voluntary</strong>: each user enables
+it themselves in the account block (<code><a href="../reference/aa_totp_ui.html">aa_totp_ui()</a></code> and
 <code><a href="../reference/aa_totp_server.html">aa_totp_server()</a></code>), and whoever has it enabled enters a code
-at sign-in.</p>
+at sign-in. Roles listed in <code>totp_required_roles</code> must
+complete setup before entering the application;
+<code><a href="../reference/aa_auth_server.html">aa_auth_server()</a></code> opens the wizard at sign-in, and
+<code><a href="../reference/aa_session_guard.html">aa_session_guard()</a></code> closes an existing session while the
+role’s 2FA is missing.</p>
 <p><strong>Setup.</strong> A button creates a secret (160 bits) and
 stores it encrypted; 2FA is not yet on. The user scans the QR code (if
 the optional <code>qrcode</code> package is installed) or enters the key
@@ -712,10 +717,11 @@ the user is shown 10 backup codes once, and their other sessions are
 ended.</p>
 <p><strong>Sign-in.</strong></p>
 <ol style="list-style-type: decimal">
-<li>The password is checked as usual. If the user has 2FA enabled,
-<strong>no auto-login token is issued and the successful sign-in attempt
-is not recorded</strong>: otherwise it would reset the failure counter
-and the code could be guessed indefinitely.</li>
+<li>The password is checked as usual. If the user has 2FA enabled or the
+role requires it, <strong>no auto-login token is issued and the
+successful sign-in attempt is not recorded</strong>: otherwise it would
+reset the failure counter and the code could be guessed
+indefinitely.</li>
 <li>The code form is shown. Before every check the shared sign-in guard
 (<code><a href="../reference/aa_login_gate.html">aa_login_gate()</a></code>) is called: a blocked login or the global
 limit closes the form.</li>
@@ -731,16 +737,20 @@ lockout ends.</li>
 issued, and then (if the password is temporary) the change password form
 is shown.</li>
 </ol>
-<p>Signing in by auto-login cookie does not ask for the second factor:
-the cookie was issued after it was passed and is valid for
-<code>session_days</code> days, effectively a “trusted device”. Password
-recovery by email does not bypass 2FA: after the password change the
-code is still required.</p>
+<p>Signing in by auto-login cookie does not ask for the second factor
+from a user who has already enrolled: the cookie was issued after it was
+passed and is valid for <code>session_days</code> days, effectively a
+“trusted device”. A role in <code>totp_required_roles</code> without
+enabled 2FA is an exception: the cookie is revoked and the setup wizard
+is shown. Password recovery by email does not bypass 2FA: after the
+password change the code (or mandatory setup) is still required.</p>
 <p><strong>Disabling.</strong> The user needs the password and a code
 (or a backup code); otherwise someone who took over another person’s
 open session could remove the protection. The code is checked only when
 the password is correct, so a third party’s attempt does not consume
-backup codes. Wrong attempts count as failed sign-in attempts.</p>
+backup codes. Wrong attempts count as failed sign-in attempts. A role
+listed in <code>totp_required_roles</code> cannot disable 2FA until that
+setting is removed.</p>
 <p><strong>Loss of the phone.</strong> Backup codes, or a 2FA reset by
 an administrator in the user card (the secret and backup codes are
 erased, the user’s sessions are ended, event
@@ -1006,11 +1016,14 @@ could be guessed without limit</td>
 <td></td>
 </tr>
 <tr class="even">
-<td>2FA is optional</td>
-<td>Forcing it on for roles requires a “first sign-in without 2FA”
-scenario and emergency access</td>
-<td>Administrators may remain without a second factor if they do not
-enable it themselves</td>
+<td>2FA is optional by default, or mandatory per role via
+<code>totp_required_roles</code>
+</td>
+<td>A mandatory role gets a setup wizard before the application, after a
+forced password change when needed; emergency access remains an
+administrator’s separate concern</td>
+<td>Administrators may remain without a second factor if they are not
+listed and do not enable it themselves</td>
 </tr>
 <tr class="odd">
 <td>SQLite by default, plus DuckDB, MySQL / MariaDB and PostgreSQL
@@ -1064,9 +1077,11 @@ Changing a user’s email in Workspace without updating the address in the
 application closes their Google sign-in, and handing the address to
 another person opens the first user’s account to them, so addresses must
 be kept up to date. The two-factor code of the application is not
-requested when signing in with Google. Two-factor protection is optional
-and only by TOTP codes: no SMS, push notifications, hardware keys, and
-no forced enabling for roles.</li>
+requested from a user who has already enrolled when signing in with
+Google; a role in <code>totp_required_roles</code> without enabled 2FA
+is sent to the setup wizard first. Two-factor protection is voluntary or
+mandatory by role, and only by TOTP codes: no SMS, push notifications or
+hardware keys.</li>
 <li>
 <strong>Losing the <code>totp_key</code> key</strong> makes the
 stored secrets unreadable: until an administrator resets 2FA, users with
@@ -1141,7 +1156,10 @@ lockout.</li>
 <strong>Keep the <code>totp_key</code> key outside the database and
 the repository</strong> (an environment variable) and not lose it:
 without it the TOTP secrets cannot be decrypted. Keep database backups
-separate from the key.</li>
+separate from the key. If privileged roles are listed in
+<code>totp_required_roles</code>, check that a first sign-in can reach
+the setup wizard and that an existing session is closed until the role’s
+2FA is enabled.</li>
 </ol>
 </div>
 <div class="section level2">

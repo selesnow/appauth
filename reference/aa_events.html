@@ -16,7 +16,7 @@ etc.). This function returns the full list of events the package can send."><met
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.13.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,7 +44,7 @@ etc.). This function returns the full list of events the package can send."><met
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Catalog of authorization events</h1>
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.12.0/R/events.R" class="external-link"><code>R/events.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/R/events.R" class="external-link"><code>R/events.R</code></a></small>
       <div class="d-none name"><code>aa_events.Rd</code></div>
     </div>
 
@@ -111,13 +111,14 @@ column. Passwords and tokens never appear in events.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 24            totp_disabled</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 25              totp_failed</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 26               totp_reset</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 27       recovery_code_used</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 28      google_login_failed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 29        weak_password_set</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 30   registration_requested</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 31   registration_confirmed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 32      registration_failed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 33      google_user_created</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27 totp_enrollment_required</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28       recovery_code_used</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29      google_login_failed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30        weak_password_set</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31   registration_requested</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32   registration_confirmed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33      registration_failed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34      google_user_created</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                                                      description</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1     Successful sign-in (by password, with Google or by an auto sign-in cookie)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                                                    Incorrect login or password</span>
@@ -145,13 +146,14 @@ column. Passwords and tokens never appear in events.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 24                                   The user disabled two-factor authentication</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 25                       Incorrect code when confirming sign-in or disabling 2FA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 26                                           An administrator reset a user's 2FA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 27                                        Sign-in confirmed with a recovery code</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 28                      Failed Google sign-in (the user is shown a generic text)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 29                  A weak password was accepted (password_policy = "warn" mode)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 30              Self-registration requested (the user is shown a generic answer)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 31                              Account created from the email confirmation link</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 32                                      Failed attempt to confirm a registration</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 33                         Account created automatically on first Google sign-in</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27                           The mandatory 2FA setup wizard was shown for a role</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28                                        Sign-in confirmed with a recovery code</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29                      Failed Google sign-in (the user is shown a generic text)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30                  A weak password was accepted (password_policy = "warn" mode)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31              Self-registration requested (the user is shown a generic answer)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32                              Account created from the email confirmation link</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33                                      Failed attempt to confirm a registration</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34                         Account created automatically on first Google sign-in</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                                                                                                                                                                                                   value</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                                                                                                                                    cookie (auto sign-in), google (Google sign-in) or registration (self-registration)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                                                                                                                                                                     password_disabled if password sign-in is disabled</span>
@@ -160,7 +162,7 @@ column. Passwords and tokens never appear in events.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5                                                                                                                                                                                                                      </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                                                                                                                                                                                       login the lock was removed from</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7                                                                                                                                                                                                                      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8                                                                                                                                                                 reason: deleted, blocked, role_changed, token_revoked</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8                                                                                                                                                  reason: deleted, blocked, role_changed, totp_required, token_revoked</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 9                                                                                                                                                                                                                      </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 10                                                                                                                                                                                   login of the new user and the role</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 11                                                                                                                                                                                            login of the deleted user</span>
@@ -179,13 +181,14 @@ column. Passwords and tokens never appear in events.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 24                                                                                                                                                                                                                     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 25                                                                                                                                                                                                                     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 26                                                                                                                                                                                                           user login</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 27                                                                                                                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 28 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 29                                                                                                                                          login and reason: password_common, password_equals_login, password_repeated</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 30                                                   reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 31                                                                                                                                                                                                login of the new user</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 32                                                                                                                                                         reason: registration_link_invalid, user_exists, email_exists</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 33                                                                                                                                                                                                login of the new user</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27                                                                                                                                                                                                           user login</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28                                                                                                                                                                                                                     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30                                                                                                                                          login and reason: password_common, password_equals_login, password_repeated</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31                                                   reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32                                                                                                                                                                                                login of the new user</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33                                                                                                                                                         reason: registration_link_invalid, user_exists, email_exists</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34                                                                                                                                                                                                login of the new user</span>
 <span class="r-in"><span><span class="fu">aa_events</span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">event</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "login_success"            "login_failed"            </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [3] "login_locked"             "login_blocked_user"      </span>
@@ -200,10 +203,10 @@ column. Passwords and tokens never appear in events.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [21] "password_reset_failed"    "email_changed"           </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [23] "totp_enabled"             "totp_disabled"           </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [25] "totp_failed"              "totp_reset"              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [27] "recovery_code_used"       "google_login_failed"     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [29] "weak_password_set"        "registration_requested"  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [31] "registration_confirmed"   "registration_failed"     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [33] "google_user_created"     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [27] "totp_enrollment_required" "recovery_code_used"      </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [29] "google_login_failed"      "weak_password_set"       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [31] "registration_requested"   "registration_confirmed"  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [33] "registration_failed"      "google_user_created"     </span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

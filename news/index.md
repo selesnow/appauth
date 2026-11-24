@@ -1,5 +1,10 @@
 # Changelog
 
+## appauth 0.13.0
+
+Feature release: 2FA can be mandatory for selected roles. No schema
+change; all new settings are opt-in and default to the 0.12.0 behaviour.
+
 ## appauth 0.12.0
 
 Security release: server-side `HttpOnly` cookies by default, DB-backed

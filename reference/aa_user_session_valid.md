@@ -10,7 +10,7 @@ revoked (password reset, "end all sessions").
 ## Usage
 
 ``` r
-aa_user_session_valid(conn, login, role, token = NULL)
+aa_user_session_valid(conn, login, role, token = NULL, settings = NULL)
 ```
 
 ## Arguments
@@ -33,11 +33,19 @@ aa_user_session_valid(conn, login, role, token = NULL)
   session has no token (for example, autologin is disabled): then the
   token is not checked.
 
+- settings:
+
+  Settings, the result of
+  [`aa_settings()`](https://alexey-seleznev.pro/appauth/reference/aa_settings.md).
+  When supplied, a session is closed if the user's role requires 2FA
+  that is not enabled.
+
 ## Value
 
 A list: `valid` (logical), `reason` (`"ok"`, `"deleted"`, `"blocked"`,
-`"role_changed"`, `"token_revoked"`, `"check_failed"`) and `role` (the
-current role from the database or `NULL`).
+`"role_changed"`, `"totp_required"`, `"token_revoked"`,
+`"check_failed"`) and `role` (the current role from the database or
+`NULL`).
 
 ## Details
 

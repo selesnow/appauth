@@ -246,13 +246,14 @@ behind nginx check `reset_base_url` (the `deployment` vignette).
 
 ### Step 5 (optional). Two-factor authentication
 
-For apps with privileged roles, enable voluntary 2FA:
+For apps with privileged roles, enable 2FA:
 `aa_settings(totp_enabled = TRUE, totp_key = ...)`, the
 [`aa_totp_ui()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_ui.md)
 and
 [`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md)
-block in the profile, and ask administrators to turn it on. Set
-`totp_key` through an environment variable and do not lose it; for
+block in the profile, and either ask administrators to turn it on or
+list their roles in `totp_required_roles` to require setup at sign-in.
+Set `totp_key` through an environment variable and do not lose it; for
 existing users protection is off after the migration. Recipe and
 limitations: the `extension-points` vignette (section “Two-factor
 authentication”).

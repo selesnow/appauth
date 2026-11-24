@@ -61,13 +61,14 @@ aa_events()
 #> 24            totp_disabled
 #> 25              totp_failed
 #> 26               totp_reset
-#> 27       recovery_code_used
-#> 28      google_login_failed
-#> 29        weak_password_set
-#> 30   registration_requested
-#> 31   registration_confirmed
-#> 32      registration_failed
-#> 33      google_user_created
+#> 27 totp_enrollment_required
+#> 28       recovery_code_used
+#> 29      google_login_failed
+#> 30        weak_password_set
+#> 31   registration_requested
+#> 32   registration_confirmed
+#> 33      registration_failed
+#> 34      google_user_created
 #>                                                                      description
 #> 1     Successful sign-in (by password, with Google or by an auto sign-in cookie)
 #> 2                                                    Incorrect login or password
@@ -95,13 +96,14 @@ aa_events()
 #> 24                                   The user disabled two-factor authentication
 #> 25                       Incorrect code when confirming sign-in or disabling 2FA
 #> 26                                           An administrator reset a user's 2FA
-#> 27                                        Sign-in confirmed with a recovery code
-#> 28                      Failed Google sign-in (the user is shown a generic text)
-#> 29                  A weak password was accepted (password_policy = "warn" mode)
-#> 30              Self-registration requested (the user is shown a generic answer)
-#> 31                              Account created from the email confirmation link
-#> 32                                      Failed attempt to confirm a registration
-#> 33                         Account created automatically on first Google sign-in
+#> 27                           The mandatory 2FA setup wizard was shown for a role
+#> 28                                        Sign-in confirmed with a recovery code
+#> 29                      Failed Google sign-in (the user is shown a generic text)
+#> 30                  A weak password was accepted (password_policy = "warn" mode)
+#> 31              Self-registration requested (the user is shown a generic answer)
+#> 32                              Account created from the email confirmation link
+#> 33                                      Failed attempt to confirm a registration
+#> 34                         Account created automatically on first Google sign-in
 #>                                                                                                                                                                                                                   value
 #> 1                                                                                                                                    cookie (auto sign-in), google (Google sign-in) or registration (self-registration)
 #> 2                                                                                                                                                                     password_disabled if password sign-in is disabled
@@ -110,7 +112,7 @@ aa_events()
 #> 5                                                                                                                                                                                                                      
 #> 6                                                                                                                                                                                       login the lock was removed from
 #> 7                                                                                                                                                                                                                      
-#> 8                                                                                                                                                                 reason: deleted, blocked, role_changed, token_revoked
+#> 8                                                                                                                                                  reason: deleted, blocked, role_changed, totp_required, token_revoked
 #> 9                                                                                                                                                                                                                      
 #> 10                                                                                                                                                                                   login of the new user and the role
 #> 11                                                                                                                                                                                            login of the deleted user
@@ -129,13 +131,14 @@ aa_events()
 #> 24                                                                                                                                                                                                                     
 #> 25                                                                                                                                                                                                                     
 #> 26                                                                                                                                                                                                           user login
-#> 27                                                                                                                                                                                                                     
-#> 28 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known
-#> 29                                                                                                                                          login and reason: password_common, password_equals_login, password_repeated
-#> 30                                                   reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason
-#> 31                                                                                                                                                                                                login of the new user
-#> 32                                                                                                                                                         reason: registration_link_invalid, user_exists, email_exists
-#> 33                                                                                                                                                                                                login of the new user
+#> 27                                                                                                                                                                                                           user login
+#> 28                                                                                                                                                                                                                     
+#> 29 reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email if known
+#> 30                                                                                                                                          login and reason: password_common, password_equals_login, password_repeated
+#> 31                                                   reason: sent, created, user_exists, email_exists, email_invalid, registration_domain, registration_throttled, send_failed or a login or password validation reason
+#> 32                                                                                                                                                                                                login of the new user
+#> 33                                                                                                                                                         reason: registration_link_invalid, user_exists, email_exists
+#> 34                                                                                                                                                                                                login of the new user
 aa_events()$event
 #>  [1] "login_success"            "login_failed"            
 #>  [3] "login_locked"             "login_blocked_user"      
@@ -150,8 +153,8 @@ aa_events()$event
 #> [21] "password_reset_failed"    "email_changed"           
 #> [23] "totp_enabled"             "totp_disabled"           
 #> [25] "totp_failed"              "totp_reset"              
-#> [27] "recovery_code_used"       "google_login_failed"     
-#> [29] "weak_password_set"        "registration_requested"  
-#> [31] "registration_confirmed"   "registration_failed"     
-#> [33] "google_user_created"     
+#> [27] "totp_enrollment_required" "recovery_code_used"      
+#> [29] "google_login_failed"      "weak_password_set"       
+#> [31] "registration_requested"   "registration_confirmed"  
+#> [33] "registration_failed"      "google_user_created"     
 ```

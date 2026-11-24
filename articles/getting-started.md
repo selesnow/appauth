@@ -153,8 +153,8 @@ aa_create_user(conn, "ivan", "ivan-password", "user")
 
 aa_list_users(conn)                                # password hashes are not returned
 #>   login  role blocked          created_at last_login_at
-#> 1  boss admin       0 2026-11-24 13:14:04          <NA>
-#> 2  ivan  user       0 2026-11-24 13:14:04          <NA>
+#> 1  boss admin       0 2026-11-24 18:43:54          <NA>
+#> 2  ivan  user       0 2026-11-24 18:43:54          <NA>
 
 aa_authenticate(conn, "ivan", "ivan-password")     # user data
 #>   login role blocked must_change
@@ -216,7 +216,7 @@ DBI::dbDisconnect(conn)
 | Russian interface | `aa_settings(texts = aa_texts("ru"))` |
 | Custom button text | `aa_texts("en", login_button = "Log in to the system")` |
 | Permanent administrator password | `aa_settings(must_change_default = FALSE)` |
-| Two-factor authentication (TOTP) | `aa_settings(totp_enabled = TRUE, totp_key = ...)` and [`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md) in the user’s account page, recipe in the `extension-points` vignette |
+| Two-factor authentication (TOTP) | `aa_settings(totp_enabled = TRUE, totp_key = ..., totp_required_roles = "admin")` and [`aa_totp_server()`](https://alexey-seleznev.pro/appauth/reference/aa_totp_server.md) in the user’s account page, recipe in the `extension-points` vignette |
 | Password reset by email | `aa_settings(reset_enabled = TRUE, send_reset = ..., reset_base_url = ...)`, recipe in the `extension-points` vignette |
 | Your own permissions (not a matrix) | a `function(user)` instead of [`aa_permissions_from_matrix()`](https://alexey-seleznev.pro/appauth/reference/aa_permissions_from_matrix.md) |
 | Your own block in the user card | `extra_card_ui` and `extra_card_server` in [`aa_users_server()`](https://alexey-seleznev.pro/appauth/reference/aa_users_server.md) |
