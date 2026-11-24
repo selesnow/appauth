@@ -1,6 +1,6 @@
 # appauth reference: Login protection and sessions
 
-Package version: 0.12.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.13.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section:
 `aa_login_gate()`, `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`, `aa_issue_token()`, `aa_find_session_user()`, `aa_revoke_token()`, `aa_revoke_sessions()`, `aa_active_autologins()`, `aa_user_session_valid()`
@@ -438,7 +438,7 @@ Description:
 
 Usage:
 
-     aa_user_session_valid(conn, login, role, token = NULL)
+     aa_user_session_valid(conn, login, role, token = NULL, settings = NULL)
 
 Arguments:
 
@@ -451,6 +451,9 @@ Arguments:
    token: Autologin token of this session ('auth$token()') or 'NULL' if the session has
           no token (for example, autologin is disabled): then the token is not checked.
 
+settings: Settings, the result of 'aa_settings()'. When supplied, a session is closed if
+          the user's role requires 2FA that is not enabled.
+
 Details:
 
      If the database cannot be read, the session is considered valid ('reason =
@@ -460,8 +463,8 @@ Details:
 Value:
 
      A list: 'valid' (logical), 'reason' ('"ok"', '"deleted"', '"blocked"',
-     '"role_changed"', '"token_revoked"', '"check_failed"') and 'role' (the current role
-     from the database or 'NULL').
+     '"role_changed"', '"totp_required"', '"token_revoked"', '"check_failed"') and 'role'
+     (the current role from the database or 'NULL').
 
 Examples:
 

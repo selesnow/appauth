@@ -162,6 +162,9 @@ aa_texts_ru <- list(
   totp_setup_hint = "Отсканируйте QR-код приложением-аутентификатором (Google Authenticator, Microsoft Authenticator, 2FAS) или введите ключ вручную, затем введите код из приложения.",
   totp_secret_label = "Ключ для ручного ввода",
   totp_confirm_button = "Подтвердить и включить",
+  totp_enroll_title = "Настройка двухфакторной аутентификации",
+  totp_enroll_hint = "Для вашей роли обязательна двухфакторная аутентификация. Отсканируйте QR-код или введите ключ вручную, затем введите код из приложения, чтобы продолжить.",
+  totp_required_hint = "Для вашей роли обязательна двухфакторная аутентификация, здесь её нельзя выключить.",
   totp_recovery_title = "Резервные коды",
   totp_recovery_hint = "Сохраните эти коды в надёжном месте. Каждый подходит один раз, повторно они не показываются.",
   totp_recovery_left = "Осталось резервных кодов: %d",
@@ -209,7 +212,7 @@ aa_events_ru_source <- list(
   logout = c("Пользователь вышел сам", ""),
   session_forced_logout = c(
     "Сессия завершена принудительно",
-    "причина: deleted, blocked, role_changed, token_revoked"
+    "причина: deleted, blocked, role_changed, totp_required, token_revoked"
   ),
   first_admin_created = c("Создан первый администратор", ""),
   user_added = c(
@@ -266,6 +269,10 @@ aa_events_ru_source <- list(
   ),
   totp_reset = c(
     "Администратор сбросил 2FA пользователя",
+    "логин пользователя"
+  ),
+  totp_enrollment_required = c(
+    "Показан обязательный мастер настройки 2FA для роли",
     "логин пользователя"
   ),
   recovery_code_used = c("Вход подтверждён резервным кодом", ""),

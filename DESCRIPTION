@@ -1,6 +1,6 @@
 Package: appauth
 Title: Secure Authentication and User Management for 'shiny' Applications
-Version: 0.12.0
+Version: 0.13.0
 Authors@R:
     c(person("Alexey", "Seleznev", , "selesnow@gmail.com", role = c("aut", "cre"),
              comment = c(ORCID = "0000-0003-0410-7385")),
@@ -10,8 +10,9 @@ Description: Provides login, user management and access control for 'shiny'
     or 'PostgreSQL'. Features include password login with hashed-only storage,
     cookie-based auto-login, brute-force protection, blocking and deleting users
     while keeping the last administrator, password recovery by email with
-    one-time links, two-factor authentication with time-based one-time
-    passwords, sign-in with 'Google' ('OpenID' Connect) with optional disabling
+     one-time links, two-factor authentication with time-based one-time
+     passwords (voluntary or mandatory for selected roles), sign-in with
+     'Google' ('OpenID' Connect) with optional disabling
     of password login, opt-in self-registration with email confirmation and
     automatic account creation for verified 'Google' users, server-side
     permission checks, ready-made user interface modules with extension points,

@@ -36,6 +36,7 @@ aa_settings(
   totp_key = NULL,
   totp_issuer = "appauth",
   totp_window = 1,
+  totp_required_roles = character(),
   google_enabled = FALSE,
   google_client_id = NULL,
   google_client_secret = NULL,
@@ -146,8 +147,9 @@ per minute (protection against spam).}
 
 \item{totp_enabled}{Enable two-factor authentication (one-time TOTP codes
 from an authenticator app). Default \code{FALSE}. Requires \code{totp_key}.
-Two-factor protection is voluntary: each user enables it in the
-\code{\link[=aa_totp_server]{aa_totp_server()}} module, and users who have it enabled enter a code when
+Two-factor protection is voluntary unless roles are listed in
+\code{totp_required_roles}: each user enables it in the \code{\link[=aa_totp_server]{aa_totp_server()}} module
+or in the sign-in wizard, and users who have it enabled enter a code when
 signing in with a password.}
 
 \item{totp_key}{Encryption key for TOTP secrets in the database, a string of
@@ -160,6 +162,10 @@ to set up 2FA again (an administrator resets it in the user card).}
 
 \item{totp_window}{How many 30-second steps in each direction of clock drift
 are tolerated (0 to 5, default 1).}
+
+\item{totp_required_roles}{Roles that must set up two-factor authentication
+before entering the application. Must be a subset of \code{roles} and requires
+\code{totp_enabled = TRUE}. Default \code{character()} (voluntary for everyone).}
 
 \item{google_enabled}{Enable sign-in with Google (OpenID Connect): a "Sign in
 with Google" button appears on the sign-in form. Default \code{FALSE}. Requires

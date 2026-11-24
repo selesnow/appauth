@@ -4,7 +4,7 @@
 \alias{aa_user_session_valid}
 \title{Check that an open session is still valid}
 \usage{
-aa_user_session_valid(conn, login, role, token = NULL)
+aa_user_session_valid(conn, login, role, token = NULL, settings = NULL)
 }
 \arguments{
 \item{conn}{Database connection.}
@@ -16,11 +16,14 @@ aa_user_session_valid(conn, login, role, token = NULL)
 \item{token}{Autologin token of this session (\code{auth$token()}) or \code{NULL} if
 the session has no token (for example, autologin is disabled): then the
 token is not checked.}
+
+\item{settings}{Settings, the result of \code{\link[=aa_settings]{aa_settings()}}. When supplied, a
+session is closed if the user's role requires 2FA that is not enabled.}
 }
 \value{
 A list: \code{valid} (logical), \code{reason} (\code{"ok"}, \code{"deleted"},
-\code{"blocked"}, \code{"role_changed"}, \code{"token_revoked"}, \code{"check_failed"}) and
-\code{role} (the current role from the database or \code{NULL}).
+\code{"blocked"}, \code{"role_changed"}, \code{"totp_required"}, \code{"token_revoked"},
+\code{"check_failed"}) and \code{role} (the current role from the database or \code{NULL}).
 }
 \description{
 Called periodically (every \code{session_check_seconds}) so that blocking,

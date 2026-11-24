@@ -27,7 +27,7 @@ A detailed comparison with existing packages such as `shinyauthr` and `shinymana
 * Forced logout: a blocked, deleted, role-changed or password-reset user loses the open session within the check interval (30 seconds by default).
 * Changing your own password, a mandatory change of a temporary password set by an administrator, and logout on all devices (`auth$logout_all()`).
 * Password recovery by email: a one-time link from the email, email rate limits, the form response does not reveal whether a user exists (off by default; the email is sent by an application function).
-* Two-factor authentication (TOTP): optional, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).
+* Two-factor authentication (TOTP): voluntary or mandatory for selected roles, a code from an authenticator app and 10 recovery codes, the secret is encrypted in the database, wrong codes lock the login, reset by an administrator (off by default).
 * Sign-in with Google (OpenID Connect): for existing users by email, with an organisation domain check; password login can be disabled (off by default).
 * Opt-in self-registration: a "Create an account" link, one-time email confirmation, configurable domains and role, an hourly limit, and optional automatic account creation for verified Google users (off by default).
 * Server-side permission checks (`aa_can()`, `aa_require()`), with permissions from a "permission -> roles" matrix or from any custom source.
@@ -153,7 +153,7 @@ Tests can run on any supported database: `Rscript dev/run-tests-db.R duckdb` (se
 
 ## Limitations
 
-Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the `architecture-and-security` vignette. By default the auto-login cookie is written by the server with `HttpOnly`; `cookie_mode = "legacy"` keeps the old JavaScript flow.
+Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the `architecture-and-security` vignette. By default the auto-login cookie is written by the server with `HttpOnly`; `cookie_mode = "legacy"` keeps the old JavaScript flow.
 
 ## Development
 

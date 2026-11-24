@@ -226,10 +226,12 @@ aa_active_autologins <- function(conn, login = NULL) {
 #' @param token Autologin token of this session (`auth$token()`) or `NULL` if
 #'   the session has no token (for example, autologin is disabled): then the
 #'   token is not checked.
+#' @param settings Settings, the result of [aa_settings()]. When supplied, a
+#'   session is closed if the user's role requires 2FA that is not enabled.
 #'
 #' @returns A list: `valid` (logical), `reason` (`"ok"`, `"deleted"`,
-#'   `"blocked"`, `"role_changed"`, `"token_revoked"`, `"check_failed"`) and
-#'   `role` (the current role from the database or `NULL`).
+#'   `"blocked"`, `"role_changed"`, `"totp_required"`, `"token_revoked"`,
+#'   `"check_failed"`) and `role` (the current role from the database or `NULL`).
 #' @export
 #'
 #' @examples
@@ -238,7 +240,7 @@ aa_active_autologins <- function(conn, login = NULL) {
 #' auth$token())
 #' if (!check$valid) auth$logout(reason = check$reason)
 #' }
-aa_user_session_valid <- function(conn, login, role, token = NULL) {
+aa_user_session_valid <- function(conn, login, role, token = NULL, settings = NULL) {
   user <- tryCatch(aa_get_user(conn, login), error = function(e) e)
 
   if (inherits(user, "error")) {
@@ -252,6 +254,13 @@ aa_user_session_valid <- function(conn, login, role, token = NULL) {
   }
   if (!identical(as.character(user$role), as.character(role))) {
     return(list(valid = FALSE, reason = "role_changed", role = user$role))
+  }
+
+  if (
+    !is.null(settings) &&
+      .aa_totp_enrollment_needed(conn, login, user$role, settings)
+  ) {
+    return(list(valid = FALSE, reason = "totp_required", role = user$role))
   }
 
   if (aa_is_string(token)) {

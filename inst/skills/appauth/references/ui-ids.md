@@ -2,7 +2,7 @@
 
 Input and output identifiers of the modules are built as `<module id>-<name>`. The table lists names without the prefix; the prefix is set by the application: `aa_auth_ui("auth")` gives `auth-login`, `aa_users_ui("users")` gives `users-add`, and if a module is nested in another one (`mod_access_ui` with `ns("users")`), it is `access-users-add`. In a test of a single module via `testServer` there is no prefix (`login`, `login_btn`); in a test of the whole app it is needed (`auth-login`).
 
-The list was checked against the package source code (version 0.12.0; the sign-in form gained registration identifiers in 0.11.0). Browser selector: `#<prefix>-<name>`, for example `page.fill("#auth-login", "ivan")`.
+The list was checked against the package source code (version 0.13.0; the sign-in form gained registration identifiers in 0.11.0 and mandatory 2FA enrollment identifiers in 0.13.0). Browser selector: `#<prefix>-<name>`, for example `page.fill("#auth-login", "ivan")`.
 
 Visible labels below are the package defaults for `aa_texts("en")`.
 
@@ -22,6 +22,7 @@ Visible labels below are the package defaults for `aa_texts("en")`.
 | `register_login`, `register_email`, `register_password`, `register_confirm`, `register_btn` | the self-registration form: desired login, email, password, password confirmation and the "Create account" button |
 | `back_link` | the "Back to sign in" link on the link request form, the new password form, the registration form, and the confirmation-link handler (`?register=<token>`) |
 | `totp_code`, `totp_btn` | the second factor code form: appears after a correct password if the user has 2FA enabled (a code from the app or a backup code; in a test `session$setInputs(totp_code = ..., totp_btn = 1)`) |
+| `totp_enroll_code`, `totp_enroll_btn` | the mandatory enrollment wizard for a role in `totp_required_roles` without enabled 2FA: appears before the application, including after a forced password change and instead of a remembered cookie; the secret is available in the module reactive `totp_enroll()$secret` in `testServer` |
 | `google_btn` | the "Sign in with Google" button (only with `google_enabled = TRUE`; with `password_login = FALSE` the `login`, `password` fields and the `login_btn` button are absent). Classes: `.aa-google-button`, the "or" separator `.aa-login-or`. The redirect to Google itself cannot be automated in a browser: test the return via `testServer` with the Google functions mocked. On a page whose address is not in `google_redirect_uri`, the button redirects to the return address (`?google=1` starts the sign-in by itself; in tests mock `aa_page_origin` and `aa_redirect`) |
 | `oauth_cookie` | an internal input with the value of the browser cookie of the browser that started the Google sign-in (in a test `session$setInputs(oauth_cookie = state)` after mocking `aa_url_search` to `"?code=...&state=..."`; it must match `state`) |
 | `cookie` | an internal input with the token from the cookie (in a test `session$setInputs(cookie = token)`) |

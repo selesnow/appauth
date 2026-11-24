@@ -1,4 +1,20 @@
 # 2026-11-24 | OPENCODE (Alsey)
+Implemented mandatory two-factor enrolment in `0.13.0`: `aa_settings()` gained
+`totp_required_roles`, so selected roles must set up TOTP before entering the
+application (after a forced password change when both are required). Sign-in
+with a password, Google, self-registration, first-admin setup and a remembered
+cookie no longer bypass the setup wizard, and active sessions are closed while
+the role's 2FA is missing. The account module can no longer disable 2FA required
+for the role. Added the `totp_enrollment_required` event, new texts in both
+languages, tests and documentation. No database migration is needed; existing
+applications keep voluntary 2FA by default.
+
+# appauth 0.13.0
+
+Feature release: 2FA can be mandatory for selected roles. No schema change;
+all new settings are opt-in and default to the 0.12.0 behaviour.
+
+# 2026-11-24 | OPENCODE (Alsey)
 Implemented server-side HttpOnly cookies in `0.12.0`: the auto-login cookie and
 the Google OAuth state cookie are now issued through short-lived encrypted
 one-time tickets handled by a same-origin Shiny HTTP handler, so JavaScript no

@@ -178,6 +178,8 @@ aa_auth_server <- function(
     pending <- shiny::reactiveVal(NULL)
     # the password is correct, waiting for the second factor code: list(login, role, must_change, old)
     second_factor <- shiny::reactiveVal(NULL)
+    # the role requires 2FA and the user must set it up before entering the app
+    totp_enroll <- shiny::reactiveVal(NULL)
     # which form is shown before sign-in: "login" or "forgot" (link request)
     mode <- shiny::reactiveVal("login")
     # token from the recovery link for which the new password form is shown
@@ -305,6 +307,35 @@ aa_auth_server <- function(
       }
     }
 
+    sign_in_or_enroll <- function(login, role) {
+      if (!.aa_totp_enrollment_needed(conn, login, role, settings)) {
+        finish_login(login, role)
+        return(TRUE)
+      }
+
+      setup <- tryCatch(
+        aa_totp_setup(conn, login, settings),
+        error = function(e) {
+          message_text(conditionMessage(e))
+          NULL
+        }
+      )
+
+      if (is.null(setup)) {
+        return(FALSE)
+      }
+
+      message_text("")
+      totp_enroll(list(
+        login = login,
+        role = role,
+        secret = setup$secret,
+        uri = setup$uri
+      ))
+      emit("totp_enrollment_required", login)
+      FALSE
+    }
+
     # password recovery link from the email: ?reset=<token>
     if (isTRUE(settings$reset_enabled) && password_on) {
       shiny::observeEvent(
@@ -363,8 +394,9 @@ aa_auth_server <- function(
           user_row <- aa_get_user(conn, login)
           role <- if (is.null(user_row)) settings$registration_role else user_row$role[1]
           emit("registration_confirmed", login)
-          emit("login_success", login, "registration")
-          finish_login(login, role)
+          if (sign_in_or_enroll(login, role)) {
+            emit("login_success", login, "registration")
+          }
         },
         once = TRUE
       )
@@ -390,6 +422,23 @@ aa_auth_server <- function(
             if (!is.null(ticket)) {
               send_ticket(ticket, navigate = FALSE)
             }
+          } else if (
+            .aa_totp_enrollment_needed(
+              conn,
+              found$login,
+              found$role,
+              settings
+            )
+          ) {
+            try(aa_revoke_token(conn, cookie_value), silent = TRUE)
+            ticket <- safe_ticket(
+              aa_cookie_clear_ticket(conn, settings, cookie_name),
+              "a cookie clearing ticket"
+            )
+            if (!is.null(ticket)) {
+              send_ticket(ticket, navigate = FALSE)
+            }
+            message_text(aa_text(settings, "totp_enroll_hint"))
           } else {
             current_token(cookie_value)
             finish_login(found$login, found$role, issue_token = FALSE)
@@ -423,6 +472,23 @@ aa_auth_server <- function(
               "appauth_clear_cookie",
               list(name = cookie_name)
             )
+            return()
+          }
+
+          if (
+            .aa_totp_enrollment_needed(
+              conn,
+              found$login,
+              found$role,
+              settings
+            )
+          ) {
+            try(aa_revoke_token(conn, input$cookie), silent = TRUE)
+            session$sendCustomMessage(
+              "appauth_clear_cookie",
+              list(name = cookie_name)
+            )
+            message_text(aa_text(settings, "totp_enroll_hint"))
             return()
           }
 
@@ -499,8 +565,9 @@ aa_auth_server <- function(
         emit("google_user_created", res$login)
       }
 
-      finish_login(res$login, res$role)
-      emit("login_success", res$login, "google")
+      if (sign_in_or_enroll(res$login, res$role)) {
+        emit("login_success", res$login, "google")
+      }
     }
 
     if (google_on) {
@@ -674,6 +741,7 @@ aa_auth_server <- function(
 
       message_text("")
       user(NULL)
+      totp_enroll(NULL)
       users_exist(tryCatch(aa_users_exist(conn), error = function(e) TRUE))
 
       if (!isTRUE(httponly) && isTRUE(reload)) {
@@ -733,6 +801,39 @@ aa_auth_server <- function(
               ns("back_link"),
               aa_text(settings, "back_to_login")
             )
+          )
+        )
+      } else if (!is.null(totp_enroll())) {
+        heading <- aa_text(settings, "totp_enroll_title")
+        hint <- shiny::tags$p(
+          class = "aa-login-hint",
+          aa_text(settings, "totp_enroll_hint")
+        )
+        setup <- totp_enroll()
+        qr <- aa_totp_qr_html(setup$uri)
+        shiny::tagList(
+          if (!is.null(qr)) {
+            shiny::div(class = "aa-totp-qr", style = "max-width: 220px;", qr)
+          },
+          shiny::p(
+            aa_text(settings, "totp_secret_label"),
+            ": ",
+            shiny::tags$code(gsub("(.{4})", "\\1 ", setup$secret)),
+            " ",
+            aa_copy_button(setup$secret, settings)
+          ),
+          shiny::textInput(
+            ns("totp_enroll_code"),
+            aa_text(settings, "totp_code_label")
+          ),
+          shiny::actionButton(
+            ns("totp_enroll_btn"),
+            aa_text(settings, "totp_confirm_button"),
+            class = "aa-login-button"
+          ),
+          shiny::div(
+            class = "aa-login-message",
+            shiny::textOutput(ns("message"))
           )
         )
       } else if (!is.null(pending())) {
@@ -1042,8 +1143,9 @@ aa_auth_server <- function(
             return()
           }
 
-          finish_login(res$login[1], res$role[1])
-          emit("login_success", res$login[1])
+          if (sign_in_or_enroll(res$login[1], res$role[1])) {
+            emit("login_success", res$login[1])
+          }
           return()
         }
 
@@ -1102,9 +1204,86 @@ aa_auth_server <- function(
         pending(NULL)
         emit("password_changed", waiting$login)
         warn_weak(input$change_password, waiting$login)
-        finish_login(waiting$login, waiting$role)
-        emit("login_success", waiting$login)
+        if (sign_in_or_enroll(waiting$login, waiting$role)) {
+          emit("login_success", waiting$login)
+        }
       }
+    })
+
+    shiny::observeEvent(input$totp_enroll_btn, {
+      waiting <- totp_enroll()
+      shiny::req(waiting)
+
+      gate <- aa_login_gate(conn, waiting$login, settings)
+      if (!gate$allowed) {
+        message_text(gate$message)
+        emit(
+          if (gate$reason == "throttled") {
+            "login_throttled"
+          } else {
+            "login_locked"
+          },
+          waiting$login,
+          gate$seconds
+        )
+        return()
+      }
+
+      codes <- tryCatch(
+        aa_totp_enable(conn, waiting$login, input$totp_enroll_code, settings),
+        appauth_error_user = function(e) {
+          if (identical(e$reason, "totp_wrong")) {
+            try(
+              aa_record_attempt(
+                conn,
+                waiting$login,
+                success = FALSE,
+                settings = settings
+              ),
+              silent = TRUE
+            )
+            emit("totp_failed", waiting$login)
+          }
+          message_text(conditionMessage(e))
+          NULL
+        }
+      )
+
+      if (is.null(codes)) {
+        gate <- aa_login_gate(conn, waiting$login, settings)
+        if (!gate$allowed && gate$reason == "locked") {
+          totp_enroll(NULL)
+          message_text(gate$message)
+          emit("login_locked", waiting$login, gate$seconds)
+        }
+        return()
+      }
+
+      try(
+        aa_record_attempt(
+          conn,
+          waiting$login,
+          success = TRUE,
+          settings = settings
+        ),
+        silent = TRUE
+      )
+      aa_revoke_user_tokens(conn, waiting$login)
+      totp_enroll(NULL)
+      emit("totp_enabled", waiting$login)
+
+      shiny::showModal(shiny::modalDialog(
+        title = aa_text(settings, "totp_recovery_title"),
+        size = "s",
+        easyClose = FALSE,
+        footer = shiny::modalButton(aa_text(settings, "button_close")),
+        shiny::p(aa_text(settings, "totp_recovery_hint")),
+        shiny::tags$pre(class = "aa-totp-codes", paste(codes, collapse = "\n")),
+        aa_copy_button(paste(codes, collapse = "\n"), settings)
+      ))
+
+      finish_login(waiting$login, waiting$role)
+      emit("login_success", waiting$login)
     })
 
     shiny::observeEvent(input$forgot_link, {
@@ -1153,8 +1332,9 @@ aa_auth_server <- function(
       if (identical(res$reason, "created")) {
         warn_weak(input$register_password, res$login)
         emit("registration_confirmed", res$login)
-        emit("login_success", res$login, "registration")
-        finish_login(res$login, settings$registration_role)
+        if (sign_in_or_enroll(res$login, settings$registration_role)) {
+          emit("login_success", res$login, "registration")
+        }
         return()
       }
 
@@ -1183,6 +1363,7 @@ aa_auth_server <- function(
     shiny::observeEvent(input$back_link, {
       message_text("")
       second_factor(NULL)
+      totp_enroll(NULL)
       reset_pending(NULL)
       mode("login")
     })
@@ -1337,8 +1518,9 @@ aa_auth_server <- function(
           return()
         }
 
-        finish_login(waiting$login, waiting$role)
-        emit("login_success", waiting$login)
+        if (sign_in_or_enroll(waiting$login, waiting$role)) {
+          emit("login_success", waiting$login)
+        }
       })
     })
 
@@ -1374,7 +1556,7 @@ aa_auth_server <- function(
       if (isTRUE(created)) {
         emit("first_admin_created", login)
         warn_weak(password, login)
-        finish_login(login, settings$admin_role)
+        sign_in_or_enroll(login, settings$admin_role)
       }
     })
 

@@ -27,7 +27,7 @@ The document describes the **intended behaviour of the package**. Functions are 
 * blocking and deleting users, with protection against losing the last administrator;
 * server-side permission checks (not just hiding buttons in the UI);
 * password recovery by email: a one-time link from the email (off by default);
-* two-factor authentication (TOTP): optional, a code from an authenticator app plus backup codes (off by default);
+* two-factor authentication (TOTP): voluntary or mandatory for selected roles, a code from an authenticator app plus backup codes (off by default);
 * the auth table schema (SQLite, DuckDB, MySQL / MariaDB, PostgreSQL) and its versioned migrations;
 * UI modules: sign-in (including the first-administrator creation dialog) and user management.
 
@@ -192,21 +192,21 @@ An administrator who resets a password manually, or a user who changes their own
 
 ## Two-factor authentication
 
-Enabled with the `totp_enabled = TRUE` setting; it requires an encryption key `totp_key` (a string of at least 16 characters, kept outside the database and outside the repository). The protection is **optional**: each user enables it themselves in the account block (`aa_totp_ui()` and `aa_totp_server()`), and whoever has it enabled enters a code at sign-in.
+Enabled with the `totp_enabled = TRUE` setting; it requires an encryption key `totp_key` (a string of at least 16 characters, kept outside the database and outside the repository). By default the protection is **voluntary**: each user enables it themselves in the account block (`aa_totp_ui()` and `aa_totp_server()`), and whoever has it enabled enters a code at sign-in. Roles listed in `totp_required_roles` must complete setup before entering the application; `aa_auth_server()` opens the wizard at sign-in, and `aa_session_guard()` closes an existing session while the role's 2FA is missing.
 
 **Setup.** A button creates a secret (160 bits) and stores it encrypted; 2FA is not yet on. The user scans the QR code (if the optional `qrcode` package is installed) or enters the key manually. After a correct code from the app the protection is enabled, the user is shown 10 backup codes once, and their other sessions are ended.
 
 **Sign-in.**
 
-1. The password is checked as usual. If the user has 2FA enabled, **no auto-login token is issued and the successful sign-in attempt is not recorded**: otherwise it would reset the failure counter and the code could be guessed indefinitely.
+1. The password is checked as usual. If the user has 2FA enabled or the role requires it, **no auto-login token is issued and the successful sign-in attempt is not recorded**: otherwise it would reset the failure counter and the code could be guessed indefinitely.
 2. The code form is shown. Before every check the shared sign-in guard (`aa_login_gate()`) is called: a blocked login or the global limit closes the form.
 3. A code from the app (6 digits) or a backup code is accepted. A code from the app passes once (the time step is remembered), within a window of +/-`totp_window` steps (1 by default). A backup code is single-use.
 4. A wrong code is recorded as a failed attempt (event `totp_failed`). When the login gets blocked, the code form is closed and the user has to start again from the password once the lockout ends.
 5. After a correct code a successful attempt is recorded, a token is issued, and then (if the password is temporary) the change password form is shown.
 
-Signing in by auto-login cookie does not ask for the second factor: the cookie was issued after it was passed and is valid for `session_days` days, effectively a "trusted device". Password recovery by email does not bypass 2FA: after the password change the code is still required.
+Signing in by auto-login cookie does not ask for the second factor from a user who has already enrolled: the cookie was issued after it was passed and is valid for `session_days` days, effectively a "trusted device". A role in `totp_required_roles` without enabled 2FA is an exception: the cookie is revoked and the setup wizard is shown. Password recovery by email does not bypass 2FA: after the password change the code (or mandatory setup) is still required.
 
-**Disabling.** The user needs the password and a code (or a backup code); otherwise someone who took over another person's open session could remove the protection. The code is checked only when the password is correct, so a third party's attempt does not consume backup codes. Wrong attempts count as failed sign-in attempts.
+**Disabling.** The user needs the password and a code (or a backup code); otherwise someone who took over another person's open session could remove the protection. The code is checked only when the password is correct, so a third party's attempt does not consume backup codes. Wrong attempts count as failed sign-in attempts. A role listed in `totp_required_roles` cannot disable 2FA until that setting is removed.
 
 **Loss of the phone.** Backup codes, or a 2FA reset by an administrator in the user card (the secret and backup codes are erased, the user's sessions are ended, event `totp_reset`).
 
@@ -273,7 +273,7 @@ These are the properties the package must preserve across all changes. Each is c
 | QR code through the optional `qrcode` package | Does not inflate the mandatory dependencies | Without the package the user enters the key manually |
 | The secret is encrypted with the application key (`totp_key`), not hashed | The server must know the secret to verify codes | Losing or replacing the key makes the secrets unreadable: users have to set up 2FA again (an administrator resets it in the user card) |
 | The successful sign-in attempt is recorded only after the code | Otherwise the password would reset the failure counter and the code could be guessed without limit | |
-| 2FA is optional | Forcing it on for roles requires a "first sign-in without 2FA" scenario and emergency access | Administrators may remain without a second factor if they do not enable it themselves |
+| 2FA is optional by default, or mandatory per role via `totp_required_roles` | A mandatory role gets a setup wizard before the application, after a forced password change when needed; emergency access remains an administrator's separate concern | Administrators may remain without a second factor if they are not listed and do not enable it themselves |
 | SQLite by default, plus DuckDB, MySQL / MariaDB and PostgreSQL through a dialect layer (`R/dialect.R`) | Most applications use SQLite, and existing databases should connect without migration; the other databases are for applications that already have a server | Time is computed by R and written as UTC text rather than a database type; DDL cannot be rolled back in MySQL; BigQuery is not supported: no unique constraints or atomic updates |
 
 # Known limitations
@@ -284,7 +284,7 @@ These limitations are known and accepted. They should be taken into account when
 * **Cookie and HTTPS**: the cookie is written with `SameSite=Lax` by default, and `Secure` is set automatically for HTTPS requests or can be forced with `cookie_secure = TRUE`; without HTTPS the token may travel in plain text, so the application should be published only over HTTPS (see the `deployment` vignette).
 * **Lockout by login**: deliberately locking another person's login for the duration of the window is possible, including the administrator's. A spare administrator should exist for this.
 * **The password is checked only by length**: no list of forbidden passwords is used.
-* **Single sign-on only through Google.** There are no other providers (Microsoft, Okta, SAML). Signing in with Google is equivalent to access to the person's Google account: whoever controls it can sign in to the application, so the organisation (Workspace) protects access to the account. The user must be created in the application in advance, and their email in the database must match the Google address. Changing a user's email in Workspace without updating the address in the application closes their Google sign-in, and handing the address to another person opens the first user's account to them, so addresses must be kept up to date. The two-factor code of the application is not requested when signing in with Google. Two-factor protection is optional and only by TOTP codes: no SMS, push notifications, hardware keys, and no forced enabling for roles.
+* **Single sign-on only through Google.** There are no other providers (Microsoft, Okta, SAML). Signing in with Google is equivalent to access to the person's Google account: whoever controls it can sign in to the application, so the organisation (Workspace) protects access to the account. The user must be created in the application in advance, and their email in the database must match the Google address. Changing a user's email in Workspace without updating the address in the application closes their Google sign-in, and handing the address to another person opens the first user's account to them, so addresses must be kept up to date. The two-factor code of the application is not requested from a user who has already enrolled when signing in with Google; a role in `totp_required_roles` without enabled 2FA is sent to the setup wizard first. Two-factor protection is voluntary or mandatory by role, and only by TOTP codes: no SMS, push notifications or hardware keys.
 * **Losing the `totp_key` key** makes the stored secrets unreadable: until an administrator resets 2FA, users with the protection enabled cannot sign in (the code will not match).
 * **Server and phone clocks**: the code is tied to time, and a discrepancy larger than the window (30 seconds by default) blocks sign-in; time synchronisation (NTP) is required.
 * **The recovery email is a key to the account**: whoever controls the user's mailbox can change their password. Enable recovery only if the email addresses can be trusted; for administrators you can leave the address empty and keep manual reset.
@@ -304,7 +304,7 @@ The package is secure only when used correctly. The application must:
 6. **Implement the event hook** and persist sign-in, lockout and access-denied events so that guessing attempts are visible.
 7. **Not create default users**, and change the passwords found by the weak-account check.
 8. **Have a spare administrator** in case of deliberate lockout.
-9. **Keep the `totp_key` key outside the database and the repository** (an environment variable) and not lose it: without it the TOTP secrets cannot be decrypted. Keep database backups separate from the key.
+9. **Keep the `totp_key` key outside the database and the repository** (an environment variable) and not lose it: without it the TOTP secrets cannot be decrypted. Keep database backups separate from the key. If privileged roles are listed in `totp_required_roles`, check that a first sign-in can reach the setup wizard and that an existing session is closed until the role's 2FA is enabled.
 
 # Compatibility and migrations
 

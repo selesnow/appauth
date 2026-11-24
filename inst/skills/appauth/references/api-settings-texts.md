@@ -1,6 +1,6 @@
 # appauth reference: Settings and texts
 
-Package version: 0.12.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.13.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section:
 `aa_settings()`, `aa_settings_from_list()`, `aa_texts()`, `aa_text()`, `aa_text_keys()`
@@ -59,6 +59,7 @@ Usage:
        totp_key = NULL,
        totp_issuer = "appauth",
        totp_window = 1,
+       totp_required_roles = character(),
        google_enabled = FALSE,
        google_client_id = NULL,
        google_client_secret = NULL,
@@ -164,8 +165,9 @@ reset_max_per_minute: Overall limit of recovery emails across all users per minu
           (protection against spam).
 
 totp_enabled: Enable two-factor authentication (one-time TOTP codes from an authenticator
-          app). Default 'FALSE'. Requires 'totp_key'. Two-factor protection is voluntary:
-          each user enables it in the 'aa_totp_server()' module, and users who have it
+          app). Default 'FALSE'. Requires 'totp_key'. Two-factor protection is voluntary
+          unless roles are listed in 'totp_required_roles': each user enables it in the
+          'aa_totp_server()' module or in the sign-in wizard, and users who have it
           enabled enter a code when signing in with a password.
 
 totp_key: Encryption key for TOTP secrets in the database, a string of at least 16
@@ -178,6 +180,10 @@ totp_issuer: Service name shown by the authenticator app.
 
 totp_window: How many 30-second steps in each direction of clock drift are tolerated (0
           to 5, default 1).
+
+totp_required_roles: Roles that must set up two-factor authentication before entering the
+          application. Must be a subset of 'roles' and requires 'totp_enabled = TRUE'.
+          Default 'character()' (voluntary for everyone).
 
 google_enabled: Enable sign-in with Google (OpenID Connect): a "Sign in with Google"
           button appears on the sign-in form. Default 'FALSE'. Requires

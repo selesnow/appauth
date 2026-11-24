@@ -199,6 +199,27 @@ test_that("live session check: valid while everything matches", {
   expect_equal(res$role, "user")
 })
 
+test_that("live session check closes a session when 2FA becomes mandatory (#noissue)", {
+  con <- users_db()
+  raw_user(con, "ivan", "user")
+  token <- aa_issue_token(con, "ivan")
+  settings <- aa_settings(
+    totp_enabled = TRUE,
+    totp_key = "a-long-random-key-for-the-tests",
+    totp_required_roles = "user"
+  )
+
+  res <- aa_user_session_valid(con, "ivan", "user", token, settings = settings)
+  expect_false(res$valid)
+  expect_equal(res$reason, "totp_required")
+
+  setup <- aa_totp_setup(con, "ivan", settings)
+  aa_totp_enable(con, "ivan", aa_totp_code(setup$secret), settings)
+  res <- aa_user_session_valid(con, "ivan", "user", token, settings = settings)
+  expect_true(res$valid)
+  expect_equal(res$reason, "ok")
+})
+
 test_that("live session check sees blocking, deletion and a role change", {
   con <- users_db()
   raw_user(con, "admin", "admin")

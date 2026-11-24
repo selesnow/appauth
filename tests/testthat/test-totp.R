@@ -129,6 +129,36 @@ test_that("2FA settings: off by default, enabling requires a key, the key does n
   )))
 })
 
+test_that("2FA can be mandatory for selected roles (#noissue)", {
+  expect_identical(aa_settings()$totp_required_roles, character())
+
+  settings <- totp_settings(totp_required_roles = c("admin", "user"))
+  expect_identical(settings$totp_required_roles, c("admin", "user"))
+  expect_output(print(settings), "mandatory for: admin, user")
+
+  expect_error(
+    totp_settings(totp_required_roles = "ghost"),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    totp_settings(totp_required_roles = c("user", "user")),
+    class = "appauth_error_settings"
+  )
+  expect_error(
+    aa_settings(totp_required_roles = "user"),
+    class = "appauth_error_settings"
+  )
+
+  expect_identical(
+    aa_settings_from_list(list(
+      totp_enabled = TRUE,
+      totp_key = "a-long-random-key-for-the-tests",
+      totp_required_roles = "admin"
+    ))$totp_required_roles,
+    "admin"
+  )
+})
+
 # --- secret storage ----------------------------------------------------------------
 
 test_that("the secret in the database is encrypted, decrypted only with its own key", {
@@ -629,6 +659,70 @@ test_that("the mandatory password change comes after the code, not instead of it
   })
 })
 
+test_that("a role that requires 2FA gets the enrollment wizard before the app (#noissue)", {
+  con <- auth_db()
+  settings <- totp_settings(totp_required_roles = "user")
+  log <- auth_events()
+
+  run_auth(con, settings = settings, log = log, {
+    session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
+
+    expect_false(session$returned$logged_in())
+    expect_null(session$returned$token())
+    expect_true(grepl("totp_enroll_code", form_html(output), fixed = TRUE))
+    expect_false(grepl("login_btn", form_html(output), fixed = TRUE))
+    expect_match(totp_enroll()$secret, "^[A-Z2-7]{32}$")
+    expect_equal(count_attempts(con), 1)
+    expect_identical(as.integer(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions")$n), 0L)
+
+    session$setInputs(totp_enroll_code = "000000", totp_enroll_btn = 1)
+    expect_false(session$returned$logged_in())
+    expect_identical(output$message, aa_text(settings, "totp_wrong"))
+
+    session$setInputs(
+      totp_enroll_code = aa_totp_code(totp_enroll()$secret),
+      totp_enroll_btn = 2
+    )
+    expect_true(session$returned$logged_in())
+    expect_identical(session$returned$user()$role, "user")
+    expect_false(is.null(session$returned$token()))
+  })
+
+  expect_true(aa_totp_enabled(con, "ivan"))
+  expect_identical(aa_recovery_codes_left(con, "ivan"), 10L)
+  expect_identical(
+    log$names(),
+    c("totp_enrollment_required", "totp_failed", "totp_enabled", "login_success")
+  )
+})
+
+test_that("the enrollment wizard comes after a mandatory password change (#noissue)", {
+  con <- users_db()
+  aa_create_user(con, "ann", "secret123", "user", must_change = TRUE)
+  settings <- totp_settings(totp_required_roles = "user")
+
+  run_auth(con, settings = settings, {
+    session$setInputs(login = "ann", password = "secret123", login_btn = 1)
+    expect_true(grepl("change_password", form_html(output), fixed = TRUE))
+
+    session$setInputs(
+      change_password = "brand-new-1",
+      change_confirm = "brand-new-1",
+      change_btn = 1
+    )
+    expect_false(session$returned$logged_in())
+    expect_true(grepl("totp_enroll_code", form_html(output), fixed = TRUE))
+
+    session$setInputs(
+      totp_enroll_code = aa_totp_code(totp_enroll()$secret),
+      totp_enroll_btn = 1
+    )
+    expect_true(session$returned$logged_in())
+  })
+
+  expect_true(aa_totp_enabled(con, "ann"))
+})
+
 test_that("\"Back to sign in\" cancels waiting for the code", {
   con <- auth_db()
   settings <- totp_settings()
@@ -824,6 +918,34 @@ test_that("module: guessing a code on disabling locks the login", {
   )
 })
 
+test_that("the account module cannot disable 2FA required for the role (#noissue)", {
+  con <- users_db()
+  raw_user(con, "ivan", password = aa_hash_password("secret123"), role = "user")
+  settings <- totp_settings(totp_required_roles = "user")
+  totp <- enable_totp(con, "ivan", settings)
+
+  shiny::testServer(
+    aa_totp_server,
+    args = totp_module_args(con, settings = settings),
+    expr = {
+      session$flushReact()
+      expect_false(grepl(
+        "disable_btn",
+        as.character(output$main$html),
+        fixed = TRUE
+      ))
+
+      session$setInputs(
+        disable_password = "secret123",
+        disable_code = totp$codes[1],
+        disable_btn = 1
+      )
+      expect_true(aa_totp_enabled(con, "ivan"))
+      expect_identical(aa_recovery_codes_left(con, "ivan"), 10L)
+    }
+  )
+})
+
 test_that("the module shows nothing until 2FA is enabled in the settings", {
   con <- users_db()
   raw_user(con, "ivan")
@@ -900,6 +1022,7 @@ test_that("the event catalog and texts contain the 2FA keys", {
       "totp_disabled",
       "totp_failed",
       "totp_reset",
+      "totp_enrollment_required",
       "recovery_code_used"
     ) %in%
       aa_events()$event
@@ -909,6 +1032,9 @@ test_that("the event catalog and texts contain the 2FA keys", {
     "totp_title",
     "totp_wrong",
     "totp_section",
+    "totp_enroll_title",
+    "totp_enroll_hint",
+    "totp_required_hint",
     "totp_recovery_left",
     "totp_reset_button",
     "done_totp_reset"

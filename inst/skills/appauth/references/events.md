@@ -1,6 +1,6 @@
 # appauth event catalog
 
-Package version: 0.12.0. The table is generated from `aa_events()`.
+Package version: 0.13.0. The table is generated from `aa_events()`.
 
 All modules and `aa_require()` report events to a single function `on_event(event, user, session_id, value)`:
 
@@ -20,7 +20,7 @@ An error inside the hook never interrupts the package action (it is printed as a
 | `login_throttled` | Refusal because of the global per-minute limit of failed attempts | (empty) |
 | `login_unlocked` | An administrator lifted the lockout caused by login attempts | the login the lockout was lifted from |
 | `logout` | The user logged out themselves | (empty) |
-| `session_forced_logout` | The session was terminated forcibly | reason: deleted, blocked, role_changed, token_revoked |
+| `session_forced_logout` | The session was terminated forcibly | reason: deleted, blocked, role_changed, totp_required, token_revoked |
 | `first_admin_created` | The first administrator was created | (empty) |
 | `user_added` | An administrator added a user | login of the new user and role |
 | `user_removed` | An administrator removed a user | login of the removed user |
@@ -39,6 +39,7 @@ An error inside the hook never interrupts the package action (it is printed as a
 | `totp_disabled` | The user disabled two-factor authentication | (empty) |
 | `totp_failed` | Wrong code when confirming login or disabling 2FA | (empty) |
 | `totp_reset` | An administrator reset a user's 2FA | user login |
+| `totp_enrollment_required` | The mandatory 2FA setup wizard was shown for a role | user login |
 | `recovery_code_used` | Login confirmed with a recovery code | (empty) |
 | `google_login_failed` | Failed Google login (the user sees a generic message) | reason: start_failed, bad_state, bad_browser, bad_code, exchange_failed, bad_token, bad_nonce, email_unverified, domain, no_user, blocked, cancelled, signup_login_taken; followed by a space and the email, if known |
 | `weak_password_set` | A weak password was accepted (`password_policy = "warn"` mode) | login and reason: password_common, password_equals_login, password_repeated |

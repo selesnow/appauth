@@ -125,6 +125,11 @@ aa_totp_server <- function(
 
     acting_login <- function() shiny::isolate(auth$user())$login
 
+    required_for_user <- function() {
+      usr <- shiny::isolate(auth$user())
+      .aa_totp_role_required(usr$role, settings)
+    }
+
     emit <- function(event, value = NULL) {
       aa_emit(on_event, event, acting_login(), session$token, value)
     }
@@ -178,20 +183,26 @@ aa_totp_server <- function(
               aa_recovery_codes_left(conn, login)
             )
           ),
-          shiny::h5(aa_text(settings, "totp_disable_title")),
-          shiny::passwordInput(
-            ns("disable_password"),
-            aa_text(settings, "password_label")
-          ),
-          shiny::textInput(
-            ns("disable_code"),
-            aa_text(settings, "totp_code_label")
-          ),
-          shiny::actionButton(
-            ns("disable_btn"),
-            aa_text(settings, "totp_disable_button"),
-            class = "btn btn-danger"
-          )
+          if (required_for_user()) {
+            shiny::p(aa_text(settings, "totp_required_hint"))
+          } else {
+            shiny::tagList(
+              shiny::h5(aa_text(settings, "totp_disable_title")),
+              shiny::passwordInput(
+                ns("disable_password"),
+                aa_text(settings, "password_label")
+              ),
+              shiny::textInput(
+                ns("disable_code"),
+                aa_text(settings, "totp_code_label")
+              ),
+              shiny::actionButton(
+                ns("disable_btn"),
+                aa_text(settings, "totp_disable_button"),
+                class = "btn btn-danger"
+              )
+            )
+          }
         )
       } else if (is.null(enrolling())) {
         shiny::tagList(
@@ -322,6 +333,11 @@ aa_totp_server <- function(
       login <- acting_login()
       shiny::req(aa_is_string(login))
       message_text("")
+
+      if (required_for_user()) {
+        message_text(aa_text(settings, "totp_required_hint"))
+        return()
+      }
 
       if (!gate_open(login)) {
         return()

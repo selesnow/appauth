@@ -1,6 +1,6 @@
 ## Submission
 
-This is a new submission of appauth 0.12.0.
+This is a new submission of appauth 0.13.0.
 
 appauth provides login, user management and access control for 'shiny'
 applications. It stores users in 'SQLite' (the default), 'DuckDB',
@@ -12,7 +12,9 @@ write-lock leak and version 0.11.2 refreshes the bundled AI skills and
 their references. Version 0.12.0 writes the auto-login and Google OAuth state
 cookies from the server with `HttpOnly` through short-lived encrypted one-time
 tickets and adds schema version 11; `cookie_mode = "legacy"` preserves the old
-behavior.
+behavior. Version 0.13.0 adds `totp_required_roles` so selected roles must
+complete 2FA enrollment before entering the application; there is no schema
+change and the setting is off by default.
 
 ## Test environments
 

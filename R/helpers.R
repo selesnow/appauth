@@ -144,7 +144,7 @@ aa_session_guard <- function(
 
     usr <- shiny::isolate(auth$user())
     token <- if (is.function(auth$token)) auth$token() else NULL
-    check <- aa_user_session_valid(conn, usr$login, usr$role, token)
+    check <- aa_user_session_valid(conn, usr$login, usr$role, token, settings)
 
     if (!check$valid) {
       message("appauth: session closed: ", usr$login, " (", check$reason, ")")

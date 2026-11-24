@@ -271,6 +271,17 @@ aa_totp_enabled <- function(conn, login) {
   !is.null(row) && isTRUE(as.logical(row$totp_enabled[1]))
 }
 
+.aa_totp_role_required <- function(role, settings) {
+  isTRUE(settings$totp_enabled) &&
+    aa_is_string(role) &&
+    role %in% settings$totp_required_roles
+}
+
+.aa_totp_enrollment_needed <- function(conn, login, role, settings) {
+  .aa_totp_role_required(role, settings) &&
+    !isTRUE(aa_totp_enabled(conn, login))
+}
+
 #' Start setting up two-factor authentication
 #'
 #' Creates a new secret and stores it in the database in encrypted form, but

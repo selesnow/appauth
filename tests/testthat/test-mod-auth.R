@@ -245,6 +245,26 @@ test_that("auto-login by cookie works, the token is not reissued", {
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
+test_that("a cookie cannot bypass mandatory 2FA enrollment (#noissue)", {
+  con <- auth_db()
+  token <- aa_issue_token(con, "ivan")
+  settings <- aa_settings(
+    totp_enabled = TRUE,
+    totp_key = "a-long-random-key-for-the-tests",
+    totp_required_roles = "user",
+    cookie_mode = "legacy"
+  )
+
+  run_auth(con, settings = settings, {
+    session$setInputs(cookie = token)
+    expect_false(session$returned$logged_in())
+    expect_null(session$returned$token())
+    expect_true(grepl("login_btn", form_html(output), fixed = TRUE))
+  })
+
+  expect_null(aa_find_session_user(con, token))
+})
+
 test_that("a foreign, revoked and blocked user's token does not let in", {
   con <- auth_db()
   revoked <- aa_issue_token(con, "ivan")

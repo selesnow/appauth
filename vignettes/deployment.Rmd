@@ -143,5 +143,5 @@ The package does not call Windows commands and works on Linux. It needs the syst
 * Connections are closed together with the session.
 * Events (`on_event`) are written to a log that someone reads.
 * Roles and permissions have been checked under each role, and action handlers refuse without the permission.
-* If two-factor authentication is on: `totp_key` is set through an environment variable and stored separately from the database, server time is synchronized, administrators have 2FA enabled and recovery codes saved.
+* If two-factor authentication is on: `totp_key` is set through an environment variable and stored separately from the database, server time is synchronized, administrators have 2FA enabled and recovery codes saved. For roles in `totp_required_roles`, a first sign-in reaches the setup wizard and an open session is closed while the role's 2FA is missing.
 * If password reset is on: `reset_base_url` opens in the browser, a test email arrives, and the link in it works only once.

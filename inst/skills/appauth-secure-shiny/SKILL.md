@@ -61,7 +61,7 @@ Ask the questions whose answers change the decision (no more than one or two rou
    9. Personal cabinet (password change, sign out on all devices with confirmation): `recipes/personal-cabinet.md`.
    9c. Google sign-in, single sign-on SSO (if needed, off by default; requires a domain with HTTPS and appauth 0.7.0+): `recipes/google-login.md`.
    9e. Self-registration (if needed, off by default; requires appauth 0.11.0+): settings `registration_enabled`, `registration_verify_email`, `registration_domains`, `registration_role`, `registration_max_per_hour` and `google_signup`; token flow, generic responses and cleanup are in the `appauth` skill, section "Self-registration" and `references/api-self-registration.md`.
-   9b. Two-factor authentication (if needed, off by default): `recipes/two-factor.md`.
+   9b. Two-factor authentication (if needed, off by default; can be mandatory for roles since 0.13.0): `recipes/two-factor.md`.
    9a. Password recovery by email (if needed, off by default): `recipes/password-reset.md`.
    9d. A different database instead of SQLite (MySQL / MariaDB, PostgreSQL, DuckDB; requires appauth 0.8.0+): `recipes/other-databases.md`.
    10. First administrator and a spare administrator: `recipes/first-admin.md`.
@@ -143,7 +143,7 @@ Everything else (mistakes in using package functions) is in the `appauth` skill.
 | `references/recipes/personal-cabinet.md` | password change, sign-out on all devices |
 | `references/recipes/google-login.md` | Google sign-in (SSO): domain and HTTPS, OAuth client, settings, domains, disabling the password, diagnosing rejections, limitations |
 | `references/api-self-registration.md` (in the `appauth` skill) | opt-in self-registration: settings, email confirmation or immediate creation, allowed domains, role, hourly limit, generic responses and cleanup |
-| `references/recipes/two-factor.md` | TOTP two-factor authentication: encryption key, profile block, lost phone, limitations |
+| `references/recipes/two-factor.md` | TOTP two-factor authentication: encryption key, profile block, mandatory roles, lost phone, limitations |
 | `references/recipes/password-reset.md` | password recovery by email: sending the message, `reset_base_url`, user addresses, limitations |
 | `references/recipes/docker-deployment.md` | Docker and Linux, `renv`, volumes |
 | `references/recipes/database-download.md` | downloading the database from the UI |

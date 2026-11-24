@@ -114,7 +114,7 @@ aa_events <- function(lang = c("en", "ru")) {
     c(
       "session_forced_logout",
       "The session was ended forcibly",
-      "reason: deleted, blocked, role_changed, token_revoked"
+      "reason: deleted, blocked, role_changed, totp_required, token_revoked"
     ),
     c("first_admin_created", "The first administrator was created", ""),
     c(
@@ -174,6 +174,11 @@ aa_events <- function(lang = c("en", "ru")) {
       ""
     ),
     c("totp_reset", "An administrator reset a user's 2FA", "user login"),
+    c(
+      "totp_enrollment_required",
+      "The mandatory 2FA setup wizard was shown for a role",
+      "user login"
+    ),
     c("recovery_code_used", "Sign-in confirmed with a recovery code", ""),
     c(
       "google_login_failed",

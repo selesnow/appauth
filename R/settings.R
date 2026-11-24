@@ -82,8 +82,9 @@
 #'   per minute (protection against spam).
 #' @param totp_enabled Enable two-factor authentication (one-time TOTP codes
 #'   from an authenticator app). Default `FALSE`. Requires `totp_key`.
-#'   Two-factor protection is voluntary: each user enables it in the
-#'   [aa_totp_server()] module, and users who have it enabled enter a code when
+#'   Two-factor protection is voluntary unless roles are listed in
+#'   `totp_required_roles`: each user enables it in the [aa_totp_server()] module
+#'   or in the sign-in wizard, and users who have it enabled enter a code when
 #'   signing in with a password.
 #' @param totp_key Encryption key for TOTP secrets in the database, a string of
 #'   at least 16 characters (for example, from an environment variable).
@@ -93,6 +94,9 @@
 #' @param totp_issuer Service name shown by the authenticator app.
 #' @param totp_window How many 30-second steps in each direction of clock drift
 #'   are tolerated (0 to 5, default 1).
+#' @param totp_required_roles Roles that must set up two-factor authentication
+#'   before entering the application. Must be a subset of `roles` and requires
+#'   `totp_enabled = TRUE`. Default `character()` (voluntary for everyone).
 #' @param google_enabled Enable sign-in with Google (OpenID Connect): a "Sign in
 #'   with Google" button appears on the sign-in form. Default `FALSE`. Requires
 #'   `google_client_id`, `google_client_secret` and `google_redirect_uri`. Only
@@ -232,6 +236,7 @@ aa_settings <- function(
   totp_key = NULL,
   totp_issuer = "appauth",
   totp_window = 1,
+  totp_required_roles = character(),
   google_enabled = FALSE,
   google_client_id = NULL,
   google_client_secret = NULL,
@@ -572,6 +577,30 @@ aa_settings <- function(
     )
   }
 
+  if (is.null(totp_required_roles)) {
+    totp_required_roles <- character()
+  }
+
+  if (
+    !(is.character(totp_required_roles) &&
+      !anyNA(totp_required_roles) &&
+      all(nzchar(totp_required_roles)) &&
+      !anyDuplicated(totp_required_roles) &&
+      all(totp_required_roles %in% roles))
+  ) {
+    rlang::abort(
+      "`totp_required_roles` must contain unique roles from `roles`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (length(totp_required_roles) && !totp_enabled) {
+    rlang::abort(
+      "`totp_required_roles` requires `totp_enabled = TRUE`.",
+      class = "appauth_error_settings"
+    )
+  }
+
   if (!inherits(texts, "aa_texts")) {
     rlang::abort(
       "`texts` must be a result of `aa_texts()`.",
@@ -612,6 +641,7 @@ aa_settings <- function(
       totp_key = totp_key,
       totp_issuer = totp_issuer,
       totp_window = totp_window,
+      totp_required_roles = totp_required_roles,
       google_enabled = google_enabled,
       google_client_id = google_client_id,
       google_client_secret = google_client_secret,
@@ -727,7 +757,17 @@ print.aa_settings <- function(x, ...) {
   )
   cat(
     "  Two-factor authentication: ",
-    if (x$totp_enabled) "enabled (voluntary)" else "disabled",
+    if (!x$totp_enabled) {
+      "disabled"
+    } else if (length(x$totp_required_roles)) {
+      paste0(
+        "enabled (mandatory for: ",
+        paste(x$totp_required_roles, collapse = ", "),
+        ")"
+      )
+    } else {
+      "enabled (voluntary)"
+    },
     "\n",
     sep = ""
   )

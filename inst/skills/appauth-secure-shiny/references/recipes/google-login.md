@@ -63,7 +63,7 @@ Add `google_signup = TRUE` to `aa_settings()` when new employees should get an a
 * The client secret stays on the server: the code is exchanged for a token by the app's server.
 * The Google token is validated in full: signature against Google's public keys (RS256 only), issuer, audience, expiry, `nonce`, verified email, domain. Token fields are read by exact access (`[["email"]]`), without partial name matching.
 * By default sign-in creates no new users and the role comes from the database; with `google_signup = TRUE` only a verified email from `google_domains` creates a non-admin account with a random password hash, and a login collision gets a numeric suffix reported as `signup_login_taken`. A blocked user cannot sign in, and cookie auto-login works as before.
-* The package's own 2FA is not asked for on Google sign-in: confirmation is done by Google (its sign-in protection and 2FA are determined by the Workspace policy).
+* The package's own 2FA code is not asked for on Google sign-in from a user who has already enrolled: confirmation is done by Google (its sign-in protection and 2FA are determined by the Workspace policy). Since 0.13.0 a role in `totp_required_roles` without enabled 2FA is sent to the enrollment wizard before entering the application.
 * The user is shown a generic text on any rejection; the reason goes only into the event.
 
 ## Diagnosing rejections

@@ -782,6 +782,49 @@ test_that("return from Google: signed in, role from the database, auto-login tok
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
 
+test_that("return from Google requires 2FA enrollment for a mandatory role (#noissue)", {
+  g_fake_jwks()
+  con <- g_db()
+  settings <- g_settings(
+    totp_enabled = TRUE,
+    totp_key = "a-long-random-key-for-the-tests",
+    totp_required_roles = "admin"
+  )
+  g_fake_exchange(con)
+  started <- aa_google_start(con, settings)
+  g_url(paste0("?code=abc&state=", started$state))
+
+  log <- run_auth(
+    con,
+    {
+      session$flushReact()
+      session$setInputs(oauth_cookie = started$state)
+
+      expect_false(session$returned$logged_in())
+      expect_true(grepl("totp_enroll_code", form_html(output), fixed = TRUE))
+      expect_match(totp_enroll()$secret, "^[A-Z2-7]{32}$")
+      expect_identical(
+        as.integer(tquery(con, "SELECT COUNT(*) AS n FROM auth_sessions")$n),
+        0L
+      )
+
+      session$setInputs(
+        totp_enroll_code = aa_totp_code(totp_enroll()$secret),
+        totp_enroll_btn = 1
+      )
+      expect_true(session$returned$logged_in())
+      expect_equal(session$returned$user(), list(login = "ann", role = "admin"))
+    },
+    settings = settings
+  )
+
+  expect_true(aa_totp_enabled(con, "ann"))
+  expect_setequal(
+    log$names(),
+    c("totp_enrollment_required", "totp_enabled", "login_success")
+  )
+})
+
 test_that("return from Google with must_change asks for a new password before a session", {
   g_fake_jwks()
   con <- g_db()

@@ -115,29 +115,32 @@ settings <- aa_settings(
 
 ## Two-factor authentication (TOTP)
 
-Off by default and **voluntary**: the user enables it in the profile area block, and those who have it enabled enter a code at login. You need a secret encryption key (outside the DB and the repository) and a block in the profile:
+Off by default; when enabled it is **voluntary** or **mandatory for roles in `totp_required_roles`**. A voluntary user enables it in the profile area block; a required role gets the setup wizard before the application. You need a secret encryption key (outside the DB and the repository) and a block in the profile:
 
 ```r
 settings <- aa_settings(
-  totp_enabled = TRUE,
-  totp_key     = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters
-  totp_issuer  = "Reports portal"
+  totp_enabled        = TRUE,
+  totp_key            = Sys.getenv("APP_TOTP_KEY"),   # a string of at least 16 characters
+  totp_issuer         = "Reports portal",
+  totp_required_roles = "admin"                       # optional; character() keeps 2FA voluntary
 )
 
 aa_totp_server("totp", conn, auth, settings, on_event = log_event)                 # server, once
 tabPanel("Profile", aa_password_ui("password"), hr(), aa_totp_ui("totp"))              # UI
 ```
 
-* `aa_auth_server()` itself asks for the code after a correct password. Order: password, code, mandatory password change, login. The autologin token and the successful login attempt are recorded only after the code; cookie login does not ask for a code.
+* `aa_auth_server()` itself asks for the code after a correct password. Order for an enrolled user: password, code, mandatory password change, login. The autologin token and the successful login attempt are recorded only after the code; cookie login does not ask for a code.
+* For a role in `totp_required_roles` without enabled 2FA the wizard comes first: after a correct password (and after a forced password change when both are pending), after Google sign-in, after self-registration and instead of a remembered cookie. Event `totp_enrollment_required`; the cookie is revoked and no session is issued until setup succeeds.
 * Enrollment: QR code (needs the optional `qrcode` package, otherwise only the key for manual entry), confirmation with a code, 10 recovery codes shown once; the user's other sessions are ended.
-* Disabling requires the password and a code. Lost phone: a recovery code or "Reset 2FA" by an administrator in the card (event `totp_reset`, the user's sessions are ended).
+* `aa_session_guard()` closes an open session with reason `totp_required` while the role's 2FA is missing; `aa_totp_server()` hides the disable form for such roles.
+* Disabling requires the password and a code. Lost phone: a recovery code or "Reset 2FA" by an administrator in the card (event `totp_reset`, the user's sessions are ended); a required role is prompted to enrol again at the next sign-in.
 * Wrong codes count as failed login attempts: the login is locked by the same rules as for password guessing. Custom UI: `aa_totp_setup()`, `aa_totp_enable()`, `aa_verify_second_factor()` (preceded by `aa_login_gate()`, after a wrong code `aa_record_attempt()`), `aa_totp_disable()`, `aa_totp_enabled()`, `aa_recovery_codes_left()`.
 * If `totp_key` is lost or replaced, the secrets become unreadable: users must enroll 2FA again (reset by an administrator). Keep the key separate from the database and its copies. Server time must be synchronized (NTP).
 * Tests: the code for the current step is `aa_totp_code(secret)`; an accepted code cannot be reused, for a second login take the next step `aa_totp_code(secret, Sys.time() + 30)`.
 
 ## Google login (since 0.7.0)
 
-Off by default. Normally only a user who already exists in the database and has an email equal to the Google account address can log in; the role comes from the database, a blocked user cannot log in, login does not create new users unless `google_signup = TRUE` (see below), and it does not ask for the package's own 2FA. You need a domain with HTTPS and an OAuth client in Google Cloud Console (consent screen type Internal, client type Web application, redirect URI exactly as `google_redirect_uri`).
+Off by default. Normally only a user who already exists in the database and has an email equal to the Google account address can log in; the role comes from the database, a blocked user cannot log in, login does not create new users unless `google_signup = TRUE` (see below), and it does not ask for the package's own 2FA code from a user who has already enrolled; since 0.13.0 a role in `totp_required_roles` without 2FA is sent to the enrollment wizard first. You need a domain with HTTPS and an OAuth client in Google Cloud Console (consent screen type Internal, client type Web application, redirect URI exactly as `google_redirect_uri`).
 
 ```r
 settings <- aa_settings(
@@ -222,7 +225,8 @@ All texts are available in Russian and English: `aa_texts("ru")`, `aa_texts("en"
 | `reset_enabled` | `FALSE` | password reset by email (needs `send_reset` and `reset_base_url`) |
 | `reset_ttl_minutes` | 60 | lifetime of the link from the email |
 | `reset_max_per_hour`, `reset_max_per_minute` | 3, 10 | email limit per user per hour and global per minute |
-| `totp_enabled` | `FALSE` | two-factor authentication (TOTP), voluntary; needs `totp_key` |
+| `totp_enabled` | `FALSE` | two-factor authentication (TOTP); needs `totp_key` |
+| `totp_required_roles` | `character()` | roles that must complete TOTP setup before entering the application; requires `totp_enabled = TRUE` |
 | `totp_key` | `NULL` | TOTP secret encryption key (a string of at least 16 characters), keep outside the DB |
 | `totp_issuer`, `totp_window` | `"appauth"`, 1 | name shown in the authenticator app, allowed clock drift in 30-second steps |
 | `google_enabled` | `FALSE` | Google login (needs `google_client_id`, `google_client_secret`, `google_redirect_uri`) |
