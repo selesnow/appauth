@@ -635,6 +635,10 @@ with the image from the `www` folder.
 | `password_policy` | `"warn"` | weak passwords: `"off"` do not check, `"warn"` accept with a warning, `"reject"` reject |
 | `login_max` | 64 | login length |
 | `autologin` | `TRUE` | auto-login by cookie |
+| `cookie_mode` | `"httponly"` | `"httponly"` writes the cookie from the server through a one-time ticket; `"legacy"` uses JavaScript |
+| `cookie_key` | `NULL` | optional secret (at least 32 characters) for ticket encryption; by default a key is generated in the database |
+| `cookie_path`, `cookie_samesite`, `cookie_secure` | `"/"`, `"Lax"`, `NULL` | cookie attributes; `cookie_secure = NULL` detects HTTPS from the request |
+| `cookie_ticket_ttl_seconds` | 300 | lifetime of a one-time ticket that sets or clears a cookie |
 | `session_days` | 30 | token lifetime |
 | `session_check_seconds` | 30 | how often to check an open session |
 | `attempts_retention_hours`, `token_retention_days` | 24, 30 | how long to keep attempts and expired tokens |

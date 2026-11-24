@@ -56,7 +56,9 @@ aa_auth_server(
 - cookie_name:
 
   Auto-login cookie name. Cookies are not isolated by port, so apps on
-  the same host need different names.
+  the same host need different names. With `cookie_mode = "httponly"`
+  the cookie is set by the server through a short-lived encrypted
+  ticket; JavaScript never sees the token.
 
 ## Value
 
@@ -156,8 +158,10 @@ sees a generic text. If the page is opened not at the
 while the return is configured for a domain), the button sends the user
 to the return address and sign-in starts there on its own (parameter
 `?google=1`): `state` is stored in the cookie of the site address, and
-cookies for an IP and for a domain are different. Password sign-in and
-cookie auto-login work independently at each address.
+cookies for an IP and for a domain are different. With
+`cookie_mode = "httponly"` the state cookie is set by the server and is
+not readable from JavaScript. Password sign-in and cookie auto-login
+work independently at each address.
 
 The role and login are taken from the database, not from the entered
 string. The `conn` connection belongs to the app: close it when the

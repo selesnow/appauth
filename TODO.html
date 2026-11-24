@@ -12,7 +12,7 @@
 
     <a class="navbar-brand me-2" href="index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -40,25 +40,21 @@
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="logo.svg" class="logo" alt=""><h1>TODO appauth</h1>
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.11.2/TODO.md" class="external-link"><code>TODO.md</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/TODO.md" class="external-link"><code>TODO.md</code></a></small>
     </div>
 
 <div id="todo-appauth" class="section level1">
 
 <p>Planned improvements, in priority order. A finished item is moved to <code>NEWS.md</code> and removed from here.</p>
 <div class="section level2">
-<h2 id="id_1-httponly-cookie">1. <code>HttpOnly</code> cookie<a class="anchor" aria-label="anchor" href="#id_1-httponly-cookie"></a></h2>
-<p>The auto-login cookie is currently written by JavaScript, so <code>HttpOnly</code> cannot be set. Mitigation: only the token hash is stored in the database, and the token is revoked on logout, blocking and password change. The real fix is to issue the cookie from the server, which is a significant rework.</p>
-</div>
-<div class="section level2">
-<h2 id="id_2-two-factor-authentication-follow-ups-after-050">2. Two-factor authentication follow-ups (after 0.5.0)<a class="anchor" aria-label="anchor" href="#id_2-two-factor-authentication-follow-ups-after-050"></a></h2>
+<h2 id="id_1-two-factor-authentication-follow-ups-after-050">1. Two-factor authentication follow-ups (after 0.5.0)<a class="anchor" aria-label="anchor" href="#id_1-two-factor-authentication-follow-ups-after-050"></a></h2>
 <ul><li>Mandatory enrolment for roles (<code>totp_required_roles</code>): when logging in without 2FA, show the setup wizard first, like the forced password change.</li>
 <li>Issue new recovery codes without disabling 2FA (password and code required).</li>
 <li>Other factors: WebAuthn and hardware keys.</li>
 <li>Ask for a code when logging in via cookie for sensitive actions (re-confirmation).</li>
 </ul></div>
 <div class="section level2">
-<h2 id="id_3-password-recovery-follow-ups-after-040">3. Password recovery follow-ups (after 0.4.0)<a class="anchor" aria-label="anchor" href="#id_3-password-recovery-follow-ups-after-040"></a></h2>
+<h2 id="id_2-password-recovery-follow-ups-after-040">2. Password recovery follow-ups (after 0.4.0)<a class="anchor" aria-label="anchor" href="#id_2-password-recovery-follow-ups-after-040"></a></h2>
 <ul><li>Send the email in the background, so the form response time does not reveal whether a user exists.</li>
 <li>Email notification that the password was changed (via the link or by an administrator).</li>
 <li>Email address confirmation (a link in an email) before it is used for recovery.</li>

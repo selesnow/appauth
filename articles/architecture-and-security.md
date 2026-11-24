@@ -194,7 +194,7 @@ roles.
 | Sign-in without a password | There are no fallback sign-in paths: the password is checked only against the hash, there is no plain-text comparison |  |
 | Forged Shiny requests (calling actions without the required role) | A server-side permission check in every handler, module registration by permission, the role only from server-side state | The application must itself call the checks in its handlers |
 | Privilege escalation through user management | User management is available only to the administrator role regardless of the permission matrix; the validity of a role is checked on the server |  |
-| Theft of the auto-login token | The database holds only the sha256 of the token, the token is random (32 bytes), its lifetime is limited, tokens are revoked on block, password change and user deletion | The cookie is set from JavaScript and has no `HttpOnly`: XSS in the application can steal the token |
+| Theft of the auto-login token | The database holds only the sha256 of the token, the token is random (32 bytes), its lifetime is limited, tokens are revoked on block, password change and user deletion; by default the cookie is written by the server with `HttpOnly` through a short-lived encrypted one-time ticket, so JavaScript never sees the token | `cookie_mode = "legacy"` writes the cookie from JavaScript and allows token theft through XSS; even with `HttpOnly`, XSS can act in the current session |
 | Interception of the token on the network | The cookie is written with `SameSite=Lax`, and on HTTPS also with `Secure` (the package does this itself); HTTPS is provided by the application (see the section on application responsibility) | Without HTTPS the token and password travel in plain text |
 | Use of someone else’s cookie after a user is deleted and a new one is created with the same login | Deleting a user deletes their tokens and failed attempts |  |
 | The session of a blocked or deleted user keeps working | The live session is checked every 30 seconds and a forced sign-out follows; auto-login for such users is impossible | A window of up to 30 seconds between the block and closing an already open session |
@@ -254,7 +254,11 @@ level.
     change.
 7.  On success an **auto-login token** is issued: 32 random bytes
     encoded in base64, sha256 stored in the database, a default lifetime
-    of 30 days, passed to the browser in a cookie.
+    of 30 days. With `cookie_mode = "httponly"` the server creates a
+    short-lived encrypted one-time ticket, the browser exchanges it at a
+    same-origin endpoint, and the endpoint sets the cookie with
+    `HttpOnly`; with `cookie_mode = "legacy"` the cookie is written from
+    JavaScript.
 
 Parameters (defaults): 5 failures within a 15-minute window lock the
 login for 15 minutes from the last failure, a global limit of 30
@@ -277,6 +281,15 @@ is not blocked and is not required to change the password. Blocked and
 deleted users, as well as users required to change their password, do
 not sign in by cookie. Auto-login is disabled with an application
 setting (`autologin = FALSE`).
+
+With `cookie_mode = "httponly"` (the default) the server reads the
+cookie from the HTTP request; in `cookie_mode = "legacy"` JavaScript
+sends it to a module input. The Google OAuth `state` cookie is written
+and cleared by the same mechanism. Cookies carry `SameSite` and `Path`
+from the settings (`cookie_samesite`, `cookie_path`), `Secure` is chosen
+from the request unless `cookie_secure` is set explicitly, and no cookie
+is issued when `autologin = FALSE` or `password_login = FALSE` with no
+Google sign-in.
 
 ### Sign-out and forced sign-out
 
@@ -479,7 +492,7 @@ Each is covered by an automated test.
 | Attempts during a lockout are not recorded | Otherwise a legitimate user extends the lockout and an attacker keeps it up indefinitely |  |
 | The counter is reset by record number, not by time | Time is stored with one-second precision, and quick events were lost (a bug found by tests) |  |
 | The lockout check fails open, the password check fails closed | Unavailability of the attempts table must not lock out all users, but the password check is never skipped | If the table could not be created, brute-force protection does not work; the error is written to the application log |
-| The cookie is set from JavaScript | Shiny cannot set cookies from server code without extra infrastructure | No `HttpOnly`. `SameSite=Lax` and `Secure` (on HTTPS) are set by the package itself; HTTPS itself is the application’s responsibility |
+| The cookie is set by a same-origin HTTP handler through a short-lived encrypted one-time ticket | Shiny has no public API for setting cookies, but an internal HTTP handler can accept an opaque ticket and return `Set-Cookie`; only the ticket hash is stored in the database, and JavaScript never sees the token | Requires a handler registration per process and a separate ticket table; `cookie_mode = "legacy"` remains for apps that need the old JavaScript flow |
 | Forced sign-out is checked on a timer | Shiny does not receive events from the database other than its own queries | Up to 30 seconds between the block and closing an open session |
 | Page reload on sign-out | Otherwise the module handlers of the previous user stay registered in this session | The page is redrawn |
 | User management only for the administrator regardless of the permission matrix | Otherwise granting this permission to a role would let it raise its own privileges | The permission for the user management tab cannot be delegated |
@@ -499,13 +512,17 @@ Each is covered by an automated test.
 These limitations are known and accepted. They should be taken into
 account when assessing an application’s risk.
 
-- **Cookie without `HttpOnly`**: vulnerable to token theft through XSS
-  in the application itself (the application must not render unchecked
-  HTML).
-- **Cookie and HTTPS**: the cookie is written with `SameSite=Lax`, and
-  `Secure` is set only if the page is opened over `https://`; without
-  HTTPS the token may travel in plain text, so the application should be
-  published only over HTTPS (see the `deployment` vignette).
+- **Legacy cookie mode**: `cookie_mode = "legacy"` writes the cookie
+  from JavaScript and has no `HttpOnly`, so XSS in the application can
+  steal the token; keep the default `httponly` mode unless an
+  application specifically needs the old behavior. Even with `HttpOnly`,
+  XSS can act in the current session, so the application must not render
+  unchecked HTML.
+- **Cookie and HTTPS**: the cookie is written with `SameSite=Lax` by
+  default, and `Secure` is set automatically for HTTPS requests or can
+  be forced with `cookie_secure = TRUE`; without HTTPS the token may
+  travel in plain text, so the application should be published only over
+  HTTPS (see the `deployment` vignette).
 - **Lockout by login**: deliberately locking another person’s login for
   the duration of the window is possible, including the administrator’s.
   A spare administrator should exist for this.

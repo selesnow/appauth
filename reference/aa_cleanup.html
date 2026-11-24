@@ -3,14 +3,16 @@
 well as expired and revoked auto-login tokens older than
 token_retention_days
 days, as well as used and expired password recovery tokens,
-pending registrations and Google sign-in parameters older than a day. Active
-tokens and fresh attempts are not touched. Call it
+pending registrations and Google sign-in parameters older than a day, as well
+as used and expired cookie tickets. Active tokens and fresh attempts are not
+touched. Call it
 after aa_init_db()."><meta property="og:description" content="Deletes login attempt records older than attempts_retention_hours hours, as
 well as expired and revoked auto-login tokens older than
 token_retention_days
 days, as well as used and expired password recovery tokens,
-pending registrations and Google sign-in parameters older than a day. Active
-tokens and fresh attempts are not touched. Call it
+pending registrations and Google sign-in parameters older than a day, as well
+as used and expired cookie tickets. Active tokens and fresh attempts are not
+touched. Call it
 after aa_init_db()."><meta property="og:image" content="https://alexey-seleznev.pro/appauth/logo.svg"><!-- Google tag (gtag.js) --><script async src="https://www.googletagmanager.com/gtag/js?id=G-Z56YHE916N"></script><script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
@@ -24,7 +26,7 @@ after aa_init_db()."><meta property="og:image" content="https://alexey-seleznev.
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -52,7 +54,7 @@ after aa_init_db()."><meta property="og:image" content="https://alexey-seleznev.
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Delete stale authentication data</h1>
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.11.2/R/schema.R" class="external-link"><code>R/schema.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/R/schema.R" class="external-link"><code>R/schema.R</code></a></small>
       <div class="d-none name"><code>aa_cleanup.Rd</code></div>
     </div>
 
@@ -61,8 +63,9 @@ after aa_init_db()."><meta property="og:image" content="https://alexey-seleznev.
 well as expired and revoked auto-login tokens older than
 <code>token_retention_days</code>
 days, as well as used and expired password recovery tokens,
-pending registrations and Google sign-in parameters older than a day. Active
-tokens and fresh attempts are not touched. Call it
+pending registrations and Google sign-in parameters older than a day, as well
+as used and expired cookie tickets. Active tokens and fresh attempts are not
+touched. Call it
 after <code><a href="aa_init_db.html">aa_init_db()</a></code>.</p>
     </div>
 
@@ -93,8 +96,8 @@ attempts),
 <code>auth_sessions</code> (the number of deleted tokens), <code>password_resets</code> (the
 number of deleted
 password recovery tokens), <code>registrations</code> (the number of deleted pending
-registrations) and <code>oauth_states</code> (the number of deleted sign-in parameters
-for Google).</p>
+registrations), <code>oauth_states</code> (the number of deleted sign-in parameters
+for Google) and <code>cookie_tickets</code> (the number of deleted cookie tickets).</p>
     </div>
 
     <div class="section level2">

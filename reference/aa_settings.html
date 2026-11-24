@@ -18,7 +18,7 @@ and modules of the package; the package does not use global variables."><meta pr
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -46,7 +46,7 @@ and modules of the package; the package does not use global variables."><meta pr
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Authorization settings</h1>
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.11.2/R/settings.R" class="external-link"><code>R/settings.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/R/settings.R" class="external-link"><code>R/settings.R</code></a></small>
       <div class="d-none name"><code>aa_settings.Rd</code></div>
     </div>
 
@@ -69,6 +69,12 @@ and modules of the package; the package does not use global variables.</p>
 <span>  login_max <span class="op">=</span> <span class="fl">64</span>,</span>
 <span>  autologin <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  session_days <span class="op">=</span> <span class="fl">30</span>,</span>
+<span>  cookie_mode <span class="op">=</span> <span class="st">"httponly"</span>,</span>
+<span>  cookie_key <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cookie_path <span class="op">=</span> <span class="st">"/"</span>,</span>
+<span>  cookie_samesite <span class="op">=</span> <span class="st">"Lax"</span>,</span>
+<span>  cookie_secure <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cookie_ticket_ttl_seconds <span class="op">=</span> <span class="fl">300</span>,</span>
 <span>  session_check_seconds <span class="op">=</span> <span class="fl">30</span>,</span>
 <span>  attempts_retention_hours <span class="op">=</span> <span class="fl">24</span>,</span>
 <span>  token_retention_days <span class="op">=</span> <span class="fl">30</span>,</span>
@@ -147,6 +153,39 @@ user enters the password on every page load and no tokens are issued.</p></dd>
 
 <dt id="arg-session-days">session_days<a class="anchor" aria-label="anchor" href="#arg-session-days"></a></dt>
 <dd><p>Lifetime of the auto sign-in token, in days.</p></dd>
+
+
+<dt id="arg-cookie-mode">cookie_mode<a class="anchor" aria-label="anchor" href="#arg-cookie-mode"></a></dt>
+<dd><p>How to write the auto sign-in cookie. <code>"httponly"</code>
+(default) sets it from the server through a one-time encrypted ticket, so
+JavaScript never sees the token; also applies to the Google OAuth <code>state</code>
+cookie. <code>"legacy"</code> keeps the old JavaScript cookie flow for applications
+that cannot use the server endpoint.</p></dd>
+
+
+<dt id="arg-cookie-key">cookie_key<a class="anchor" aria-label="anchor" href="#arg-cookie-key"></a></dt>
+<dd><p>Optional additional secret for encrypting one-time cookie
+tickets, a string of at least 32 characters. When <code>NULL</code>, the key generated
+by <code><a href="aa_init_db.html">aa_init_db()</a></code> and stored in the database is used.</p></dd>
+
+
+<dt id="arg-cookie-path">cookie_path<a class="anchor" aria-label="anchor" href="#arg-cookie-path"></a></dt>
+<dd><p>Path of the auto sign-in and OAuth state cookies.</p></dd>
+
+
+<dt id="arg-cookie-samesite">cookie_samesite<a class="anchor" aria-label="anchor" href="#arg-cookie-samesite"></a></dt>
+<dd><p><code>SameSite</code> attribute of those cookies: <code>"Lax"</code>,
+<code>"Strict"</code> or <code>"None"</code>.</p></dd>
+
+
+<dt id="arg-cookie-secure">cookie_secure<a class="anchor" aria-label="anchor" href="#arg-cookie-secure"></a></dt>
+<dd><p>Force the <code>Secure</code> attribute (<code>TRUE</code>/<code>FALSE</code>), or detect
+it from the request (<code>NULL</code>, default).</p></dd>
+
+
+<dt id="arg-cookie-ticket-ttl-seconds">cookie_ticket_ttl_seconds<a class="anchor" aria-label="anchor" href="#arg-cookie-ticket-ttl-seconds"></a></dt>
+<dd><p>Lifetime of one-time cookie tickets, in
+seconds.</p></dd>
 
 
 <dt id="arg-session-check-seconds">session_check_seconds<a class="anchor" aria-label="anchor" href="#arg-session-check-seconds"></a></dt>

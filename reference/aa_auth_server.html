@@ -22,7 +22,7 @@ settings) and sign-out. The module reports all events to the on_event hook
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -50,7 +50,7 @@ settings) and sign-out. The module reports all events to the on_event hook
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
       <img src="../logo.svg" class="logo" alt=""><h1>Sign-in module: server</h1>
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.11.2/R/mod-auth.R" class="external-link"><code>R/mod-auth.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/R/mod-auth.R" class="external-link"><code>R/mod-auth.R</code></a></small>
       <div class="d-none name"><code>aa_auth_server.Rd</code></div>
     </div>
 
@@ -109,7 +109,8 @@ from the
 
 <dt id="arg-cookie-name">cookie_name<a class="anchor" aria-label="anchor" href="#arg-cookie-name"></a></dt>
 <dd><p>Auto-login cookie name. Cookies are not isolated by port,
-so apps on the same host need different names.</p></dd>
+so apps on the same host need different names. With <code>cookie_mode = "httponly"</code> the cookie is set by the server through a short-lived encrypted
+ticket; JavaScript never sees the token.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -224,8 +225,9 @@ domain), the button sends the user to the return address and sign-in starts
 there on its own
 (parameter <code>?google=1</code>): <code>state</code> is stored in the cookie of the site address,
 and cookies for an IP and for a domain
-are different. Password sign-in and cookie auto-login work independently at
-each address.</p>
+are different. With <code>cookie_mode = "httponly"</code> the state cookie is set by the
+server and is not readable from JavaScript. Password sign-in and cookie
+auto-login work independently at each address.</p>
 <p>The role and login are taken from the database, not from the entered string.
 The <code>conn</code>
 connection belongs to the app: close it when the session ends.</p>

@@ -1,5 +1,11 @@
 # Changelog
 
+## appauth 0.12.0
+
+Security release: server-side `HttpOnly` cookies by default, DB-backed
+one-time tickets, and a legacy JavaScript fallback. Schema version is
+11.
+
 ## appauth 0.11.2
 
 Documentation-only patch: refreshes the bundled AI skills and their

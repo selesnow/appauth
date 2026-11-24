@@ -35,7 +35,7 @@
 
     <a class="navbar-brand me-2" href="index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -330,7 +330,7 @@
 <div class="section level2">
 <h2 id="limitations">Limitations<a class="anchor" aria-label="anchor" href="#limitations"></a>
 </h2>
-<p>Known limitations (the cookie is not <code>HttpOnly</code>, lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the <code>architecture-and-security</code> vignette.</p>
+<p>Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the <code>architecture-and-security</code> vignette. By default the auto-login cookie is written by the server with <code>HttpOnly</code>; <code>cookie_mode = "legacy"</code> keeps the old JavaScript flow.</p>
 </div>
 <div class="section level2">
 <h2 id="development">Development<a class="anchor" aria-label="anchor" href="#development"></a>

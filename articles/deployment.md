@@ -11,9 +11,11 @@ server. Without HTTPS anyone who can see the traffic can intercept them.
 
 - The app must be served over `https://`. If TLS is terminated at nginx,
   Shiny itself can listen on `127.0.0.1` only.
-- The auto-login cookie is written with `SameSite=Lax`, and over HTTPS
-  also with `Secure` (the browser will not send it over HTTP). `Secure`
-  is set automatically when the page is opened over `https://`.
+- With the default `cookie_mode = "httponly"` the server writes the
+  auto-login cookie with `HttpOnly` and `SameSite=Lax`; over HTTPS it
+  also sets `Secure` (the browser will not send it over HTTP). `Secure`
+  is chosen automatically from the request, or can be forced with
+  `cookie_secure = TRUE`.
 - The app port must not be reachable from the outside network bypassing
   nginx (close it on the firewall).
 

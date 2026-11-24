@@ -4,8 +4,8 @@ Deletes login attempt records older than `attempts_retention_hours`
 hours, as well as expired and revoked auto-login tokens older than
 `token_retention_days` days, as well as used and expired password
 recovery tokens, pending registrations and Google sign-in parameters
-older than a day. Active tokens and fresh attempts are not touched. Call
-it after
+older than a day, as well as used and expired cookie tickets. Active
+tokens and fresh attempts are not touched. Call it after
 [`aa_init_db()`](https://alexey-seleznev.pro/appauth/reference/aa_init_db.md).
 
 ## Usage
@@ -32,8 +32,9 @@ aa_cleanup(conn, settings = aa_settings())
 A list (invisibly): `login_attempts` (the number of deleted login
 attempts), `auth_sessions` (the number of deleted tokens),
 `password_resets` (the number of deleted password recovery tokens),
-`registrations` (the number of deleted pending registrations) and
-`oauth_states` (the number of deleted sign-in parameters for Google).
+`registrations` (the number of deleted pending registrations),
+`oauth_states` (the number of deleted sign-in parameters for Google) and
+`cookie_tickets` (the number of deleted cookie tickets).
 
 ## Examples
 

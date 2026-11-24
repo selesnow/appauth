@@ -4,7 +4,8 @@ Call it once in the application UI (inside
 [`fluidPage()`](https://rdrr.io/pkg/shiny/man/fluidPage.html) or
 [`tagList()`](https://rstudio.github.io/htmltools/reference/tagList.html)).
 Adds the CSS of the sign-in form and the users tab, and the JS that
-reads, writes and deletes the auto sign-in cookie.
+handles the server-side auto sign-in cookie tickets (plus legacy cookie
+handlers).
 
 ## Usage
 
@@ -23,8 +24,9 @@ The look is changed with `--aa-*` CSS variables (for example
 `aa_app_head()`. The light theme is enabled with the `aa-theme-light`
 class on `<body>` or a parent element.
 
-The cookie is written with `SameSite=Lax`, and on HTTPS also with
-`Secure`.
+With `cookie_mode = "httponly"` the cookie is written by the server with
+`HttpOnly`, `SameSite=Lax` and `Secure` on HTTPS. The legacy mode uses
+the same flags except for `HttpOnly`.
 
 ## Examples
 

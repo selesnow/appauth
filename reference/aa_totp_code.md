@@ -35,5 +35,5 @@ A string of `digits` digits or `NA` if the secret is invalid.
 
 ``` r
 aa_totp_code("JBSWY3DPEHPK3PXP")
-#> [1] "416409"
+#> [1] "690962"
 ```

@@ -30,7 +30,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">appauth</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.11.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.12.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -70,7 +70,7 @@
       <img src="../logo.svg" class="logo" alt=""><h1>Extension points</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/v0.11.2/vignettes/extension-points.Rmd" class="external-link"><code>vignettes/extension-points.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/selesnow/appauth/blob/master/vignettes/extension-points.Rmd" class="external-link"><code>vignettes/extension-points.Rmd</code></a></small>
       <div class="d-none name"><code>extension-points.Rmd</code></div>
     </div>
 
@@ -967,6 +967,35 @@ accept with a warning, <code>"reject"</code> reject</td>
 <td><code>autologin</code></td>
 <td><code>TRUE</code></td>
 <td>auto-login by cookie</td>
+</tr>
+<tr class="even">
+<td><code>cookie_mode</code></td>
+<td><code>"httponly"</code></td>
+<td>
+<code>"httponly"</code> writes the cookie from the server through a
+one-time ticket; <code>"legacy"</code> uses JavaScript</td>
+</tr>
+<tr class="odd">
+<td><code>cookie_key</code></td>
+<td><code>NULL</code></td>
+<td>optional secret (at least 32 characters) for ticket encryption; by
+default a key is generated in the database</td>
+</tr>
+<tr class="even">
+<td>
+<code>cookie_path</code>, <code>cookie_samesite</code>,
+<code>cookie_secure</code>
+</td>
+<td>
+<code>"/"</code>, <code>"Lax"</code>, <code>NULL</code>
+</td>
+<td>cookie attributes; <code>cookie_secure = NULL</code> detects HTTPS
+from the request</td>
+</tr>
+<tr class="odd">
+<td><code>cookie_ticket_ttl_seconds</code></td>
+<td>300</td>
+<td>lifetime of a one-time ticket that sets or clears a cookie</td>
 </tr>
 <tr class="even">
 <td><code>session_days</code></td>
