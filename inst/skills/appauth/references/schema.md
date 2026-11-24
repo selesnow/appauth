@@ -1,8 +1,8 @@
 # appauth database schema
 
-Package version: 0.11.2, schema version: 10. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
+Package version: 0.12.0, schema version: 11. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
 
-The package owns eight tables. It does not touch the other tables of the application.
+The package owns ten tables. It does not touch the other tables of the application.
 
 ## users
 
@@ -122,6 +122,31 @@ Pending self-registrations (since version 0.11.0). A record is created by `aa_re
 * `password` is already a scrypt hash; a plain-text password never reaches this table.
 * `token_hash` is the sha256 of the one-time confirmation token; the token itself exists only in the email link. The unique index prevents reusing a token.
 * `aa_cleanup()` deletes registrations that expired or were used more than a day ago. Creating a user with the same login or email consumes unused registrations.
+
+## appauth_cookie_keys
+
+Server-side encryption key for HttpOnly cookie tickets (since version 0.12.0). One row (`id = 1`) is created by `aa_init_db()`; the secret is a random 32-byte value encoded in base64. An explicit `cookie_key` setting overrides it without changing the stored row.
+
+| Column | Type | Required | Default | Key |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | no |  | PK |
+| `secret` | TEXT | yes |  |  |
+
+## cookie_tickets
+
+Short-lived one-time tickets that let a same-origin Shiny HTTP handler set or clear an HttpOnly cookie (since version 0.12.0). The browser receives only an opaque encrypted ticket; the database stores the token hash and the encrypted payload.
+
+| Column | Type | Required | Default | Key |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | no |  | PK |
+| `token_hash` | TEXT | yes |  | UNIQUE index |
+| `payload` | TEXT | yes |  |  |
+| `created_at` | TEXT | yes | now (UTC) |  |
+| `expires_at` | TEXT | yes |  |  |
+| `consumed_at` | TEXT | no |  |  |
+
+* A ticket is consumed by an atomic `UPDATE` that sets `consumed_at` only while `consumed_at IS NULL` and `expires_at` has not passed; the unique index on `token_hash` prevents reuse.
+* `aa_cleanup()` deletes consumed tickets and tickets whose `expires_at` has passed.
 
 ## appauth_migrations
 

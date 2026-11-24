@@ -1,8 +1,8 @@
 // appauth: auto-login cookie handling. Included through aa_app_head().
 //
-// The auto-login token is stored in a cookie. HttpOnly cannot be set on a cookie
-// written by JS, so the token is stored in the database only as a sha256 hash and
-// is revoked on sign-out, blocking, deletion and password change.
+// With cookie_mode = "httponly" the server sets cookies through a same-origin
+// ticket endpoint; the token never appears in JavaScript. Legacy handlers are
+// kept for apps that explicitly opt out of HttpOnly.
 (function () {
   function secureFlag() {
     return window.location.protocol === 'https:' ? '; Secure' : '';
@@ -62,7 +62,32 @@
     });
   });
 
+  function cookieEndpointUrl(url) {
+    if (typeof url !== 'string') return null;
+    try {
+      var target = new URL(url, window.location.href);
+      if (target.origin !== window.location.origin) return null;
+      if (target.pathname.indexOf('__appauth/cookie') === -1) return null;
+      return target.href;
+    } catch (err) {
+      return null;
+    }
+  }
+
   function register() {
+    Shiny.addCustomMessageHandler('appauth_cookie_ticket', function (msg) {
+      var url = cookieEndpointUrl(msg && msg.url);
+      if (url) window.location.assign(url);
+    });
+
+    Shiny.addCustomMessageHandler('appauth_cookie_ticket_fetch', function (msg) {
+      var url = cookieEndpointUrl(msg && msg.url);
+      if (!url) return;
+      fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function () {
+        if (msg && msg.reload) window.location.reload();
+      }).catch(function () {});
+    });
+
     // {name, token, days}
     Shiny.addCustomMessageHandler('appauth_set_cookie', function (msg) {
       document.cookie = encodeURIComponent(msg.name) + '=' + encodeURIComponent(msg.token) +

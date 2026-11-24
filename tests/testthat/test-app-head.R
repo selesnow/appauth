@@ -22,6 +22,8 @@ test_that("JS contains cookie handlers and sets SameSite and Secure", {
   expect_match(js, "appauth_set_cookie", fixed = TRUE)
   expect_match(js, "appauth_clear_cookie", fixed = TRUE)
   expect_match(js, "appauth_read_cookie", fixed = TRUE)
+  expect_match(js, "appauth_cookie_ticket", fixed = TRUE)
+  expect_match(js, "appauth_cookie_ticket_fetch", fixed = TRUE)
   expect_match(js, "SameSite=Lax", fixed = TRUE)
   expect_match(js, "Secure", fixed = TRUE)
 })

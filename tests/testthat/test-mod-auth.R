@@ -234,7 +234,7 @@ test_that("auto-login by cookie works, the token is not reissued", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
-  log <- run_auth(con, {
+  log <- run_auth(con, settings = aa_settings(cookie_mode = "legacy"), {
     session$setInputs(cookie = token)
     expect_true(session$returned$logged_in())
     expect_equal(session$returned$user()$login, "ivan")
@@ -254,7 +254,7 @@ test_that("a foreign, revoked and blocked user's token does not let in", {
   aa_set_blocked(con, "alsey", TRUE, acting_login = "ivan")
 
   for (token in c("not-a-token", revoked, blocked_token)) {
-    run_auth(con, {
+    run_auth(con, settings = aa_settings(cookie_mode = "legacy"), {
       session$setInputs(cookie = token)
       expect_false(session$returned$logged_in())
     })
@@ -265,13 +265,17 @@ test_that("with auto-login off the cookie is ignored, tokens are not issued", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
-  run_auth(con, settings = aa_settings(autologin = FALSE), {
-    session$setInputs(cookie = token)
-    expect_false(session$returned$logged_in())
+  run_auth(
+    con,
+    settings = aa_settings(autologin = FALSE, cookie_mode = "legacy"),
+    {
+      session$setInputs(cookie = token)
+      expect_false(session$returned$logged_in())
 
-    session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
-    expect_true(session$returned$logged_in())
-  })
+      session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
+      expect_true(session$returned$logged_in())
+    }
+  )
 
   expect_equal(nrow(rows_of(con, "auth_sessions")), 1)
 })
@@ -308,7 +312,7 @@ test_that("after sign-out the cookie no longer works", {
   con <- auth_db()
   token <- NULL
 
-  run_auth(con, {
+  run_auth(con, settings = aa_settings(cookie_mode = "legacy"), {
     session$setInputs(cookie = aa_issue_token(con, "ivan"))
     token <- rows_of(con, "auth_sessions")$token_hash
     session$returned$logout()
@@ -385,7 +389,7 @@ test_that("sign-out on all devices without sign-in does nothing", {
 test_that("after sign-out on all devices the cookie of the open session no longer works", {
   con <- auth_db()
 
-  run_auth(con, {
+  run_auth(con, settings = aa_settings(cookie_mode = "legacy"), {
     session$setInputs(login = "ivan", password = "secret123", login_btn = 1)
     own <- session$returned$token()
     session$returned$logout_all(reload = FALSE)

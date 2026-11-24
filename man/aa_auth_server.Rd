@@ -31,7 +31,8 @@ from the
 \code{www} folder) or \code{NULL}.}
 
 \item{cookie_name}{Auto-login cookie name. Cookies are not isolated by port,
-so apps on the same host need different names.}
+so apps on the same host need different names. With \code{cookie_mode = "httponly"} the cookie is set by the server through a short-lived encrypted
+ticket; JavaScript never sees the token.}
 }
 \value{
 A list: \code{user} (reactive value, a list with \code{login} and \code{role} or
@@ -147,8 +148,9 @@ domain), the button sends the user to the return address and sign-in starts
 there on its own
 (parameter \code{?google=1}): \code{state} is stored in the cookie of the site address,
 and cookies for an IP and for a domain
-are different. Password sign-in and cookie auto-login work independently at
-each address.
+are different. With \code{cookie_mode = "httponly"} the state cookie is set by the
+server and is not readable from JavaScript. Password sign-in and cookie
+auto-login work independently at each address.
 
 The role and login are taken from the database, not from the entered string.
 The \code{conn}

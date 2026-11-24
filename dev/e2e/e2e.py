@@ -74,7 +74,7 @@ with sync_playwright() as p:
 
     cookies = ctx.cookies()
     tok = [c for c in cookies if c["name"] == "appauth_token"]
-    check("auto-login cookie issued with SameSite=Lax, without HttpOnly (JS)", len(tok) == 1 and tok[0]["sameSite"] == "Lax" and not tok[0]["httpOnly"], tok)
+    check("auto-login cookie issued with SameSite=Lax and HttpOnly", len(tok) == 1 and tok[0]["sameSite"] == "Lax" and tok[0]["httpOnly"], tok)
 
     page.wait_for_selector("#users-table tbody tr", timeout=15000)
     page.wait_for_timeout(800)
@@ -85,7 +85,7 @@ with sync_playwright() as p:
     lbg = lrow.locator("td").first.evaluate("e => getComputedStyle(e).backgroundColor")
     check("row locked by attempts: class aa-row-locked and orange background", "aa-row-locked" in lcls and lbg.startswith("rgba(245, 158, 11"), (lcls, lbg))
     heads = [h.strip() for h in page.locator("#users-table thead th").all_inner_texts()]
-    check("state column hidden, date columns shown", heads == ["Login", "Role", "Status", "Created", "Last sign-in"], heads)
+    check("state column hidden, date and account columns shown", heads == ["Login", "Role", "Status", "Created", "Last sign-in", "Email", "Auto-logins"], heads)
     alsey_row = page.locator("#users-table tbody tr", has_text="alsey").inner_text()
     ivan_row = page.locator("#users-table tbody tr", has_text="ivan").inner_text()
     check("signed-in administrator has a last sign-in date", re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}.*\d{4}-\d{2}-\d{2} \d{2}:\d{2}", alsey_row.replace("\n", " ").replace("\t", " ")), alsey_row)

@@ -31,7 +31,18 @@ aa_token_hash <- function(token) {
 #' @examples
 #' \dontrun{
 #' token <- aa_issue_token(conn, "ivan")
-#' if (!is.null(token)) session$sendCustomMessage("setAuthCookie", token)
+#' if (!is.null(token)) {
+#'   aa_cookie_ticket(
+#'     conn,
+#'     settings,
+#'     list(
+#'       action = "set",
+#'       name = "appauth_token",
+#'       value = token,
+#'       max_age = settings$session_days * 86400
+#'     )
+#'   )
+#' }
 #' }
 aa_issue_token <- function(conn, login, settings = aa_settings()) {
   if (!isTRUE(settings$autologin) || !aa_is_string(login)) {

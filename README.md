@@ -153,7 +153,7 @@ Tests can run on any supported database: `Rscript dev/run-tests-db.R duckdb` (se
 
 ## Limitations
 
-Known limitations (the cookie is not `HttpOnly`, lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the `architecture-and-security` vignette.
+Known limitations (lockout is per login, BigQuery and other analytical warehouses are not supported, two-factor authentication is optional and TOTP only, single sign-on is Google only, no independent audit has been done) are listed in the `architecture-and-security` vignette. By default the auto-login cookie is written by the server with `HttpOnly`; `cookie_mode = "legacy"` keeps the old JavaScript flow.
 
 ## Development
 

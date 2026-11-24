@@ -1,6 +1,6 @@
 # appauth function reference (index)
 
-Package version: 0.11.2. Read only the file you need for the task.
+Package version: 0.12.0. Read only the file you need for the task.
 
 | Topic | File | Functions |
 | --- | --- | --- |

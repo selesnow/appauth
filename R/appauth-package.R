@@ -18,3 +18,7 @@
 #' @importFrom rlang %||%
 ## usethis namespace: end
 NULL
+
+.onLoad <- function(libname, pkgname) {
+  aa_register_cookie_handler()
+}

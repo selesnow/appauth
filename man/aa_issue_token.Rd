@@ -29,6 +29,17 @@ settings, the user does not exist or the user is blocked.
 \examples{
 \dontrun{
 token <- aa_issue_token(conn, "ivan")
-if (!is.null(token)) session$sendCustomMessage("setAuthCookie", token)
+if (!is.null(token)) {
+  aa_cookie_ticket(
+    conn,
+    settings,
+    list(
+      action = "set",
+      name = "appauth_token",
+      value = token,
+      max_age = settings$session_days * 86400
+    )
+  )
+}
 }
 }

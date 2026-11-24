@@ -2,9 +2,9 @@
 
 ## Auto-login cookie
 
-The login module stores the auto-login token in a cookie (`aa_auth_server(cookie_name = "appauth_token")`). The `aa_app_head()` script writes the cookie with `SameSite=Lax`, and on HTTPS also with `Secure` (the browser will not send it over HTTP). `Secure` is set automatically when the page is opened over `https://`.
+The login module stores the auto-login token in a cookie (`aa_auth_server(cookie_name = "appauth_token")`). Since 0.12.0 the default `cookie_mode = "httponly"` writes it from the server: the browser exchanges an opaque encrypted ticket at a same-origin endpoint, and the response sets the cookie with `HttpOnly`, `SameSite=Lax` and, on HTTPS, `Secure` (the browser will not send it over HTTP). `Secure` is chosen from the request, or can be forced with `cookie_secure = TRUE`.
 
-Limitation: the cookie is written by JavaScript, so it has no `HttpOnly`. XSS in the app can steal the token. Mitigations: the database holds only the sha256 of the token, the token is revoked on logout, lock, password change and "log out on all devices", and the app must never output unvalidated HTML (recipes/handler-guards.md).
+Keep the default mode: with `cookie_mode = "legacy"` the cookie is written by JavaScript and has no `HttpOnly`, so XSS in the app can steal the token. Compensation in legacy mode: the database holds only the sha256 of the token, the token is revoked on logout, lock, password change and "log out on all devices". Even with `HttpOnly`, XSS can act in the current session, so the app must never output unvalidated HTML (recipes/handler-guards.md).
 
 Cookie name:
 
@@ -55,6 +55,6 @@ Locking is counted per login, not per IP: behind nginx Shiny sees the proxy's ad
 
 ## Verification
 
-* Open the app over `https://`; in DevTools (Application, Cookies) the auto-login cookie has `SameSite = Lax` and `Secure`.
+* Open the app over `https://`; in DevTools (Application, Cookies) the auto-login cookie has `HttpOnly`, `SameSite = Lax` and `Secure`.
 * The Shiny port is unreachable from outside.
 * Auto-login works after a page reload; after logout the cookie is deleted.

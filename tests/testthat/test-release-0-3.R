@@ -61,14 +61,14 @@ test_that("the migration completes the columns in an existing database, data is 
   after <- aa_get_user(con, "old")
   expect_equal(after$login, "old")
   expect_true(is.na(after$created_at))
-  expect_identical(aa_schema_version(con), 10L)
+  expect_identical(aa_schema_version(con), 11L)
 })
 
 test_that("password sign-in updates last_login_at, cookie sign-in does not", {
   con <- auth_db()
   token <- aa_issue_token(con, "ivan")
 
-  run_auth(con, {
+  run_auth(con, settings = aa_settings(cookie_mode = "legacy"), {
     session$setInputs(cookie = token)
     expect_true(session$returned$logged_in())
   })

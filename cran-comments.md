@@ -1,6 +1,6 @@
 ## Submission
 
-This is a new submission of appauth 0.11.2.
+This is a new submission of appauth 0.12.0.
 
 appauth provides login, user management and access control for 'shiny'
 applications. It stores users in 'SQLite' (the default), 'DuckDB',
@@ -9,7 +9,10 @@ self-registration by one-time email link and automatic creation of
 non-admin accounts on the first verified Google sign-in; both are off
 by default and require explicit settings. Version 0.11.1 fixed a MySQL
 write-lock leak and version 0.11.2 refreshes the bundled AI skills and
-their references; neither changes the API or the schema.
+their references. Version 0.12.0 writes the auto-login and Google OAuth state
+cookies from the server with `HttpOnly` through short-lived encrypted one-time
+tickets and adds schema version 11; `cookie_mode = "legacy"` preserves the old
+behavior.
 
 ## Test environments
 

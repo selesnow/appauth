@@ -33,6 +33,21 @@
 #' @param autologin Whether to use cookie-based auto sign-in. If `FALSE`, the
 #'   user enters the password on every page load and no tokens are issued.
 #' @param session_days Lifetime of the auto sign-in token, in days.
+#' @param cookie_mode How to write the auto sign-in cookie. `"httponly"`
+#'   (default) sets it from the server through a one-time encrypted ticket, so
+#'   JavaScript never sees the token; also applies to the Google OAuth `state`
+#'   cookie. `"legacy"` keeps the old JavaScript cookie flow for applications
+#'   that cannot use the server endpoint.
+#' @param cookie_key Optional additional secret for encrypting one-time cookie
+#'   tickets, a string of at least 32 characters. When `NULL`, the key generated
+#'   by [aa_init_db()] and stored in the database is used.
+#' @param cookie_path Path of the auto sign-in and OAuth state cookies.
+#' @param cookie_samesite `SameSite` attribute of those cookies: `"Lax"`,
+#'   `"Strict"` or `"None"`.
+#' @param cookie_secure Force the `Secure` attribute (`TRUE`/`FALSE`), or detect
+#'   it from the request (`NULL`, default).
+#' @param cookie_ticket_ttl_seconds Lifetime of one-time cookie tickets, in
+#'   seconds.
 #' @param session_check_seconds How often to check that an open session is
 #'   still allowed (the user has not been blocked or deleted), in seconds.
 #' @param attempts_retention_hours How many hours to keep records of sign-in
@@ -195,6 +210,12 @@ aa_settings <- function(
   login_max = 64,
   autologin = TRUE,
   session_days = 30,
+  cookie_mode = "httponly",
+  cookie_key = NULL,
+  cookie_path = "/",
+  cookie_samesite = "Lax",
+  cookie_secure = NULL,
+  cookie_ticket_ttl_seconds = 300,
   session_check_seconds = 30,
   attempts_retention_hours = 24,
   token_retention_days = 30,
@@ -253,6 +274,62 @@ aa_settings <- function(
   aa_check_positive(session_check_seconds, "session_check_seconds")
   aa_check_positive(attempts_retention_hours, "attempts_retention_hours")
   aa_check_positive(token_retention_days, "token_retention_days")
+  aa_check_positive(cookie_ticket_ttl_seconds, "cookie_ticket_ttl_seconds")
+
+  if (!(aa_is_string(cookie_mode) && cookie_mode %in% c("httponly", "legacy"))) {
+    rlang::abort(
+      "`cookie_mode` must be either \"httponly\" or \"legacy\".",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!(
+    is.null(cookie_key) ||
+      (aa_is_string(cookie_key) && nchar(cookie_key) >= 32)
+  )) {
+    rlang::abort(
+      "`cookie_key` must be `NULL` or a string of at least 32 characters.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (!aa_is_string(cookie_path) || !startsWith(cookie_path, "/")) {
+    rlang::abort(
+      "`cookie_path` must be a non-empty string starting with `/`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (
+    !(aa_is_string(cookie_samesite) &&
+      cookie_samesite %in% c("Lax", "Strict", "None"))
+  ) {
+    rlang::abort(
+      "`cookie_samesite` must be one of: \"Lax\", \"Strict\", \"None\".",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (
+    !(is.null(cookie_secure) ||
+      (is.logical(cookie_secure) && length(cookie_secure) == 1 &&
+        !is.na(cookie_secure)))
+  ) {
+    rlang::abort(
+      "`cookie_secure` must be `TRUE`, `FALSE` or `NULL`.",
+      class = "appauth_error_settings"
+    )
+  }
+
+  if (
+    identical(cookie_mode, "httponly") &&
+      identical(cookie_samesite, "None") && identical(cookie_secure, FALSE)
+  ) {
+    rlang::abort(
+      "`cookie_samesite = \"None\"` requires `cookie_secure = TRUE`.",
+      class = "appauth_error_settings"
+    )
+  }
 
   if (
     !(aa_is_string(password_policy) &&
@@ -513,6 +590,12 @@ aa_settings <- function(
       login_max = login_max,
       autologin = autologin,
       session_days = session_days,
+      cookie_mode = cookie_mode,
+      cookie_key = cookie_key,
+      cookie_path = cookie_path,
+      cookie_samesite = cookie_samesite,
+      cookie_secure = cookie_secure,
+      cookie_ticket_ttl_seconds = cookie_ticket_ttl_seconds,
       session_check_seconds = session_check_seconds,
       attempts_retention_hours = attempts_retention_hours,
       token_retention_days = token_retention_days,

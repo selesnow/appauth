@@ -78,7 +78,7 @@ Plug in the package following the [getting started guide](getting-started.html) 
 | `create_user()`, `create_first_admin()`, `set_user_password()` | `aa_create_user()`, `aa_create_first_admin()`, `aa_set_password()` |
 | `migrate_passwords_to_hash()` | `aa_migrate_plaintext_passwords()` |
 | `mod_auth_ui()`, `mod_auth_server()` (including the first administrator window) | `aa_auth_ui()`, `aa_auth_server()` |
-| JS `setAuthCookie`, `clearAuthCookie`, `readAuthCookie` and `input$auth_cookie` in `app.R` | `aa_app_head()` and auto-login inside `aa_auth_server()` |
+| JS `setAuthCookie`, `clearAuthCookie`, `readAuthCookie` and `input$auth_cookie` in `app.R` | `aa_app_head()` and auto-login inside `aa_auth_server()`; with the default `cookie_mode = "httponly"` no cookie JavaScript is needed |
 | `record_login_attempt()`, `login_lock_remaining()`, `login_global_throttled()`, `clear_login_attempts()` | `aa_record_attempt()`, `aa_login_lock_remaining()`, `aa_global_throttled()`, `aa_clear_attempts()`; the login module calls them itself through `aa_login_gate()` |
 | `login_security_settings()` (settings from `config.yaml`) | `aa_settings_from_list(conf$security)` |
 | `normalize_login()` | not needed: the login is compared exactly (see "What changes") |

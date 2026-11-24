@@ -1,4 +1,20 @@
 # 2026-11-24 | OPENCODE (Alsey)
+Implemented server-side HttpOnly cookies in `0.12.0`: the auto-login cookie and
+the Google OAuth state cookie are now issued through short-lived encrypted
+one-time tickets handled by a same-origin Shiny HTTP handler, so JavaScript no
+longer sees the token by default. Added schema version 11 with the
+`appauth_cookie_keys` and `cookie_tickets` tables, cookie settings (`cookie_mode`,
+`cookie_key`, `cookie_path`, `cookie_samesite`, `cookie_secure`,
+`cookie_ticket_ttl_seconds`), cleanup of consumed and expired tickets, and a
+`cookie_mode = "legacy"` fallback for existing applications. Refreshed docs,
+vignettes, bundled AI skills and the Playwright E2E check.
+
+# appauth 0.12.0
+
+Security release: server-side `HttpOnly` cookies by default, DB-backed
+one-time tickets, and a legacy JavaScript fallback. Schema version is 11.
+
+# 2026-11-24 | OPENCODE (Alsey)
 Brought the bundled AI skills into compliance with the skill-creator rules:
 shortened both descriptions, removed duplicated activation sections, corrected
 the Google self-signup statement in the `appauth` reference and documented

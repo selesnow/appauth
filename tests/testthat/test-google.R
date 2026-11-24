@@ -7,6 +7,7 @@ g_client_id <- "cid.apps.googleusercontent.com"
 
 g_settings <- function(...) {
   args <- list(
+    cookie_mode = "legacy",
     google_enabled = TRUE,
     google_client_id = g_client_id,
     google_client_secret = "s3cret-value",

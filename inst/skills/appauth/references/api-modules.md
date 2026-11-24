@@ -1,6 +1,6 @@
 # appauth reference: UI modules and app helpers
 
-Package version: 0.11.2. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
+Package version: 0.12.0. This file is generated automatically from the package help (`dev/skills/build_reference.R`) and must not be edited by hand.
 
 Functions in this section:
 `aa_app_head()`, `aa_auth_ui()`, `aa_auth_server()`, `aa_users_ui()`, `aa_users_server()`, `aa_password_ui()`, `aa_password_server()`, `aa_totp_ui()`, `aa_totp_server()`, `aa_session_guard()`, `aa_register_module()`
@@ -27,8 +27,8 @@ Attach appauth styles and scripts
 Description:
 
      Call it once in the application UI (inside 'fluidPage()' or 'tagList()'). Adds the
-     CSS of the sign-in form and the users tab, and the JS that reads, writes and deletes
-     the auto sign-in cookie.
+     CSS of the sign-in form and the users tab, and the JS that handles the server-side
+     auto sign-in cookie tickets (plus legacy cookie handlers).
 
 Usage:
 
@@ -40,7 +40,9 @@ Details:
      you override in your own CSS after 'aa_app_head()'. The light theme is enabled with
      the 'aa-theme-light' class on <body> or a parent element.
 
-     The cookie is written with 'SameSite=Lax', and on HTTPS also with 'Secure'.
+     With 'cookie_mode = "httponly"' the cookie is written by the server with 'HttpOnly',
+     'SameSite=Lax' and 'Secure' on HTTPS. The legacy mode uses the same flags except for
+     'HttpOnly'.
 
 Value:
 
@@ -126,7 +128,9 @@ on_event: Event hook function(event, user, session_id, value) or 'NULL'.
           folder) or 'NULL'.
 
 cookie_name: Auto-login cookie name. Cookies are not isolated by port, so apps on the
-          same host need different names.
+          same host need different names. With 'cookie_mode = "httponly"' the cookie is
+          set by the server through a short-lived encrypted ticket; JavaScript never sees
+          the token.
 
 Details:
 
@@ -205,8 +209,9 @@ Sign-in with Google:
      return is configured for a domain), the button sends the user to the return address
      and sign-in starts there on its own (parameter '?google=1'): 'state' is stored in
      the cookie of the site address, and cookies for an IP and for a domain are
-     different. Password sign-in and cookie auto-login work independently at each
-     address.
+     different. With 'cookie_mode = "httponly"' the state cookie is set by the server and
+     is not readable from JavaScript. Password sign-in and cookie auto-login work
+     independently at each address.
 
      The role and login are taken from the database, not from the entered string. The
      'conn' connection belongs to the app: close it when the session ends.

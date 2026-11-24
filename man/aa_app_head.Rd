@@ -11,15 +11,17 @@ A \code{shiny.tag.list} object that attaches the \code{appauth} dependency.
 }
 \description{
 Call it once in the application UI (inside \code{fluidPage()} or \code{tagList()}).
-Adds the CSS of the sign-in form and the users tab, and the JS that reads,
-writes and deletes the auto sign-in cookie.
+Adds the CSS of the sign-in form and the users tab, and the JS that handles
+the server-side auto sign-in cookie tickets (plus legacy cookie handlers).
 }
 \details{
 The look is changed with \verb{--aa-*} CSS variables (for example \code{--aa-primary}),
 which you override in your own CSS after \code{aa_app_head()}. The light theme is
 enabled with the \code{aa-theme-light} class on \verb{<body>} or a parent element.
 
-The cookie is written with \code{SameSite=Lax}, and on HTTPS also with \code{Secure}.
+With \code{cookie_mode = "httponly"} the cookie is written by the server with
+\code{HttpOnly}, \code{SameSite=Lax} and \code{Secure} on HTTPS. The legacy mode uses the
+same flags except for \code{HttpOnly}.
 }
 \examples{
 ui <- shiny::fluidPage(

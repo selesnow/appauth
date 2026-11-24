@@ -25,7 +25,7 @@ Contents: A. Passwords and login, B. Sessions, C. Permissions and handlers, D. U
 | B1 | `aa_session_guard()` is wired in | the call is in `server`; after a user is blocked, their open session closes within 30 seconds |
 | B2 | Sign-out revokes the token and clears the cookie | manually: sign out, reload the page: login form, no `appauth_token` cookie (or your own name) |
 | B3 | Blocking, deletion, role change and password reset affect open sessions | `testServer` test with `session$elapse(35000)` or manually in two browsers |
-| B4 | The auto-login cookie has `SameSite=Lax`, `Secure` on HTTPS, and every app on the host has its own name | DevTools: Application, Cookies; the `cookie_name` parameter |
+| B4 | The auto-login cookie has `HttpOnly`, `SameSite=Lax`, `Secure` on HTTPS, and every app on the host has its own name | DevTools: Application, Cookies; `cookie_mode`, `cookie_name` and `cookie_secure` settings |
 | B5 | The role comes from `auth$user()`, not from `input` | audit: no `ROLE_FROM_INPUT` findings |
 
 ## C. Permissions and handlers

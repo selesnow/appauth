@@ -14,6 +14,7 @@
 #' @examples
 #' ui <- shiny::fluidPage(aa_app_head(), aa_auth_ui("auth"))
 aa_auth_ui <- function(id) {
+  aa_register_cookie_handler()
   shiny::uiOutput(shiny::NS(id, "form"))
 }
 
@@ -101,8 +102,9 @@ aa_auth_ui <- function(id) {
 #' there on its own
 #' (parameter `?google=1`): `state` is stored in the cookie of the site address,
 #' and cookies for an IP and for a domain
-#' are different. Password sign-in and cookie auto-login work independently at
-#' each address.
+#' are different. With `cookie_mode = "httponly"` the state cookie is set by the
+#' server and is not readable from JavaScript. Password sign-in and cookie
+#' auto-login work independently at each address.
 #'
 #' The role and login are taken from the database, not from the entered string.
 #' The `conn`
@@ -118,7 +120,9 @@ aa_auth_ui <- function(id) {
 #' from the
 #'   `www` folder) or `NULL`.
 #' @param cookie_name Auto-login cookie name. Cookies are not isolated by port,
-#'   so apps on the same host need different names.
+#'   so apps on the same host need different names. With `cookie_mode =
+#'   "httponly"` the cookie is set by the server through a short-lived encrypted
+#'   ticket; JavaScript never sees the token.
 #'
 #' @returns A list: `user` (reactive value, a list with `login` and `role` or
 #'   `NULL`), `logged_in` (reactive logical), `role` (reactive role or
@@ -169,7 +173,7 @@ aa_auth_server <- function(
   shiny::moduleServer(id, function(input, output, session) {
     user <- shiny::reactiveVal(NULL)
     message_text <- shiny::reactiveVal("")
-    current_token <- NULL
+    current_token <- shiny::reactiveVal(NULL)
     # signed in with a password set by an administrator: not let into the app until it is changed
     pending <- shiny::reactiveVal(NULL)
     # the password is correct, waiting for the second factor code: list(login, role, must_change, old)
@@ -185,6 +189,50 @@ aa_auth_server <- function(
     password_on <- !identical(settings$password_login, FALSE)
     registration_on <- isTRUE(settings$registration_enabled)
     oauth_cookie <- paste0(cookie_name, "_oauth")
+    httponly <- identical(settings$cookie_mode, "httponly")
+    endpoint_id <- paste0(
+      "aa_",
+      openssl::base64_encode(openssl::rand_bytes(12))
+    )
+    app_path <- aa_cookie_app_path(session)
+    endpoint_path <- aa_cookie_request_path(session)
+
+    aa_register_cookie_handler()
+    aa_register_cookie_endpoint(
+      endpoint_id,
+      conn,
+      settings,
+      cookie_name,
+      oauth_cookie,
+      endpoint_path
+    )
+    session$onSessionEnded(function() aa_unregister_cookie_endpoint(endpoint_id))
+
+    send_ticket <- function(ticket, navigate = TRUE, reload = FALSE) {
+      url <- aa_cookie_endpoint_url(endpoint_path, endpoint_id, ticket)
+
+      if (isTRUE(navigate)) {
+        session$sendCustomMessage(
+          "appauth_cookie_ticket",
+          list(url = url)
+        )
+      } else {
+        session$sendCustomMessage(
+          "appauth_cookie_ticket_fetch",
+          list(url = url, reload = isTRUE(reload))
+        )
+      }
+    }
+
+    safe_ticket <- function(expr, context) {
+      tryCatch(
+        expr,
+        error = function(e) {
+          message("appauth: could not create ", context, ": ", conditionMessage(e))
+          NULL
+        }
+      )
+    }
 
     users_exist <- shiny::reactiveVal(
       tryCatch(aa_users_exist(conn), error = function(e) TRUE)
@@ -225,15 +273,34 @@ aa_auth_server <- function(
         )
 
         if (!is.null(token)) {
-          current_token <<- token
-          session$sendCustomMessage(
-            "appauth_set_cookie",
-            list(
-              name = cookie_name,
-              token = token,
-              days = settings$session_days
+          current_token(token)
+
+          if (isTRUE(httponly)) {
+            ticket <- safe_ticket(
+              aa_cookie_set_ticket(
+                conn,
+                settings,
+                cookie_name,
+                token,
+                settings$session_days * 86400,
+                redirect = app_path
+              ),
+              "a cookie ticket"
             )
-          )
+
+            if (!is.null(ticket)) {
+              send_ticket(ticket)
+            }
+          } else {
+            session$sendCustomMessage(
+              "appauth_set_cookie",
+              list(
+                name = cookie_name,
+                token = token,
+                days = settings$session_days
+              )
+            )
+          }
         }
       }
     }
@@ -305,40 +372,67 @@ aa_auth_server <- function(
 
     # auto-login by cookie
     if (isTRUE(settings$autologin)) {
-      session$onFlushed(
-        function() {
-          session$sendCustomMessage(
-            "appauth_read_cookie",
-            list(name = cookie_name, input = session$ns("cookie"))
+      if (isTRUE(httponly)) {
+        cookie_value <- aa_request_cookie(session, cookie_name)
+
+        if (aa_is_string(cookie_value)) {
+          found <- tryCatch(
+            aa_find_session_user(conn, cookie_value),
+            error = function(e) NULL
           )
-        },
-        once = TRUE
-      )
 
-      shiny::observeEvent(input$cookie, {
-        if (!is.null(shiny::isolate(user())) || !aa_is_string(input$cookie)) {
-          return()
+          if (is.null(found)) {
+            ticket <- safe_ticket(
+              aa_cookie_clear_ticket(conn, settings, cookie_name),
+              "a cookie clearing ticket"
+            )
+
+            if (!is.null(ticket)) {
+              send_ticket(ticket, navigate = FALSE)
+            }
+          } else {
+            current_token(cookie_value)
+            finish_login(found$login, found$role, issue_token = FALSE)
+            emit("login_success", found$login, "cookie")
+          }
         }
-
-        found <- tryCatch(
-          aa_find_session_user(conn, input$cookie),
-          error = function(e) NULL
+      } else {
+        session$onFlushed(
+          function() {
+            session$sendCustomMessage(
+              "appauth_read_cookie",
+              list(name = cookie_name, input = session$ns("cookie"))
+            )
+          },
+          once = TRUE
         )
 
-        if (is.null(found)) {
-          # the token is expired, revoked or belongs to a blocked user: remove the cookie
-          session$sendCustomMessage(
-            "appauth_clear_cookie",
-            list(name = cookie_name)
-          )
-          return()
-        }
+        shiny::observeEvent(input$cookie, {
+          if (!is.null(shiny::isolate(user())) || !aa_is_string(input$cookie)) {
+            return()
+          }
 
-        current_token <<- input$cookie
-        finish_login(found$login, found$role, issue_token = FALSE)
-        emit("login_success", found$login, "cookie")
-      })
+          found <- tryCatch(
+            aa_find_session_user(conn, input$cookie),
+            error = function(e) NULL
+          )
+
+          if (is.null(found)) {
+            # the token is expired, revoked or belongs to a blocked user: remove the cookie
+            session$sendCustomMessage(
+              "appauth_clear_cookie",
+              list(name = cookie_name)
+            )
+            return()
+          }
+
+          current_token(input$cookie)
+          finish_login(found$login, found$role, issue_token = FALSE)
+          emit("login_success", found$login, "cookie")
+        })
+      }
     }
+
 
     # sign-in with Google ------------------------------------------------------------
     google_fail <- function(reason, email = NULL) {
@@ -348,6 +442,65 @@ aa_auth_server <- function(
         NULL,
         paste(c(reason, if (aa_is_string(email)) email), collapse = " ")
       )
+    }
+
+    complete_google <- function(state_cookie) {
+      callback <- shiny::isolate(google_callback())
+      shiny::req(callback)
+      google_callback(NULL)
+
+      if (isTRUE(httponly)) {
+        ticket <- safe_ticket(
+          aa_cookie_clear_ticket(conn, settings, oauth_cookie),
+          "a Google state clearing ticket"
+        )
+
+        if (!is.null(ticket)) {
+          send_ticket(ticket, navigate = FALSE)
+        }
+      } else {
+        session$sendCustomMessage(
+          "appauth_clear_cookie",
+          list(name = oauth_cookie)
+        )
+      }
+
+      if (!is.null(shiny::isolate(user()))) {
+        return()
+      }
+
+      if (
+        !aa_is_string(state_cookie) ||
+          !identical(state_cookie, callback$state)
+      ) {
+        google_fail("bad_browser")
+        return()
+      }
+
+      res <- aa_google_complete(
+        conn,
+        settings,
+        callback$code,
+        callback$state
+      )
+
+      if (!isTRUE(res$ok)) {
+        google_fail(res$reason, res$email)
+        return()
+      }
+
+      if (isTRUE(res$must_change)) {
+        message_text("")
+        pending(list(login = res$login, role = res$role, via_sso = TRUE))
+        return()
+      }
+
+      if (isTRUE(res$created)) {
+        emit("google_user_created", res$login)
+      }
+
+      finish_login(res$login, res$role)
+      emit("login_success", res$login, "google")
     }
 
     if (google_on) {
@@ -374,11 +527,33 @@ aa_auth_server <- function(
         }
 
         message_text("")
-        session$sendCustomMessage(
-          "appauth_set_cookie",
-          list(name = oauth_cookie, token = started$state, days = 600 / 86400)
-        )
-        aa_redirect(session, started$url, "https://accounts.google.com")
+
+        if (isTRUE(httponly)) {
+          ticket <- safe_ticket(
+            aa_cookie_set_ticket(
+              conn,
+              settings,
+              oauth_cookie,
+              started$state,
+              600,
+              redirect = started$url
+            ),
+            "a Google state cookie ticket"
+          )
+
+          if (is.null(ticket)) {
+            google_fail("start_failed")
+            return()
+          }
+
+          send_ticket(ticket)
+        } else {
+          session$sendCustomMessage(
+            "appauth_set_cookie",
+            list(name = oauth_cookie, token = started$state, days = 600 / 86400)
+          )
+          aa_redirect(session, started$url, "https://accounts.google.com")
+        }
       }
 
       # the button. state is stored in the cookie of the address the page is opened from, and Google returns
@@ -440,10 +615,15 @@ aa_auth_server <- function(
           }
 
           google_callback(list(code = code, state = state))
-          session$sendCustomMessage(
-            "appauth_read_cookie",
-            list(name = oauth_cookie, input = session$ns("oauth_cookie"))
-          )
+
+          if (isTRUE(httponly)) {
+            complete_google(aa_request_cookie(session, oauth_cookie))
+          } else {
+            session$sendCustomMessage(
+              "appauth_read_cookie",
+              list(name = oauth_cookie, input = session$ns("oauth_cookie"))
+            )
+          }
         },
         once = TRUE
       )
@@ -453,50 +633,7 @@ aa_auth_server <- function(
       shiny::observeEvent(
         input$oauth_cookie,
         {
-          callback <- shiny::isolate(google_callback())
-          shiny::req(callback)
-          google_callback(NULL)
-          session$sendCustomMessage(
-            "appauth_clear_cookie",
-            list(name = oauth_cookie)
-          )
-
-          if (!is.null(shiny::isolate(user()))) {
-            return()
-          }
-
-          if (
-            !aa_is_string(input$oauth_cookie) ||
-              !identical(input$oauth_cookie, callback$state)
-          ) {
-            google_fail("bad_browser")
-            return()
-          }
-
-          res <- aa_google_complete(
-            conn,
-            settings,
-            callback$code,
-            callback$state
-          )
-
-          if (!isTRUE(res$ok)) {
-            google_fail(res$reason, res$email)
-            return()
-          }
-
-          if (isTRUE(res$must_change)) {
-            message_text("")
-            pending(list(login = res$login, role = res$role, via_sso = TRUE))
-            return()
-          }
-
-          if (isTRUE(res$created)) {
-            emit("google_user_created", res$login)
-          }
-
-          finish_login(res$login, res$role)
-          emit("login_success", res$login, "google")
+          complete_google(input$oauth_cookie)
         },
         ignoreNULL = FALSE,
         ignoreInit = TRUE
@@ -506,14 +643,28 @@ aa_auth_server <- function(
     logout <- function(reason = NULL, reload = FALSE) {
       login <- shiny::isolate(user())$login
 
-      if (!is.null(current_token)) {
-        try(aa_revoke_token(conn, current_token), silent = TRUE)
+      if (!is.null(current_token())) {
+        try(aa_revoke_token(conn, current_token()), silent = TRUE)
       }
-      current_token <<- NULL
-      session$sendCustomMessage(
-        "appauth_clear_cookie",
-        list(name = cookie_name)
-      )
+      current_token(NULL)
+
+      if (isTRUE(httponly)) {
+        ticket <- safe_ticket(
+          aa_cookie_clear_ticket(conn, settings, cookie_name),
+          "a cookie clearing ticket"
+        )
+
+        if (!is.null(ticket)) {
+          send_ticket(ticket, navigate = FALSE, reload = isTRUE(reload))
+        } else if (isTRUE(reload)) {
+          session$reload()
+        }
+      } else {
+        session$sendCustomMessage(
+          "appauth_clear_cookie",
+          list(name = cookie_name)
+        )
+      }
 
       if (is.null(reason)) {
         emit("logout", login)
@@ -525,7 +676,7 @@ aa_auth_server <- function(
       user(NULL)
       users_exist(tryCatch(aa_users_exist(conn), error = function(e) TRUE))
 
-      if (isTRUE(reload)) {
+      if (!isTRUE(httponly) && isTRUE(reload)) {
         session$reload()
       }
 
@@ -1233,7 +1384,7 @@ aa_auth_server <- function(
       role = shiny::reactive(user()$role),
       logout = logout,
       logout_all = logout_all,
-      token = function() current_token
+      token = function() current_token()
     )
   })
 }

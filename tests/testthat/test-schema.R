@@ -5,14 +5,16 @@ test_that("on an empty database all tables are created and all migrations applie
 
   res <- aa_init_db(con)
 
-  expect_identical(res$applied, 1:10)
-  expect_identical(res$version, 10L)
+  expect_identical(res$applied, 1:11)
+  expect_identical(res$version, 11L)
   expect_false(res$legacy)
   expect_identical(
     table_names(con),
     c(
+      "appauth_cookie_keys",
       "appauth_migrations",
       "auth_sessions",
+      "cookie_tickets",
       "login_attempts",
       "oauth_states",
       "password_resets",
@@ -21,7 +23,7 @@ test_that("on an empty database all tables are created and all migrations applie
       "users"
     )
   )
-  expect_identical(aa_schema_version(con), 10L)
+  expect_identical(aa_schema_version(con), 11L)
 })
 
 test_that("table columns match the schema of earlier versions", {
@@ -89,7 +91,7 @@ test_that("migrations are recorded in the service table", {
     "SELECT version, name FROM appauth_migrations ORDER BY version"
   )
 
-  expect_identical(migrations$version, 1:10)
+  expect_identical(migrations$version, 1:11)
   expect_identical(
     migrations$name,
     c(
@@ -102,7 +104,8 @@ test_that("migrations are recorded in the service table", {
       "password_resets_and_email",
       "totp_two_factor",
       "oauth_states",
-      "registrations"
+      "registrations",
+      "cookie_tickets"
     )
   )
 })
@@ -128,7 +131,7 @@ test_that("a repeated run changes nothing", {
   )
 
   expect_identical(res$applied, integer())
-  expect_identical(res$version, 10L)
+  expect_identical(res$version, 11L)
   expect_identical(before, after)
 })
 
@@ -143,7 +146,7 @@ test_that("production schema from before login protection: completed, data uncha
   res <- aa_init_db(con)
 
   expect_true(res$legacy)
-  expect_identical(res$applied, 1:10)
+  expect_identical(res$applied, 1:11)
   expect_true("blocked" %in% columns_of(con, "users"))
   expect_true("login_attempts" %in% table_names(con))
 
@@ -186,8 +189,10 @@ test_that("home-grown schema: plain-text passwords and root/root stay as is, app
     table_names(con),
     c(
       "action_log",
+      "appauth_cookie_keys",
       "appauth_migrations",
       "auth_sessions",
+      "cookie_tickets",
       "login_attempts",
       "oauth_states",
       "password_resets",
@@ -337,7 +342,7 @@ test_that("aa_prepare_db prepares the database and does not throw errors", {
   con <- new_db()
 
   expect_true(suppressMessages(aa_prepare_db(con, aa_settings())))
-  expect_identical(aa_schema_version(con), 10L)
+  expect_identical(aa_schema_version(con), 11L)
 
   expect_message(
     aa_prepare_db(new_db(), aa_settings()),

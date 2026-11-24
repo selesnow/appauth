@@ -14,6 +14,12 @@ aa_settings(
   login_max = 64,
   autologin = TRUE,
   session_days = 30,
+  cookie_mode = "httponly",
+  cookie_key = NULL,
+  cookie_path = "/",
+  cookie_samesite = "Lax",
+  cookie_secure = NULL,
+  cookie_ticket_ttl_seconds = 300,
   session_check_seconds = 30,
   attempts_retention_hours = 24,
   token_retention_days = 30,
@@ -73,6 +79,27 @@ exactly, case-sensitively, when attempts are counted).}
 user enters the password on every page load and no tokens are issued.}
 
 \item{session_days}{Lifetime of the auto sign-in token, in days.}
+
+\item{cookie_mode}{How to write the auto sign-in cookie. \code{"httponly"}
+(default) sets it from the server through a one-time encrypted ticket, so
+JavaScript never sees the token; also applies to the Google OAuth \code{state}
+cookie. \code{"legacy"} keeps the old JavaScript cookie flow for applications
+that cannot use the server endpoint.}
+
+\item{cookie_key}{Optional additional secret for encrypting one-time cookie
+tickets, a string of at least 32 characters. When \code{NULL}, the key generated
+by \code{\link[=aa_init_db]{aa_init_db()}} and stored in the database is used.}
+
+\item{cookie_path}{Path of the auto sign-in and OAuth state cookies.}
+
+\item{cookie_samesite}{\code{SameSite} attribute of those cookies: \code{"Lax"},
+\code{"Strict"} or \code{"None"}.}
+
+\item{cookie_secure}{Force the \code{Secure} attribute (\code{TRUE}/\code{FALSE}), or detect
+it from the request (\code{NULL}, default).}
+
+\item{cookie_ticket_ttl_seconds}{Lifetime of one-time cookie tickets, in
+seconds.}
 
 \item{session_check_seconds}{How often to check that an open session is
 still allowed (the user has not been blocked or deleted), in seconds.}

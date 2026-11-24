@@ -436,6 +436,82 @@ aa_migrations <- function() {
           "email"
         )
       }
+    ),
+    list(
+      version = 11L,
+      name = "cookie_tickets",
+      up = function(conn) {
+        t <- aa_col_types(conn)
+
+        aa_execute(
+          conn,
+          paste0(
+            "
+          CREATE TABLE IF NOT EXISTS appauth_cookie_keys (
+            id     INTEGER PRIMARY KEY,
+            secret ",
+            t$text,
+            " NOT NULL
+          )
+        "
+          )
+        )
+
+        has_key <- aa_query(
+          conn,
+          "SELECT secret FROM appauth_cookie_keys WHERE id = 1"
+        )$secret
+
+        if (length(has_key) == 0 || is.na(has_key[1])) {
+          aa_execute(
+            conn,
+            "INSERT INTO appauth_cookie_keys (id, secret) VALUES (1, ?)",
+            params = list(openssl::base64_encode(openssl::rand_bytes(32)))
+          )
+        }
+
+        aa_execute(
+          conn,
+          paste0(
+            "
+          CREATE TABLE IF NOT EXISTS cookie_tickets (
+            ",
+            aa_pk_column(conn, "cookie_tickets"),
+            ",
+            token_hash  ",
+            t$key,
+            " NOT NULL,
+            payload     ",
+            t$text,
+            " NOT NULL,
+            created_at  ",
+            t$ts_now,
+            " NOT NULL,
+            expires_at  ",
+            t$ts,
+            " NOT NULL,
+            consumed_at ",
+            t$ts,
+            "
+          )
+        "
+          )
+        )
+
+        aa_create_index(
+          conn,
+          "idx_cookie_tickets_token",
+          "cookie_tickets",
+          "token_hash",
+          unique = TRUE
+        )
+        aa_create_index(
+          conn,
+          "idx_cookie_tickets_expires",
+          "cookie_tickets",
+          "expires_at"
+        )
+      }
     )
   )
 }
@@ -570,8 +646,9 @@ aa_schema_version <- function(conn) {
 #' well as expired and revoked auto-login tokens older than
 #' `token_retention_days`
 #' days, as well as used and expired password recovery tokens,
-#' pending registrations and Google sign-in parameters older than a day. Active
-#' tokens and fresh attempts are not touched. Call it
+#' pending registrations and Google sign-in parameters older than a day, as well
+#' as used and expired cookie tickets. Active tokens and fresh attempts are not
+#' touched. Call it
 #' after [aa_init_db()].
 #'
 #' @inheritParams aa_init_db
@@ -582,8 +659,8 @@ aa_schema_version <- function(conn) {
 #'   `auth_sessions` (the number of deleted tokens), `password_resets` (the
 #'   number of deleted
 #'   password recovery tokens), `registrations` (the number of deleted pending
-#'   registrations) and `oauth_states` (the number of deleted sign-in parameters
-#'   for Google).
+#'   registrations), `oauth_states` (the number of deleted sign-in parameters
+#'   for Google) and `cookie_tickets` (the number of deleted cookie tickets).
 #' @export
 #'
 #' @examples
@@ -646,12 +723,23 @@ aa_cleanup <- function(conn, settings = aa_settings()) {
     error = function(e) 0L
   )
 
+  tickets <- tryCatch(
+    aa_execute(
+      conn,
+      "DELETE FROM cookie_tickets
+       WHERE expires_at < ? OR consumed_at IS NOT NULL",
+      params = list(aa_utc())
+    ),
+    error = function(e) 0L
+  )
+
   invisible(list(
     login_attempts = attempts,
     auth_sessions = sessions,
     password_resets = resets,
     registrations = registrations,
-    oauth_states = oauth
+    oauth_states = oauth,
+    cookie_tickets = tickets
   ))
 }
 
