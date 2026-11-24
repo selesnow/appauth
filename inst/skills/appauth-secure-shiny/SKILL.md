@@ -1,11 +1,7 @@
 ---
 name: appauth-secure-shiny
-description: Step-by-step guide to secure authentication and hardening of Shiny apps with appauth. Helps add login, roles, permissions and user management, migrate home-grown auth and plaintext passwords, add Google sign-in (OIDC/SSO), and run a security audit (SQL injection, XSS, JS/runjs injection, secrets, UI-only permissions, user-controlled paths, SameSite/Secure cookies, HTTPS, nginx), with checklists and tests. ALWAYS activate when asked to add or rework Shiny login, username/password, roles, permissions, lockouts or sessions, to protect an app, or to audit its security, even if appauth is not named. Do NOT use for script authentication to Google APIs, plain R scripts or packages without Shiny. Function reference comes from the sibling appauth skill shipped in the same package.
+description: Step-by-step guide to secure authentication and hardening of Shiny apps with appauth. Helps add login, roles, permissions and user management, migrate home-grown auth and plaintext passwords, add Google sign-in (OIDC/SSO), opt-in self-registration by email or on first Google sign-in, and run a security audit (SQL injection, XSS, JS/runjs injection, secrets, UI-only permissions, user-controlled paths, SameSite/Secure cookies, HTTPS, nginx), with checklists and tests. ALWAYS activate when asked to add or rework Shiny login, username/password, roles, permissions, lockouts or sessions, to protect an app, or to audit its security, even if appauth is not named. Do NOT use for script authentication to Google APIs, plain R scripts or packages without Shiny. Function reference comes from the sibling appauth skill shipped in the same package.
 ---
-
-## When to activate (full rules)
-
-Step-by-step guide to secure authentication and hardening of Shiny apps with the appauth package. Helps implement login, roles, permissions and user management with appauth, migrate custom (home-grown) authentication and plaintext passwords, add Google sign-in (SSO, OpenID Connect), run a security audit of your own or someone else's app (SQL injection, XSS, runjs and JS injection, secrets in code, permissions enforced only in the UI, user-controlled paths from input, cookie SameSite/Secure, HTTPS, nginx), and produce a checklist and tests. ALWAYS activate this skill when asked to add or rework login, username and password, roles, permissions, lockouts or sessions in a Shiny app, to protect it, to check its security or to audit it, even if appauth is not named. Do NOT use for authenticating scripts against Google APIs (Sheets, Drive, BigQuery), for security of plain R scripts and packages without Shiny. Function reference for the package comes from the sibling reference skill `appauth` (it ships in the same package, inst/skills/appauth).
 
 # Secure authentication in Shiny apps
 
@@ -42,6 +38,7 @@ Ask the questions whose answers change the decision (no more than one or two rou
 * Is there a **custom users table** and **plaintext passwords**? Are there open sessions that must not be lost (which cookie name was used)?
 * Where is the app **hosted** (server with nginx and HTTPS, Docker/Linux, locally)? Who configures the proxy?
 * Is **Google sign-in** needed (single sign-on for Workspace staff)? Does the app have a domain with HTTPS, are there rights to an OAuth client in Google Cloud, should password login stay as a fallback?
+* Is **self-registration** needed (email confirmation or immediate creation, allowed domains, role, hourly limit), including automatic viewer creation on the first verified Google sign-in?
 * **UI language** (ru or en)? Are custom texts needed?
 * Is a **custom field or block in the user card** (slot) needed, i.e. extra user data?
 * Who is the **first administrator** and how is it created?
@@ -63,6 +60,7 @@ Ask the questions whose answers change the decision (no more than one or two rou
    8. Logging via the `on_event` hook and toggles: `recipes/logging-toggles.md`.
    9. Personal cabinet (password change, sign out on all devices with confirmation): `recipes/personal-cabinet.md`.
    9c. Google sign-in, single sign-on SSO (if needed, off by default; requires a domain with HTTPS and appauth 0.7.0+): `recipes/google-login.md`.
+   9e. Self-registration (if needed, off by default; requires appauth 0.11.0+): settings `registration_enabled`, `registration_verify_email`, `registration_domains`, `registration_role`, `registration_max_per_hour` and `google_signup`; token flow, generic responses and cleanup are in the `appauth` skill, section "Self-registration" and `references/api-self-registration.md`.
    9b. Two-factor authentication (if needed, off by default): `recipes/two-factor.md`.
    9a. Password recovery by email (if needed, off by default): `recipes/password-reset.md`.
    9d. A different database instead of SQLite (MySQL / MariaDB, PostgreSQL, DuckDB; requires appauth 0.8.0+): `recipes/other-databases.md`.
@@ -144,6 +142,7 @@ Everything else (mistakes in using package functions) is in the `appauth` skill.
 | `references/recipes/legacy-migration.md` | mode B: migration from custom authentication and plaintext passwords |
 | `references/recipes/personal-cabinet.md` | password change, sign-out on all devices |
 | `references/recipes/google-login.md` | Google sign-in (SSO): domain and HTTPS, OAuth client, settings, domains, disabling the password, diagnosing rejections, limitations |
+| `references/api-self-registration.md` (in the `appauth` skill) | opt-in self-registration: settings, email confirmation or immediate creation, allowed domains, role, hourly limit, generic responses and cleanup |
 | `references/recipes/two-factor.md` | TOTP two-factor authentication: encryption key, profile block, lost phone, limitations |
 | `references/recipes/password-reset.md` | password recovery by email: sending the message, `reset_base_url`, user addresses, limitations |
 | `references/recipes/docker-deployment.md` | Docker and Linux, `renv`, volumes |

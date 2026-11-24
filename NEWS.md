@@ -1,3 +1,16 @@
+# 2026-11-24 | OPENCODE (Alsey)
+Brought the bundled AI skills into compliance with the skill-creator rules:
+shortened both descriptions, removed duplicated activation sections, corrected
+the Google self-signup statement in the `appauth` reference and documented
+opt-in self-registration in the `appauth-secure-shiny` guide (interview question,
+implementation step and reference table). `quick_validate.py` passes for both
+skills. No API or schema changes.
+
+# appauth 0.11.2
+
+Documentation-only patch: refreshes the bundled AI skills and their references.
+No runtime code or schema changes; tests and `R CMD check` pass.
+
 # 2026-11-23 | OPENCODE (Alsey)
 Fixed a MySQL write-lock leak in `0.11.1`: `RELEASE_LOCK()` was called with a
 bound parameter and RMariaDB silently ignored it, so a second connection could

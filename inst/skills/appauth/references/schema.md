@@ -1,6 +1,6 @@
 # appauth database schema
 
-Package version: 0.11.1, schema version: 10. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
+Package version: 0.11.2, schema version: 10. The description was produced from a real SQLite database after `aa_init_db()`; other databases have the same tables and columns, the types are shown in the "Types per database" section.
 
 The package owns eight tables. It does not touch the other tables of the application.
 
